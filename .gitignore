@@ -1,0 +1,17 @@
+# dependencies / build
+node_modules/
+dist/
+
+# environment (TMDB key)
+.env
+.env.local
+
+# personal watch history - keep your own data out of the public repo
+data/
+gdpr-data.zip
+tvtime_import.json
+watchnext-backup-*.json
+
+# misc
+.DS_Store
+*.log
