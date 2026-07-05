@@ -1,12 +1,32 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { useStore } from '../store/useStore.js';
 import { setTmdbKey, importTvTime, getState, resetAll } from '../store/db.js';
+import {
+  isCloudAvailable,
+  getCloudUser,
+  subscribeCloudUser,
+  signIn,
+  signOutCloud,
+} from '../store/cloud.js';
 
 export default function Settings() {
   const state = useStore();
   const [key, setKey] = useState(state.settings.tmdbKey || '');
   const [msg, setMsg] = useState('');
   const fileRef = useRef();
+  const cloudUser = useSyncExternalStore(subscribeCloudUser, getCloudUser);
+  const [cloudBusy, setCloudBusy] = useState(false);
+
+  async function handleSignIn() {
+    setCloudBusy(true);
+    try {
+      await signIn();
+    } catch (err) {
+      alert('Sign-in failed: ' + err.message);
+    } finally {
+      setCloudBusy(false);
+    }
+  }
 
   function saveKey() {
     setTmdbKey(key);
@@ -57,6 +77,38 @@ export default function Settings() {
 
   return (
     <div>
+      <h2 className="section">Sync across devices</h2>
+      {!isCloudAvailable() && (
+        <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+          Cloud sync isn't configured for this deployment yet — see the README
+          for setup. Until then, use the backup file below to move data
+          between devices.
+        </p>
+      )}
+      {isCloudAvailable() && !cloudUser && (
+        <>
+          <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+            Sign in with Google to keep this browser and every other device
+            you sign into showing the same watch history automatically.
+          </p>
+          <button className="btn primary" onClick={handleSignIn} disabled={cloudBusy}>
+            {cloudBusy ? 'Opening sign-in…' : 'Sign in with Google'}
+          </button>
+        </>
+      )}
+      {isCloudAvailable() && cloudUser && (
+        <>
+          <p style={{ fontSize: 13.5 }}>
+            Signed in as <strong>{cloudUser.email}</strong>. Changes here sync
+            to the cloud automatically and appear on your other signed-in
+            devices within a few seconds.
+          </p>
+          <button className="btn" onClick={() => signOutCloud()}>
+            Sign out
+          </button>
+        </>
+      )}
+
       <h2 className="section">TMDB API key</h2>
       <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
         Show posters, episode lists and air dates come from The Movie Database.

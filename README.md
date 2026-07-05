@@ -40,6 +40,39 @@ WatchNext imports that export and keeps tracking going: no accounts, no server, 
 
    Then in the app: Settings → Choose import file → select `tvtime_import.json`. Finally, on the Shows tab, press **Sync with TMDB** to resolve every show (the export uses TVDB IDs; the app maps them to TMDB via the `/find` endpoint) and load posters, episode counts and air dates.
 
+## Cloud sync (optional, but recommended)
+
+By default your data lives only in the current browser's storage — great for
+privacy, but it means switching devices loses your history unless you use the
+manual backup/import above every time.
+
+WatchNext can optionally sync across devices via Firebase, using Google
+sign-in so it's still only you accessing your own data (enforced by
+`firestore.rules`, not by hiding any keys).
+
+**One-time setup:**
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) → **Add project** → name it anything (e.g. `watchnext`) → skip Google Analytics (not needed) → Create.
+2. **Build → Authentication** → Get started → enable **Google** as a sign-in provider → Save.
+3. **Build → Firestore Database** → Create database → start in **production mode** → pick any region → Enable.
+4. In Firestore, go to the **Rules** tab, replace the contents with everything in `firestore.rules` from this repo, and click **Publish**.
+5. Go to **Project settings** (gear icon) → scroll to "Your apps" → click the **</>** (web) icon → register an app (any nickname) → you'll be shown a `firebaseConfig` object.
+6. Copy those values into a `.env` file in the project root (copy `.env.example` to `.env` first):
+   ```
+   VITE_FIREBASE_API_KEY=...
+   VITE_FIREBASE_AUTH_DOMAIN=...
+   VITE_FIREBASE_PROJECT_ID=...
+   VITE_FIREBASE_STORAGE_BUCKET=...
+   VITE_FIREBASE_MESSAGING_SENDER_ID=...
+   VITE_FIREBASE_APP_ID=...
+   ```
+7. Rebuild and redeploy: `npm run deploy`.
+8. In **Authentication → Settings → Authorized domains**, add your GitHub Pages domain (e.g. `aceasif.github.io`) if it isn't already listed — otherwise Google sign-in will reject the popup.
+
+After that, open the deployed app → Settings → **Sign in with Google**. Your existing local data merges into the cloud automatically, and any other device that signs in with the same Google account will pick up the same shows and watched episodes within a few seconds of any change.
+
+Cost: Firebase's free "Spark" plan covers this comfortably — a single-user watch history is a tiny fraction of the free Firestore read/write quota.
+
 ## Deploying
 
 `npm run build` produces a static `dist/` folder. Host it anywhere static files go: GitHub Pages, Netlify, Cloudflare Pages, or a home server. Because storage is per-browser, use Settings → Download backup to move history between devices.

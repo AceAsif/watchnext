@@ -51,6 +51,31 @@ export function update(mutator) {
 }
 
 // ---------------------------------------------------------------------------
+// Dirty tracking for cloud sync (see store/cloud.js).
+// Mutations below call markShowDirty()/markMoviesDirty() so the sync layer
+// knows what changed since its last flush, without re-uploading everything.
+// ---------------------------------------------------------------------------
+
+let dirtyShows = new Set();
+let dirtyMovies = false;
+
+export function markShowDirty(id) {
+  dirtyShows.add(id);
+}
+
+export function markMoviesDirty() {
+  dirtyMovies = true;
+}
+
+export function takeDirty() {
+  const showIds = dirtyShows;
+  const movies = dirtyMovies;
+  dirtyShows = new Set();
+  dirtyMovies = false;
+  return { showIds, movies };
+}
+
+// ---------------------------------------------------------------------------
 // Show helpers
 // ---------------------------------------------------------------------------
 
@@ -99,6 +124,7 @@ export function toggleFollow(id) {
     const show = s.shows[id];
     if (show) s.shows[id] = { ...show, followed: !show.followed };
   });
+  markShowDirty(id);
 }
 
 export function markEpisode(id, season, episode, runtimeMin, watched = true) {
@@ -114,6 +140,7 @@ export function markEpisode(id, season, episode, runtimeMin, watched = true) {
     }
     s.shows[id] = { ...show, watched: map };
   });
+  markShowDirty(id);
 }
 
 export function markSeason(id, season, episodes, watched = true) {
@@ -135,12 +162,13 @@ export function markSeason(id, season, episodes, watched = true) {
     }
     s.shows[id] = { ...show, watched: map };
   });
+  markShowDirty(id);
 }
 
 export function addShowFromTmdb(details) {
   // details: TMDB /tv/{id} response
+  const id = `tmdb:${details.id}`;
   update((s) => {
-    const id = `tmdb:${details.id}`;
     if (s.shows[id]) {
       s.shows[id] = { ...s.shows[id], followed: true };
       return;
@@ -154,6 +182,7 @@ export function addShowFromTmdb(details) {
       ...tmdbFields(details),
     };
   });
+  markShowDirty(id);
 }
 
 export function tmdbFields(d) {
@@ -185,6 +214,7 @@ export function applyTmdbDetails(id, details) {
     if (!show) return;
     s.shows[id] = { ...show, ...tmdbFields(details) };
   });
+  markShowDirty(id);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,9 +224,11 @@ export function applyTmdbDetails(id, details) {
 export function importTvTime(json) {
   let shows = 0;
   let watches = 0;
+  const touchedIds = [];
   update((s) => {
     for (const src of json.shows || []) {
       const id = `tvdb:${src.tvdbId}`;
+      touchedIds.push(id);
       const existing = s.shows[id] || {
         tvdbId: src.tvdbId,
         name: src.name,
@@ -230,6 +262,8 @@ export function importTvTime(json) {
       }
     }
   });
+  touchedIds.forEach(markShowDirty);
+  if ((json.movies || []).length) markMoviesDirty();
   return { shows, watches };
 }
 

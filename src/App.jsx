@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import UpNext from './pages/UpNext.jsx';
 import ShowDetail from './pages/ShowDetail.jsx';
+import { initCloudSync } from './store/cloud.js';
 import Shows from './pages/Shows.jsx';
 import Stats from './pages/Stats.jsx';
 import Settings from './pages/Settings.jsx';
@@ -49,6 +50,11 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState('next');
   const [showOpen, setShowOpen] = useState(null); // show id or null
+
+  useEffect(() => {
+    const unsub = initCloudSync();
+    return unsub;
+  }, []);
 
   const openShow = (id) => setShowOpen(id);
   const closeShow = () => setShowOpen(null);
