@@ -34,6 +34,14 @@ export function searchShows(query) {
   return get('/search/tv', { query });
 }
 
+export function searchMovies(query) {
+  return get('/search/movie', { query });
+}
+
+export function movieDetails(tmdbId) {
+  return get(`/movie/${tmdbId}`);
+}
+
 export async function findByTvdb(tvdbId) {
   const data = await get(`/find/${tvdbId}`, { external_source: 'tvdb_id' });
   return (data.tv_results && data.tv_results[0]) || null;

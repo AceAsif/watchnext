@@ -271,3 +271,43 @@ export function resetAll() {
   state = empty();
   commit();
 }
+
+// ---------------------------------------------------------------------------
+// Movie mutations. Movies are a flat list: imported TV Time entries have just
+// name/watchedAt/runtimeMin; movies added in-app (or matched later) also carry
+// tmdbId, poster and year.
+// ---------------------------------------------------------------------------
+
+export function addMovieWatched(details) {
+  // details: TMDB /movie/{id} response
+  update((s) => {
+    const already = s.movies.some((m) => m.tmdbId === details.id);
+    if (already) return;
+    s.movies = [
+      ...s.movies,
+      {
+        tmdbId: details.id,
+        name: details.title,
+        watchedAt: new Date().toISOString(),
+        runtimeMin: details.runtime || null,
+        poster: details.poster_path || null,
+        year: (details.release_date || '').slice(0, 4) || null,
+      },
+    ];
+  });
+  markMoviesDirty();
+}
+
+export function removeMovie(index) {
+  update((s) => {
+    s.movies = s.movies.filter((_, i) => i !== index);
+  });
+  markMoviesDirty();
+}
+
+export function updateMovie(index, patch) {
+  update((s) => {
+    s.movies = s.movies.map((m, i) => (i === index ? { ...m, ...patch } : m));
+  });
+  markMoviesDirty();
+}
