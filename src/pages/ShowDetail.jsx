@@ -8,7 +8,7 @@ import {
   applyTmdbDetails,
   watchedCount,
 } from '../store/db.js';
-import { seasonDetails, resolveShow, hasKey, img } from '../api/tmdb.js';
+import { seasonDetails, resolveShow, searchShows, showDetails, hasKey, img } from '../api/tmdb.js';
 
 function Check({ on, onClick, label }) {
   return (
@@ -104,6 +104,32 @@ export default function ShowDetail({ id, onBack }) {
   const state = useStore();
   const show = state.shows[id];
   const [syncing, setSyncing] = useState(false);
+  const [fixing, setFixing] = useState(false);
+  const [fixQuery, setFixQuery] = useState('');
+  const [fixResults, setFixResults] = useState(null);
+
+  async function runFixSearch(e) {
+    e && e.preventDefault();
+    if (!fixQuery.trim()) return;
+    try {
+      const data = await searchShows(fixQuery.trim());
+      setFixResults(data.results || []);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function linkTo(result) {
+    try {
+      const details = await showDetails(result.id);
+      applyTmdbDetails(id, details);
+      setFixing(false);
+      setFixResults(null);
+      setFixQuery('');
+    } catch (err) {
+      alert(err.message);
+    }
+  }
 
   useEffect(() => {
     // Auto-sync a show that has never been resolved against TMDB.
@@ -150,10 +176,63 @@ export default function ShowDetail({ id, onBack }) {
             <button className="btn" onClick={() => toggleFollow(id)}>
               {show.followed ? 'Unfollow' : 'Follow'}
             </button>
+            {hasKey() && (
+              <button
+                className="btn"
+                onClick={() => {
+                  setFixing(!fixing);
+                  setFixQuery(show.name);
+                  setFixResults(null);
+                }}
+              >
+                Fix match
+              </button>
+            )}
             {syncing && <span className="muted">Syncing with TMDB…</span>}
           </div>
         </div>
       </div>
+
+      {fixing && (
+        <div className="notice accent">
+          <p style={{ marginTop: 0 }}>
+            Search TMDB and pick the correct show. Your watch history stays;
+            only the poster, episode data and air dates get relinked.
+          </p>
+          <form onSubmit={runFixSearch} className="row">
+            <input
+              type="search"
+              value={fixQuery}
+              onChange={(e) => setFixQuery(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button className="btn" type="submit">Search</button>
+          </form>
+          {fixResults &&
+            (fixResults.length === 0 ? (
+              <p className="muted">No results — try a different name (e.g. the English title).</p>
+            ) : (
+              fixResults.slice(0, 6).map((r) => (
+                <div key={r.id} className="next-row" style={{ cursor: 'default', marginTop: 10 }}>
+                  {r.poster_path ? (
+                    <img src={img(r.poster_path, 'w154')} alt="" />
+                  ) : (
+                    <div className="thumb" />
+                  )}
+                  <div className="info">
+                    <div className="name">{r.name}</div>
+                    <div className="detail">
+                      {(r.first_air_date || '').slice(0, 4) || 'unknown year'}
+                    </div>
+                  </div>
+                  <button className="btn primary" onClick={() => linkTo(r)}>
+                    Link this
+                  </button>
+                </div>
+              ))
+            ))}
+        </div>
+      )}
 
       {!show.seasons?.length && !syncing && (
         <div className="notice">
