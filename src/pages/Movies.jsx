@@ -20,8 +20,12 @@ export default function Movies() {
     [state.movies]
   );
 
+  // Needs matching if it has no poster yet, or its name contains non-Latin
+  // characters (imported titles in other languages get renamed to English).
+  const needsMatch = (m) => !m.poster || /[^\u0000-\u024F]/.test(m.name);
+
   const unmatched = useMemo(
-    () => state.movies.filter((m) => !m.poster).length,
+    () => state.movies.filter(needsMatch).length,
     [state.movies]
   );
 
@@ -57,7 +61,7 @@ export default function Movies() {
   async function matchPosters() {
     const targets = state.movies
       .map((m, index) => ({ ...m, index }))
-      .filter((m) => !m.poster);
+      .filter(needsMatch);
     setMatch({ done: 0, total: targets.length });
     let done = 0;
     for (const m of targets) {
@@ -67,6 +71,7 @@ export default function Movies() {
         if (hit) {
           updateMovie(m.index, {
             tmdbId: hit.id,
+            name: hit.title || m.name, // normalize to English title
             poster: hit.poster_path || null,
             year: (hit.release_date || '').slice(0, 4) || null,
           });
