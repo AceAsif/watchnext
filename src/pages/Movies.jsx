@@ -9,6 +9,38 @@ export default function Movies() {
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
   const [match, setMatch] = useState(null); // {done, total} while matching posters
+  const [fixIndex, setFixIndex] = useState(null); // movie index being fixed
+  const [fixQuery, setFixQuery] = useState('');
+  const [fixResults, setFixResults] = useState(null);
+
+  async function runFixSearch(e) {
+    e && e.preventDefault();
+    if (!fixQuery.trim()) return;
+    try {
+      const data = await searchMovies(fixQuery.trim());
+      setFixResults(data.results || []);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function linkMovie(r) {
+    try {
+      const details = await movieDetails(r.id);
+      updateMovie(fixIndex, {
+        tmdbId: details.id,
+        name: details.title,
+        poster: details.poster_path || null,
+        year: (details.release_date || '').slice(0, 4) || null,
+        runtimeMin: details.runtime || null,
+      });
+      setFixIndex(null);
+      setFixResults(null);
+      setFixQuery('');
+    } catch (err) {
+      alert(err.message);
+    }
+  }
 
   // Newest watches first; remember each movie's index in the real array so
   // remove/update target the right entry after sorting.
@@ -155,30 +187,82 @@ export default function Movies() {
       )}
 
       {movies.map((m) => (
-        <div key={`${m.name}|${m.watchedAt}|${m.index}`} className="next-row" style={{ cursor: 'default' }}>
-          {m.poster ? (
-            <img src={img(m.poster, 'w154')} alt="" loading="lazy" />
-          ) : (
-            <div className="thumb" />
-          )}
-          <div className="info">
-            <div className="name">{m.name}</div>
-            <div className="detail">
-              {m.year ? `${m.year} · ` : ''}
-              watched {(m.watchedAt || '').slice(0, 10) || 'sometime'}
+        <React.Fragment key={`${m.name}|${m.watchedAt}|${m.index}`}>
+          <div className="next-row" style={{ cursor: 'default' }}>
+            {m.poster ? (
+              <img src={img(m.poster, 'w154')} alt="" loading="lazy" />
+            ) : (
+              <div className="thumb" />
+            )}
+            <div className="info">
+              <div className="name">{m.name}</div>
+              <div className="detail">
+                {m.year ? `${m.year} · ` : ''}
+                watched {(m.watchedAt || '').slice(0, 10) || 'sometime'}
+              </div>
             </div>
+            <button
+              className="btn"
+              onClick={() => {
+                setFixIndex(fixIndex === m.index ? null : m.index);
+                setFixQuery(m.name);
+                setFixResults(null);
+              }}
+            >
+              Fix
+            </button>
+            <button
+              className="btn danger"
+              onClick={() => {
+                if (confirm(`Remove "${m.name}" from your watched movies?`)) {
+                  removeMovie(m.index);
+                }
+              }}
+            >
+              Remove
+            </button>
           </div>
-          <button
-            className="btn danger"
-            onClick={() => {
-              if (confirm(`Remove "${m.name}" from your watched movies?`)) {
-                removeMovie(m.index);
-              }
-            }}
-          >
-            Remove
-          </button>
-        </div>
+          {fixIndex === m.index && (
+            <div className="notice accent">
+              <p style={{ marginTop: 0 }}>
+                Search TMDB and pick the correct movie — try the English title
+                (e.g. "Tiger Zinda Hai"). Your watch date stays.
+              </p>
+              <form onSubmit={runFixSearch} className="row">
+                <input
+                  type="search"
+                  value={fixQuery}
+                  onChange={(e) => setFixQuery(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button className="btn" type="submit">Search</button>
+              </form>
+              {fixResults &&
+                (fixResults.length === 0 ? (
+                  <p className="muted">No results — try another spelling or the English title.</p>
+                ) : (
+                  fixResults.slice(0, 6).map((r) => (
+                    <div key={r.id} className="next-row" style={{ cursor: 'default', marginTop: 10 }}>
+                      {r.poster_path ? (
+                        <img src={img(r.poster_path, 'w154')} alt="" />
+                      ) : (
+                        <div className="thumb" />
+                      )}
+                      <div className="info">
+                        <div className="name">{r.title}</div>
+                        <div className="detail">
+                          {(r.release_date || '').slice(0, 4) || 'unknown year'}
+                        </div>
+                      </div>
+                      <button className="btn primary" onClick={() => linkMovie(r)}>
+                        Link this
+                      </button>
+                    </div>
+                  ))
+                ))}
+            </div>
+          )}
+        </React.Fragment>
       ))}
     </div>
   );
