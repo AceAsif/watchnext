@@ -197,6 +197,7 @@ export function tmdbFields(d) {
     backdrop: d.backdrop_path || null,
     status: d.status || null,
     totalEpisodes: d.number_of_episodes || null,
+    genres: (d.genres || []).map((g) => g.name),
     seasons: (d.seasons || [])
       .filter((x) => x.season_number > 0)
       .map((x) => ({ n: x.season_number, count: x.episode_count })),

@@ -28,10 +28,15 @@ export default function Stats() {
     let minutes = 0;
     const perShow = [];
     const perYear = {};
+    const moviesPerYear = {};
+    const perGenre = {};
+    let finished = 0;
+    let inProgress = 0;
+    let notStarted = 0;
+    let genreDataMissing = 0;
 
     for (const show of Object.values(state.shows)) {
       const entries = Object.values(show.watched || {});
-      if (!entries.length) continue;
       let count = 0;
       for (const w of entries) {
         const n = w.n || 1;
@@ -43,15 +48,48 @@ export default function Stats() {
           perYear[y] = (perYear[y] || 0) + n;
         }
       }
-      perShow.push({ label: show.name, value: count });
+      if (entries.length) perShow.push({ label: show.name, value: count });
+
+      // Completion buckets (followed shows only, so the numbers match Library)
+      if (show.followed) {
+        const seen = entries.length;
+        const total = show.totalEpisodes;
+        if (total && seen >= total) finished++;
+        else if (seen > 0) inProgress++;
+        else notStarted++;
+      }
+
+      // Genre tally, weighted by episodes watched of that show
+      if (count > 0) {
+        if (show.genres && show.genres.length) {
+          for (const g of show.genres) {
+            perGenre[g] = (perGenre[g] || 0) + count;
+          }
+        } else {
+          genreDataMissing++;
+        }
+      }
     }
 
     let movieMinutes = 0;
-    for (const m of state.movies) movieMinutes += m.runtimeMin || 110;
+    for (const m of state.movies) {
+      movieMinutes += m.runtimeMin || 110;
+      if (m.watchedAt) {
+        const y = m.watchedAt.slice(0, 4);
+        moviesPerYear[y] = (moviesPerYear[y] || 0) + 1;
+      }
+    }
 
     perShow.sort((a, b) => b.value - a.value);
     const years = Object.entries(perYear)
       .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([label, value]) => ({ label, value }));
+    const movieYears = Object.entries(moviesPerYear)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([label, value]) => ({ label, value }));
+    const genres = Object.entries(perGenre)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
       .map(([label, value]) => ({ label, value }));
 
     return {
@@ -63,6 +101,14 @@ export default function Stats() {
       movieHours: Math.round(movieMinutes / 60),
       topShows: perShow.slice(0, 12),
       years,
+      movieYears,
+      genres,
+      genreDataMissing,
+      completion: [
+        { label: 'Finished', value: finished },
+        { label: 'Watching', value: inProgress },
+        { label: 'Not started', value: notStarted },
+      ],
     };
   }, [state.shows, state.movies]);
 
@@ -117,6 +163,34 @@ export default function Stats() {
           <h2 className="section">Episodes per year</h2>
           <Bars rows={s.years} />
         </>
+      )}
+
+      {s.movieYears.length > 0 && (
+        <>
+          <h2 className="section">Movies per year</h2>
+          <Bars rows={s.movieYears} />
+        </>
+      )}
+
+      <h2 className="section">Library completion</h2>
+      <Bars rows={s.completion} />
+
+      <h2 className="section">Genres</h2>
+      {s.genres.length > 0 ? (
+        <>
+          <Bars rows={s.genres} unit=" eps" />
+          {s.genreDataMissing > 0 && (
+            <p className="muted" style={{ fontSize: 13 }}>
+              {s.genreDataMissing} shows have no genre data yet — run "Refresh
+              all from TMDB" on the Shows tab to fill them in.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="muted" style={{ fontSize: 13.5 }}>
+          No genre data yet. Run "Refresh all from TMDB" on the Shows tab
+          once, and genres will appear here.
+        </p>
       )}
     </div>
   );
