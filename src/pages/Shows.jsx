@@ -37,6 +37,16 @@ export default function Shows({ openShow }) {
     [state.shows]
   );
 
+  const followedTmdbIds = useMemo(
+    () =>
+      new Set(
+        Object.values(state.shows)
+          .filter((s) => s.followed && s.tmdbId)
+          .map((s) => s.tmdbId)
+      ),
+    [state.shows]
+  );
+
   async function runSearch(e) {
     e && e.preventDefault();
     if (!query.trim()) return;
@@ -121,9 +131,15 @@ export default function Shows({ openShow }) {
                   {(r.first_air_date || '').slice(0, 4) || 'unknown year'}
                 </div>
               </div>
-              <button className="btn primary" onClick={() => addFromSearch(r)} disabled={busy}>
-                Follow
-              </button>
+              {followedTmdbIds.has(r.id) ? (
+                <button className="btn" disabled>
+                  Following
+                </button>
+              ) : (
+                <button className="btn primary" onClick={() => addFromSearch(r)} disabled={busy}>
+                  Follow
+                </button>
+              )}
             </div>
           ))}
           <button className="btn" onClick={() => setResults(null)}>

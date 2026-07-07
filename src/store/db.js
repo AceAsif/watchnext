@@ -167,7 +167,12 @@ export function markSeason(id, season, episodes, watched = true) {
 
 export function addShowFromTmdb(details) {
   // details: TMDB /tv/{id} response
-  const id = `tmdb:${details.id}`;
+  // If a show with this TMDB id already exists (e.g. imported from TV Time
+  // under a tvdb: key and synced), follow that record instead of duplicating.
+  const existing = Object.entries(getState().shows).find(
+    ([, s]) => s.tmdbId === details.id
+  );
+  const id = existing ? existing[0] : `tmdb:${details.id}`;
   update((s) => {
     if (s.shows[id]) {
       s.shows[id] = { ...s.shows[id], followed: true };
