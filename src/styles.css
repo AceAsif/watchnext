@@ -368,6 +368,68 @@ input:focus { outline: none; border-color: var(--amber); }
 }
 .back:hover { color: var(--amber); }
 
+/* ------------------------------------------------ movie rows */
+/* Unlike .next-row, the title is never truncated: it wraps onto as many
+   lines as it needs and the buttons sit underneath, which matters on
+   narrow phone screens where long film titles were being clipped. */
+.movie-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  margin-bottom: 10px;
+}
+.movie-row > img,
+.movie-row > .thumb {
+  width: 56px;
+  height: 84px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--bg-raise);
+  flex: none;
+}
+.movie-row .info { flex: 1; min-width: 0; }
+.movie-row .name {
+  font-weight: 600;
+  font-size: 14.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.movie-row .detail {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.movie-row .actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+}
+.movie-row .actions .btn {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+.movie-overview {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin: 8px 0 0;
+}
+.movie-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 8px;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .poster-card .poster, .next-row { transition: border-color 0.15s ease, transform 0.15s ease; }
   .poster-card:hover .poster { transform: translateY(-2px); border-color: var(--amber); }

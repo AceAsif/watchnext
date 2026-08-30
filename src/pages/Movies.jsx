@@ -12,6 +12,26 @@ export default function Movies() {
   const [fixIndex, setFixIndex] = useState(null); // movie index being fixed
   const [fixQuery, setFixQuery] = useState('');
   const [fixResults, setFixResults] = useState(null);
+  const [openIndex, setOpenIndex] = useState(null); // movie index showing details
+  const [details, setDetails] = useState({}); // tmdbId -> TMDB movie details
+
+  // Overviews are fetched on demand rather than stored: they're always
+  // re-queryable from TMDB, and keeping 395 of them in local storage would
+  // bloat the saved state for no real gain.
+  async function toggleDetails(m) {
+    if (openIndex === m.index) {
+      setOpenIndex(null);
+      return;
+    }
+    setOpenIndex(m.index);
+    if (!m.tmdbId || details[m.tmdbId]) return;
+    try {
+      const d = await movieDetails(m.tmdbId);
+      setDetails((prev) => ({ ...prev, [m.tmdbId]: d }));
+    } catch (err) {
+      setDetails((prev) => ({ ...prev, [m.tmdbId]: { error: err.message } }));
+    }
+  }
 
   async function runFixSearch(e) {
     e && e.preventDefault();
@@ -158,7 +178,7 @@ export default function Movies() {
           {results.slice(0, 10).map((r) => {
             const seen = watchedByTmdb.get(r.id);
             return (
-              <div key={r.id} className="next-row" style={{ cursor: 'default' }}>
+              <div key={r.id} className="movie-row">
                 {r.poster_path ? (
                   <img src={img(r.poster_path, 'w154')} alt="" />
                 ) : (
@@ -178,25 +198,34 @@ export default function Movies() {
                       </>
                     )}
                   </div>
+                  {r.overview ? (
+                    <p className="movie-overview">
+                      {r.overview.length > 220
+                        ? r.overview.slice(0, 220).trimEnd() + '…'
+                        : r.overview}
+                    </p>
+                  ) : null}
+                  <div className="actions">
+                    {seen ? (
+                      <button
+                        className="btn"
+                        onClick={() => addFromSearch(r, true)}
+                        disabled={busy}
+                        title="Add another watch with today's date"
+                      >
+                        Log rewatch
+                      </button>
+                    ) : (
+                      <button
+                        className="btn primary"
+                        onClick={() => addFromSearch(r)}
+                        disabled={busy}
+                      >
+                        Watched it
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {seen ? (
-                  <button
-                    className="btn"
-                    onClick={() => addFromSearch(r, true)}
-                    disabled={busy}
-                    title="Add another watch with today's date"
-                  >
-                    Log rewatch
-                  </button>
-                ) : (
-                  <button
-                    className="btn primary"
-                    onClick={() => addFromSearch(r)}
-                    disabled={busy}
-                  >
-                    Watched it
-                  </button>
-                )}
               </div>
             );
           })}
@@ -227,84 +256,132 @@ export default function Movies() {
         </p>
       )}
 
-      {movies.map((m) => (
-        <React.Fragment key={`${m.name}|${m.watchedAt}|${m.index}`}>
-          <div className="next-row" style={{ cursor: 'default' }}>
-            {m.poster ? (
-              <img src={img(m.poster, 'w154')} alt="" loading="lazy" />
-            ) : (
-              <div className="thumb" />
-            )}
-            <div className="info">
-              <div className="name">{m.name}</div>
-              <div className="detail">
-                {m.year ? `${m.year} · ` : ''}
-                watched {(m.watchedAt || '').slice(0, 10) || 'sometime'}
+      {movies.map((m) => {
+        const d = m.tmdbId ? details[m.tmdbId] : null;
+        const isOpen = openIndex === m.index;
+        return (
+          <React.Fragment key={`${m.name}|${m.watchedAt}|${m.index}`}>
+            <div className="movie-row">
+              {m.poster ? (
+                <img src={img(m.poster, 'w154')} alt="" loading="lazy" />
+              ) : (
+                <div className="thumb" />
+              )}
+              <div className="info">
+                <div className="name">{m.name}</div>
+                <div className="detail">
+                  {m.year ? `${m.year} · ` : ''}
+                  watched {(m.watchedAt || '').slice(0, 10) || 'sometime'}
+                </div>
+
+                {isOpen && (
+                  <>
+                    {!m.tmdbId ? (
+                      <p className="movie-overview">
+                        Not linked to TMDB yet — use Fix to match it, then
+                        details will load here.
+                      </p>
+                    ) : !d ? (
+                      <p className="movie-overview">Loading details…</p>
+                    ) : d.error ? (
+                      <p className="movie-overview">Couldn't load details: {d.error}</p>
+                    ) : (
+                      <>
+                        <div className="movie-facts">
+                          {d.runtime ? <span>{d.runtime} min</span> : null}
+                          {d.vote_average ? (
+                            <span>★ {d.vote_average.toFixed(1)}</span>
+                          ) : null}
+                          {(d.genres || []).length ? (
+                            <span>{d.genres.map((g) => g.name).join(', ')}</span>
+                          ) : null}
+                          {d.release_date ? <span>{d.release_date}</span> : null}
+                        </div>
+                        {d.tagline ? (
+                          <p className="movie-overview" style={{ fontStyle: 'italic' }}>
+                            {d.tagline}
+                          </p>
+                        ) : null}
+                        <p className="movie-overview">
+                          {d.overview || 'No description available on TMDB.'}
+                        </p>
+                      </>
+                    )}
+                  </>
+                )}
+
+                <div className="actions">
+                  <button className="btn" onClick={() => toggleDetails(m)}>
+                    {isOpen ? 'Hide' : 'Details'}
+                  </button>
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      setFixIndex(fixIndex === m.index ? null : m.index);
+                      setFixQuery(m.name);
+                      setFixResults(null);
+                    }}
+                  >
+                    Fix
+                  </button>
+                  <button
+                    className="btn danger"
+                    onClick={() => {
+                      if (confirm(`Remove "${m.name}" from your watched movies?`)) {
+                        removeMovie(m.index);
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             </div>
-            <button
-              className="btn"
-              onClick={() => {
-                setFixIndex(fixIndex === m.index ? null : m.index);
-                setFixQuery(m.name);
-                setFixResults(null);
-              }}
-            >
-              Fix
-            </button>
-            <button
-              className="btn danger"
-              onClick={() => {
-                if (confirm(`Remove "${m.name}" from your watched movies?`)) {
-                  removeMovie(m.index);
-                }
-              }}
-            >
-              Remove
-            </button>
-          </div>
-          {fixIndex === m.index && (
-            <div className="notice accent">
-              <p style={{ marginTop: 0 }}>
-                Search TMDB and pick the correct movie — try the English title
-                (e.g. "Tiger Zinda Hai"). Your watch date stays.
-              </p>
-              <form onSubmit={runFixSearch} className="row">
-                <input
-                  type="search"
-                  value={fixQuery}
-                  onChange={(e) => setFixQuery(e.target.value)}
-                  style={{ flex: 1 }}
-                />
-                <button className="btn" type="submit">Search</button>
-              </form>
-              {fixResults &&
-                (fixResults.length === 0 ? (
-                  <p className="muted">No results — try another spelling or the English title.</p>
-                ) : (
-                  fixResults.slice(0, 6).map((r) => (
-                    <div key={r.id} className="next-row" style={{ cursor: 'default', marginTop: 10 }}>
-                      {r.poster_path ? (
-                        <img src={img(r.poster_path, 'w154')} alt="" />
-                      ) : (
-                        <div className="thumb" />
-                      )}
-                      <div className="info">
-                        <div className="name">{r.title}</div>
-                        <div className="detail">
-                          {(r.release_date || '').slice(0, 4) || 'unknown year'}
+            {fixIndex === m.index && (
+              <div className="notice accent">
+                <p style={{ marginTop: 0 }}>
+                  Search TMDB and pick the correct movie — try the English title
+                  (e.g. "Tiger Zinda Hai"). Your watch date stays.
+                </p>
+                <form onSubmit={runFixSearch} className="row">
+                  <input
+                    type="search"
+                    value={fixQuery}
+                    onChange={(e) => setFixQuery(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  <button className="btn" type="submit">Search</button>
+                </form>
+                {fixResults &&
+                  (fixResults.length === 0 ? (
+                    <p className="muted">No results — try another spelling or the English title.</p>
+                  ) : (
+                    fixResults.slice(0, 6).map((r) => (
+                      <div key={r.id} className="movie-row" style={{ marginTop: 10 }}>
+                        {r.poster_path ? (
+                          <img src={img(r.poster_path, 'w154')} alt="" />
+                        ) : (
+                          <div className="thumb" />
+                        )}
+                        <div className="info">
+                          <div className="name">{r.title}</div>
+                          <div className="detail">
+                            {(r.release_date || '').slice(0, 4) || 'unknown year'}
+                          </div>
+                          <div className="actions">
+                            <button className="btn primary" onClick={() => linkMovie(r)}>
+                              Link this
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <button className="btn primary" onClick={() => linkMovie(r)}>
-                        Link this
-                      </button>
-                    </div>
-                  ))
-                ))}
-            </div>
-          )}
-        </React.Fragment>
-      ))}
+                    ))
+                  ))}
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }
