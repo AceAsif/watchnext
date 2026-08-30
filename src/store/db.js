@@ -284,11 +284,12 @@ export function resetAll() {
 // tmdbId, poster and year.
 // ---------------------------------------------------------------------------
 
-export function addMovieWatched(details) {
+export function addMovieWatched(details, force = false) {
   // details: TMDB /movie/{id} response
+  // force = true logs another watch (a rewatch) as its own dated entry.
   update((s) => {
     const already = s.movies.some((m) => m.tmdbId === details.id);
-    if (already) return;
+    if (already && !force) return;
     s.movies = [
       ...s.movies,
       {

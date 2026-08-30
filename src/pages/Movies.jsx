@@ -52,6 +52,20 @@ export default function Movies() {
     [state.movies]
   );
 
+  // What's already logged, keyed by TMDB id -> { count, last }, so search
+  // results can say "already watched" instead of silently doing nothing.
+  const watchedByTmdb = useMemo(() => {
+    const map = new Map();
+    for (const m of state.movies) {
+      if (!m.tmdbId) continue;
+      const prev = map.get(m.tmdbId) || { count: 0, last: null };
+      const last =
+        !prev.last || (m.watchedAt || '') > prev.last ? m.watchedAt : prev.last;
+      map.set(m.tmdbId, { count: prev.count + 1, last });
+    }
+    return map;
+  }, [state.movies]);
+
   // Needs matching if it has no poster yet, or its name contains non-Latin
   // characters (imported titles in other languages get renamed to English).
   const needsMatch = (m) => !m.poster || /[^\u0000-\u024F]/.test(m.name);
@@ -75,11 +89,11 @@ export default function Movies() {
     }
   }
 
-  async function addFromSearch(r) {
+  async function addFromSearch(r, force = false) {
     setBusy(true);
     try {
       const details = await movieDetails(r.id);
-      addMovieWatched(details);
+      addMovieWatched(details, force);
       setResults(null);
       setQuery('');
     } catch (err) {
@@ -141,24 +155,51 @@ export default function Movies() {
         <>
           <h2 className="section">Search results</h2>
           {results.length === 0 && <p className="muted">No movies found for that search.</p>}
-          {results.slice(0, 10).map((r) => (
-            <div key={r.id} className="next-row" style={{ cursor: 'default' }}>
-              {r.poster_path ? (
-                <img src={img(r.poster_path, 'w154')} alt="" />
-              ) : (
-                <div className="thumb" />
-              )}
-              <div className="info">
-                <div className="name">{r.title}</div>
-                <div className="detail">
-                  {(r.release_date || '').slice(0, 4) || 'unknown year'}
+          {results.slice(0, 10).map((r) => {
+            const seen = watchedByTmdb.get(r.id);
+            return (
+              <div key={r.id} className="next-row" style={{ cursor: 'default' }}>
+                {r.poster_path ? (
+                  <img src={img(r.poster_path, 'w154')} alt="" />
+                ) : (
+                  <div className="thumb" />
+                )}
+                <div className="info">
+                  <div className="name">{r.title}</div>
+                  <div className="detail">
+                    {(r.release_date || '').slice(0, 4) || 'unknown year'}
+                    {seen && (
+                      <>
+                        {' · '}
+                        <span style={{ color: 'var(--teal)' }}>
+                          ✓ already logged {(seen.last || '').slice(0, 10)}
+                          {seen.count > 1 ? ` (${seen.count}×)` : ''}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
+                {seen ? (
+                  <button
+                    className="btn"
+                    onClick={() => addFromSearch(r, true)}
+                    disabled={busy}
+                    title="Add another watch with today's date"
+                  >
+                    Log rewatch
+                  </button>
+                ) : (
+                  <button
+                    className="btn primary"
+                    onClick={() => addFromSearch(r)}
+                    disabled={busy}
+                  >
+                    Watched it
+                  </button>
+                )}
               </div>
-              <button className="btn primary" onClick={() => addFromSearch(r)} disabled={busy}>
-                Watched it
-              </button>
-            </div>
-          ))}
+            );
+          })}
           <button className="btn" onClick={() => setResults(null)}>
             Clear results
           </button>
