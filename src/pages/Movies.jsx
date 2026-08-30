@@ -8,7 +8,6 @@ export default function Movies() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [match, setMatch] = useState(null); // {done, total} while matching posters
   const [fixIndex, setFixIndex] = useState(null); // movie index being fixed
   const [fixQuery, setFixQuery] = useState('');
   const [fixResults, setFixResults] = useState(null);
@@ -86,15 +85,6 @@ export default function Movies() {
     return map;
   }, [state.movies]);
 
-  // Needs matching if it has no poster yet, or its name contains non-Latin
-  // characters (imported titles in other languages get renamed to English).
-  const needsMatch = (m) => !m.poster || /[^\u0000-\u024F]/.test(m.name);
-
-  const unmatched = useMemo(
-    () => state.movies.filter(needsMatch).length,
-    [state.movies]
-  );
-
   async function runSearch(e) {
     e && e.preventDefault();
     if (!query.trim()) return;
@@ -121,34 +111,6 @@ export default function Movies() {
     } finally {
       setBusy(false);
     }
-  }
-
-  // Find posters for imported TV Time movies by searching their titles.
-  async function matchPosters() {
-    const targets = state.movies
-      .map((m, index) => ({ ...m, index }))
-      .filter(needsMatch);
-    setMatch({ done: 0, total: targets.length });
-    let done = 0;
-    for (const m of targets) {
-      try {
-        const data = await searchMovies(m.name);
-        const hit = (data.results || [])[0];
-        if (hit) {
-          updateMovie(m.index, {
-            tmdbId: hit.id,
-            name: hit.title || m.name, // normalize to English title
-            poster: hit.poster_path || null,
-            year: (hit.release_date || '').slice(0, 4) || null,
-          });
-        }
-      } catch (err) {
-        console.warn('poster match failed for', m.name, err);
-      }
-      done++;
-      setMatch({ done, total: targets.length });
-    }
-    setMatch(null);
   }
 
   return (
@@ -239,14 +201,6 @@ export default function Movies() {
         <h2 className="section" style={{ margin: 0 }}>
           Watched <span className="muted">({movies.length})</span>
         </h2>
-        <div className="spacer" />
-        {unmatched > 0 && (
-          <button className="btn" onClick={matchPosters} disabled={!hasKey() || !!match}>
-            {match
-              ? `Matching ${match.done}/${match.total}`
-              : `Find posters for ${unmatched} imported`}
-          </button>
-        )}
       </div>
 
       {movies.length === 0 && (
