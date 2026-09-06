@@ -127,6 +127,54 @@ export function toggleFollow(id) {
   markShowDirty(id);
 }
 
+// ---------------------------------------------------------------------------
+// Watchlist ("plan to watch"). `watchlist: true` is independent of
+// `followed` — a show can be queued without being in the library yet.
+// ---------------------------------------------------------------------------
+
+export function addShowToWatchlist(details) {
+  // details: TMDB /tv/{id} response. Same dedupe pattern as addShowFromTmdb:
+  // if this show already exists (e.g. imported under a tvdb: key, or already
+  // followed), flag the existing record instead of creating a duplicate.
+  const existing = Object.entries(getState().shows).find(
+    ([, s]) => s.tmdbId === details.id
+  );
+  const id = existing ? existing[0] : `tmdb:${details.id}`;
+  update((s) => {
+    if (s.shows[id]) {
+      s.shows[id] = { ...s.shows[id], watchlist: true };
+      return;
+    }
+    s.shows[id] = {
+      tmdbId: details.id,
+      name: details.name,
+      followed: false,
+      watchlist: true,
+      watched: {},
+      addedAt: new Date().toISOString(),
+      ...tmdbFields(details),
+    };
+  });
+  markShowDirty(id);
+}
+
+export function toggleWatchlist(id) {
+  update((s) => {
+    const show = s.shows[id];
+    if (show) s.shows[id] = { ...show, watchlist: !show.watchlist };
+  });
+  markShowDirty(id);
+}
+
+export function startWatchingShow(id) {
+  // Promote a watchlist show into the library (Up Next / Shows tab).
+  update((s) => {
+    const show = s.shows[id];
+    if (show) s.shows[id] = { ...show, followed: true, watchlist: false };
+  });
+  markShowDirty(id);
+}
+
 export function markEpisode(id, season, episode, runtimeMin, watched = true) {
   update((s) => {
     const show = s.shows[id];
@@ -284,23 +332,73 @@ export function resetAll() {
 // tmdbId, poster and year.
 // ---------------------------------------------------------------------------
 
+// Movies added before the watchlist feature have no `status` field at all —
+// treat that as 'watched' everywhere so existing entries keep showing up
+// exactly as before.
+export const movieStatus = (m) => m.status || 'watched';
+
 export function addMovieWatched(details, force = false) {
   // details: TMDB /movie/{id} response
   // force = true logs another watch (a rewatch) as its own dated entry.
   update((s) => {
-    const already = s.movies.some((m) => m.tmdbId === details.id);
-    if (already && !force) return;
+    const idx = s.movies.findIndex((m) => m.tmdbId === details.id);
+    if (idx !== -1 && !force) {
+      const existing = s.movies[idx];
+      if (movieStatus(existing) === 'planned') {
+        // It was queued on the watchlist — promote it instead of a no-op,
+        // so "Watched it" from search always does something sensible.
+        s.movies = s.movies.map((m, i) =>
+          i === idx
+            ? { ...m, status: 'watched', watchedAt: new Date().toISOString() }
+            : m
+        );
+      }
+      return;
+    }
     s.movies = [
       ...s.movies,
       {
         tmdbId: details.id,
         name: details.title,
+        status: 'watched',
         watchedAt: new Date().toISOString(),
         runtimeMin: details.runtime || null,
         poster: details.poster_path || null,
         year: (details.release_date || '').slice(0, 4) || null,
       },
     ];
+  });
+  markMoviesDirty();
+}
+
+export function addMovieToWatchlist(details) {
+  // details: TMDB /movie/{id} response. Queued, not watched — no watchedAt.
+  update((s) => {
+    const already = s.movies.some((m) => m.tmdbId === details.id);
+    if (already) return;
+    s.movies = [
+      ...s.movies,
+      {
+        tmdbId: details.id,
+        name: details.title,
+        status: 'planned',
+        addedAt: new Date().toISOString(),
+        runtimeMin: details.runtime || null,
+        poster: details.poster_path || null,
+        year: (details.release_date || '').slice(0, 4) || null,
+      },
+    ];
+  });
+  markMoviesDirty();
+}
+
+export function markPlannedMovieWatched(index) {
+  update((s) => {
+    s.movies = s.movies.map((m, i) =>
+      i === index
+        ? { ...m, status: 'watched', watchedAt: new Date().toISOString() }
+        : m
+    );
   });
   markMoviesDirty();
 }
