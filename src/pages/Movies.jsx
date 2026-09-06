@@ -1,6 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore.js';
-import { addMovieWatched, removeMovie, updateMovie } from '../store/db.js';
+import {
+  addMovieWatched,
+  addMovieToWatchlist,
+  removeMovie,
+  updateMovie,
+  movieStatus,
+} from '../store/db.js';
 import { searchMovies, movieDetails, hasKey, img } from '../api/tmdb.js';
 
 export default function Movies() {
@@ -67,22 +73,34 @@ export default function Movies() {
     () =>
       state.movies
         .map((m, index) => ({ ...m, index }))
+        .filter((m) => movieStatus(m) === 'watched')
         .sort((a, b) => (b.watchedAt || '').localeCompare(a.watchedAt || '')),
     [state.movies]
   );
 
   // What's already logged, keyed by TMDB id -> { count, last }, so search
   // results can say "already watched" instead of silently doing nothing.
+  // Planned (watchlist) entries don't count as "watched" here.
   const watchedByTmdb = useMemo(() => {
     const map = new Map();
     for (const m of state.movies) {
-      if (!m.tmdbId) continue;
+      if (!m.tmdbId || movieStatus(m) !== 'watched') continue;
       const prev = map.get(m.tmdbId) || { count: 0, last: null };
       const last =
         !prev.last || (m.watchedAt || '') > prev.last ? m.watchedAt : prev.last;
       map.set(m.tmdbId, { count: prev.count + 1, last });
     }
     return map;
+  }, [state.movies]);
+
+  // Already queued on the watchlist, so search results can say so instead of
+  // offering to queue it a second time.
+  const plannedTmdbIds = useMemo(() => {
+    const set = new Set();
+    for (const m of state.movies) {
+      if (m.tmdbId && movieStatus(m) === 'planned') set.add(m.tmdbId);
+    }
+    return set;
   }, [state.movies]);
 
   async function runSearch(e) {
@@ -92,6 +110,18 @@ export default function Movies() {
     try {
       const data = await searchMovies(query.trim());
       setResults(data.results || []);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addToWatchlistFromSearch(r) {
+    setBusy(true);
+    try {
+      const details = await movieDetails(r.id);
+      addMovieToWatchlist(details);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -186,6 +216,20 @@ export default function Movies() {
                         Watched it
                       </button>
                     )}
+                    {!seen &&
+                      (plannedTmdbIds.has(r.id) ? (
+                        <button className="btn" disabled>
+                          On watchlist
+                        </button>
+                      ) : (
+                        <button
+                          className="btn"
+                          onClick={() => addToWatchlistFromSearch(r)}
+                          disabled={busy}
+                        >
+                          ＋ Watchlist
+                        </button>
+                      ))}
                   </div>
                 </div>
               </div>
