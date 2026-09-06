@@ -4,6 +4,7 @@ import ShowDetail from './pages/ShowDetail.jsx';
 import { initCloudSync } from './store/cloud.js';
 import Shows from './pages/Shows.jsx';
 import Movies from './pages/Movies.jsx';
+import Watchlist from './pages/Watchlist.jsx';
 import Stats from './pages/Stats.jsx';
 import Settings from './pages/Settings.jsx';
 
@@ -34,6 +35,15 @@ const TABS = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <rect x="3" y="4" width="18" height="16" rx="2" />
         <path d="M3 9h18M7 4v5M12 4v5M17 4v5" />
+      </svg>
+    ),
+  },
+  {
+    id: 'watchlist',
+    label: 'Watchlist',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z" />
       </svg>
     ),
   },
@@ -86,6 +96,7 @@ export default function App() {
           {tab === 'next' && <UpNext openShow={openShow} />}
           {tab === 'shows' && <Shows openShow={openShow} />}
           {tab === 'movies' && <Movies />}
+          {tab === 'watchlist' && <Watchlist openShow={openShow} />}
           {tab === 'stats' && <Stats />}
           {tab === 'settings' && <Settings />}
         </>
