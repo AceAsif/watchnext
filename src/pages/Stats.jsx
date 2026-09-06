@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../store/useStore.js';
+import { movieStatus } from '../store/db.js';
 
 function Bars({ rows, unit }) {
   const max = Math.max(...rows.map((r) => r.value), 1);
@@ -72,13 +73,23 @@ export default function Stats() {
     }
 
     let movieMinutes = 0;
+    let watchedMovieCount = 0;
     for (const m of state.movies) {
+      if (movieStatus(m) !== 'watched') continue; // still on the watchlist
+      watchedMovieCount++;
       movieMinutes += m.runtimeMin || 110;
       if (m.watchedAt) {
         const y = m.watchedAt.slice(0, 4);
         moviesPerYear[y] = (moviesPerYear[y] || 0) + 1;
       }
     }
+
+    const watchlistShows = Object.values(state.shows).filter(
+      (sh) => sh.watchlist && !sh.followed
+    ).length;
+    const watchlistMovies = state.movies.filter(
+      (m) => movieStatus(m) === 'planned'
+    ).length;
 
     perShow.sort((a, b) => b.value - a.value);
     const years = Object.entries(perYear)
@@ -97,13 +108,15 @@ export default function Stats() {
       hours: Math.round(minutes / 60),
       days: (minutes / 60 / 24).toFixed(1),
       showCount: perShow.length,
-      movieCount: state.movies.length,
+      movieCount: watchedMovieCount,
       movieHours: Math.round(movieMinutes / 60),
       topShows: perShow.slice(0, 12),
       years,
       movieYears,
       genres,
       genreDataMissing,
+      watchlistShows,
+      watchlistMovies,
       completion: [
         { label: 'Finished', value: finished },
         { label: 'Watching', value: inProgress },
@@ -150,6 +163,13 @@ export default function Stats() {
           <div className="label">Movie hours</div>
         </div>
       </div>
+
+      {(s.watchlistShows > 0 || s.watchlistMovies > 0) && (
+        <p className="muted" style={{ fontSize: 13, marginTop: -6 }}>
+          On your watchlist: {s.watchlistShows} show{s.watchlistShows === 1 ? '' : 's'},{' '}
+          {s.watchlistMovies} movie{s.watchlistMovies === 1 ? '' : 's'}.
+        </p>
+      )}
 
       {s.topShows.length > 0 && (
         <>
