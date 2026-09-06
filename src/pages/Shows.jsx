@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore.js';
 import {
   watchedCount,
   addShowFromTmdb,
+  addShowToWatchlist,
   applyTmdbDetails,
   showId,
 } from '../store/db.js';
@@ -47,6 +48,16 @@ export default function Shows({ openShow }) {
     [state.shows]
   );
 
+  const watchlistTmdbIds = useMemo(
+    () =>
+      new Set(
+        Object.values(state.shows)
+          .filter((s) => s.watchlist && s.tmdbId)
+          .map((s) => s.tmdbId)
+      ),
+    [state.shows]
+  );
+
   async function runSearch(e) {
     e && e.preventDefault();
     if (!query.trim()) return;
@@ -68,6 +79,42 @@ export default function Shows({ openShow }) {
       addShowFromTmdb(details);
       setResults(null);
       setQuery('');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openFromSearch(r) {
+    // If this show is already in the store (followed, on the watchlist, or
+    // imported), just open that record. Otherwise add it — which follows it,
+    // so any episodes marked land in the Library and Up Next rather than
+    // being orphaned on a show that isn't in the library — then open it.
+    const existing = Object.entries(state.shows).find(
+      ([, s]) => s.tmdbId === r.id
+    );
+    if (existing) {
+      openShow(existing[0]);
+      return;
+    }
+    setBusy(true);
+    try {
+      const details = await showDetails(r.id);
+      addShowFromTmdb(details);
+      openShow(`tmdb:${details.id}`);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addToWatchlistFromSearch(r) {
+    setBusy(true);
+    try {
+      const details = await showDetails(r.id);
+      addShowToWatchlist(details);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -120,26 +167,63 @@ export default function Shows({ openShow }) {
           {results.length === 0 && <p className="muted">No shows found for that search.</p>}
           {results.slice(0, 10).map((r) => (
             <div key={r.id} className="next-row" style={{ cursor: 'default' }}>
-              {r.poster_path ? (
-                <img src={img(r.poster_path, 'w154')} alt="" />
-              ) : (
-                <div className="thumb" />
-              )}
-              <div className="info">
-                <div className="name">{r.name}</div>
-                <div className="detail">
-                  {(r.first_air_date || '').slice(0, 4) || 'unknown year'}
+              <button
+                onClick={() => openFromSearch(r)}
+                disabled={busy}
+                title={`Open ${r.name}`}
+                style={{
+                  display: 'flex',
+                  gap: 14,
+                  alignItems: 'center',
+                  flex: 1,
+                  minWidth: 0,
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  margin: 0,
+                  cursor: 'pointer',
+                  color: 'var(--text)',
+                  textAlign: 'left',
+                  font: 'inherit',
+                }}
+              >
+                {r.poster_path ? (
+                  <img src={img(r.poster_path, 'w154')} alt="" />
+                ) : (
+                  <div className="thumb" />
+                )}
+                <div className="info">
+                  <div className="name">{r.name}</div>
+                  <div className="detail">
+                    {(r.first_air_date || '').slice(0, 4) || 'unknown year'}
+                  </div>
                 </div>
+              </button>
+              <div className="row" style={{ gap: 8 }}>
+                {followedTmdbIds.has(r.id) ? (
+                  <button className="btn" disabled>
+                    Following
+                  </button>
+                ) : (
+                  <button className="btn primary" onClick={() => addFromSearch(r)} disabled={busy}>
+                    Follow
+                  </button>
+                )}
+                {!followedTmdbIds.has(r.id) &&
+                  (watchlistTmdbIds.has(r.id) ? (
+                    <button className="btn" disabled>
+                      On watchlist
+                    </button>
+                  ) : (
+                    <button
+                      className="btn"
+                      onClick={() => addToWatchlistFromSearch(r)}
+                      disabled={busy}
+                    >
+                      ＋ Watchlist
+                    </button>
+                  ))}
               </div>
-              {followedTmdbIds.has(r.id) ? (
-                <button className="btn" disabled>
-                  Following
-                </button>
-              ) : (
-                <button className="btn primary" onClick={() => addFromSearch(r)} disabled={busy}>
-                  Follow
-                </button>
-              )}
             </div>
           ))}
           <button className="btn" onClick={() => setResults(null)}>
