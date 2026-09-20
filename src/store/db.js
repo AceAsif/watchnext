@@ -127,6 +127,15 @@ export function toggleFollow(id) {
   markShowDirty(id);
 }
 
+export function setShowRating(id, rating) {
+  // rating: 0–5. 0 clears it. Rides the existing per-show sync doc.
+  update((s) => {
+    const show = s.shows[id];
+    if (show) s.shows[id] = { ...show, rating: rating || 0 };
+  });
+  markShowDirty(id);
+}
+
 // ---------------------------------------------------------------------------
 // Watchlist ("plan to watch"). `watchlist: true` is independent of
 // `followed` — a show can be queued without being in the library yet.
@@ -398,6 +407,16 @@ export function markPlannedMovieWatched(index) {
       i === index
         ? { ...m, status: 'watched', watchedAt: new Date().toISOString() }
         : m
+    );
+  });
+  markMoviesDirty();
+}
+
+export function setMovieRating(index, rating) {
+  // rating: 0–5. 0 clears it. Rides the existing movies sync doc.
+  update((s) => {
+    s.movies = s.movies.map((m, i) =>
+      i === index ? { ...m, rating: rating || 0 } : m
     );
   });
   markMoviesDirty();

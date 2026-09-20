@@ -5,10 +5,12 @@ import {
   markEpisode,
   markSeason,
   toggleFollow,
+  setShowRating,
   applyTmdbDetails,
   watchedCount,
 } from '../store/db.js';
 import { seasonDetails, resolveShow, searchShows, showDetails, hasKey, img } from '../api/tmdb.js';
+import Stars from '../components/Stars.jsx';
 
 function Check({ on, onClick, label }) {
   return (
@@ -218,6 +220,10 @@ export default function ShowDetail({ id, onBack }) {
               </button>
             )}
             {syncing && <span className="muted">Syncing with TMDB…</span>}
+          </div>
+          <div className="rate-row">
+            <span className="muted" style={{ fontSize: 12 }}>Your rating</span>
+            <Stars value={show.rating || 0} onChange={(n) => setShowRating(id, n)} />
           </div>
         </div>
       </div>

@@ -5,9 +5,11 @@ import {
   addMovieToWatchlist,
   removeMovie,
   updateMovie,
+  setMovieRating,
   movieStatus,
 } from '../store/db.js';
 import { searchMovies, movieDetails, hasKey, img } from '../api/tmdb.js';
+import Stars from '../components/Stars.jsx';
 
 export default function Movies() {
   const state = useStore();
@@ -270,6 +272,14 @@ export default function Movies() {
                 <div className="detail">
                   {m.year ? `${m.year} · ` : ''}
                   watched {(m.watchedAt || '').slice(0, 10) || 'sometime'}
+                </div>
+
+                <div style={{ margin: '4px 0 2px' }}>
+                  <Stars
+                    value={m.rating || 0}
+                    size={18}
+                    onChange={(n) => setMovieRating(m.index, n)}
+                  />
                 </div>
 
                 {isOpen && (

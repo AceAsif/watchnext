@@ -275,6 +275,52 @@ input:focus { outline: none; border-color: var(--amber); }
 }
 .season-block { margin-top: 18px; }
 
+/* star ratings */
+.stars { display: inline-flex; gap: 2px; color: var(--text-dim); line-height: 0; }
+.stars .star {
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 2px;
+  color: inherit;
+  cursor: pointer;
+  line-height: 0;
+}
+.stars .star.on { color: var(--amber); }
+.stars .star:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+.stars.ro { gap: 1px; }
+.stars.ro .star { padding: 0; cursor: default; }
+
+.rate-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.card-rating { margin-top: 4px; }
+
+h3.subsection {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--text-dim);
+  margin: 14px 0 6px;
+}
+.rated-list { display: flex; flex-direction: column; gap: 2px; }
+.rated-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+.rated-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+
 /* library filter + sort controls (Shows tab) */
 .lib-filter { margin: 12px 0; }
 .lib-controls {

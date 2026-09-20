@@ -12,7 +12,7 @@ import { searchShows, showDetails, resolveShow, hasKey, img } from '../api/tmdb.
 import PosterCard from '../components/PosterCard.jsx';
 
 const FILTERS = ['All', 'Watching', 'Finished', 'Not started'];
-const SORTS = ['Alphabetical', 'Recently watched', 'Progress'];
+const SORTS = ['Alphabetical', 'Recently watched', 'Progress', 'Rating'];
 
 export default function Shows({ openShow }) {
   const state = useStore();
@@ -57,6 +57,12 @@ export default function Shows({ openShow }) {
     } else if (sortBy === 'Progress') {
       list.sort(
         (a, b) => frac(b[1]) - frac(a[1]) || a[1].name.localeCompare(b[1].name)
+      );
+    } else if (sortBy === 'Rating') {
+      list.sort(
+        (a, b) =>
+          (b[1].rating || 0) - (a[1].rating || 0) ||
+          a[1].name.localeCompare(b[1].name)
       );
     } else {
       list.sort((a, b) => a[1].name.localeCompare(b[1].name));

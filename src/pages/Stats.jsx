@@ -1,6 +1,20 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../store/useStore.js';
 import { movieStatus } from '../store/db.js';
+import Stars from '../components/Stars.jsx';
+
+function RatedList({ rows }) {
+  return (
+    <div className="rated-list">
+      {rows.map((r) => (
+        <div className="rated-row" key={r.name}>
+          <span className="rated-name" title={r.name}>{r.name}</span>
+          <Stars value={r.rating} size={15} readOnly />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function Bars({ rows, unit }) {
   const max = Math.max(...rows.map((r) => r.value), 1);
@@ -35,9 +49,11 @@ export default function Stats() {
     let inProgress = 0;
     let notStarted = 0;
     let genreDataMissing = 0;
+    const ratedShows = [];
 
     for (const show of Object.values(state.shows)) {
       const entries = Object.values(show.watched || {});
+      if (show.rating) ratedShows.push({ name: show.name, rating: show.rating });
       let count = 0;
       for (const w of entries) {
         const n = w.n || 1;
@@ -74,9 +90,11 @@ export default function Stats() {
 
     let movieMinutes = 0;
     let watchedMovieCount = 0;
+    const ratedMovies = [];
     for (const m of state.movies) {
       if (movieStatus(m) !== 'watched') continue; // still on the watchlist
       watchedMovieCount++;
+      if (m.rating) ratedMovies.push({ name: m.name, rating: m.rating });
       movieMinutes += m.runtimeMin || 110;
       if (m.watchedAt) {
         const y = m.watchedAt.slice(0, 4);
@@ -92,6 +110,9 @@ export default function Stats() {
     ).length;
 
     perShow.sort((a, b) => b.value - a.value);
+    const byRating = (a, b) => b.rating - a.rating || a.name.localeCompare(b.name);
+    ratedShows.sort(byRating);
+    ratedMovies.sort(byRating);
     const years = Object.entries(perYear)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([label, value]) => ({ label, value }));
@@ -117,6 +138,8 @@ export default function Stats() {
       genreDataMissing,
       watchlistShows,
       watchlistMovies,
+      topRatedShows: ratedShows.slice(0, 10),
+      topRatedMovies: ratedMovies.slice(0, 10),
       completion: [
         { label: 'Finished', value: finished },
         { label: 'Watching', value: inProgress },
@@ -169,6 +192,24 @@ export default function Stats() {
           On your watchlist: {s.watchlistShows} show{s.watchlistShows === 1 ? '' : 's'},{' '}
           {s.watchlistMovies} movie{s.watchlistMovies === 1 ? '' : 's'}.
         </p>
+      )}
+
+      {(s.topRatedShows.length > 0 || s.topRatedMovies.length > 0) && (
+        <>
+          <h2 className="section">Top rated</h2>
+          {s.topRatedShows.length > 0 && (
+            <>
+              <h3 className="subsection">Shows</h3>
+              <RatedList rows={s.topRatedShows} />
+            </>
+          )}
+          {s.topRatedMovies.length > 0 && (
+            <>
+              <h3 className="subsection">Movies</h3>
+              <RatedList rows={s.topRatedMovies} />
+            </>
+          )}
+        </>
       )}
 
       {s.topShows.length > 0 && (

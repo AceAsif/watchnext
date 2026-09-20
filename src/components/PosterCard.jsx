@@ -1,6 +1,7 @@
 import React from 'react';
 import { img } from '../api/tmdb.js';
 import { watchedCount } from '../store/db.js';
+import Stars from './Stars.jsx';
 
 export default function PosterCard({ show, onOpen }) {
   const seen = watchedCount(show);
@@ -19,6 +20,11 @@ export default function PosterCard({ show, onOpen }) {
       <div className="meta">
         {total ? `${seen} / ${total} eps` : seen ? `${seen} eps seen` : 'not started'}
       </div>
+      {show.rating ? (
+        <div className="card-rating">
+          <Stars value={show.rating} size={13} readOnly />
+        </div>
+      ) : null}
       {total ? (
         <div className={'progress' + (done ? ' done' : '')}>
           <i style={{ width: pct + '%' }} />
