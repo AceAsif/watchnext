@@ -248,7 +248,7 @@ export function tmdbFields(d) {
     genres: (d.genres || []).map((g) => g.name),
     seasons: (d.seasons || [])
       .filter((x) => x.season_number > 0)
-      .map((x) => ({ n: x.season_number, count: x.episode_count })),
+      .map((x) => ({ n: x.season_number, count: x.episode_count, air: x.air_date || null })),
     runtimeMin: (d.episode_run_time && d.episode_run_time[0]) || null,
     nextAir: d.next_episode_to_air
       ? {

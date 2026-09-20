@@ -274,6 +274,18 @@ input:focus { outline: none; border-color: var(--amber); }
   margin-bottom: 12px;
 }
 .season-block { margin-top: 18px; }
+.badge-soon {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: var(--amber-soft);
+}
 .season-head {
   display: flex;
   align-items: center;

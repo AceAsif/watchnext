@@ -20,6 +20,15 @@ function Check({ on, onClick, label }) {
   );
 }
 
+// "2026-12-25" -> "25 Dec 2026", with no timezone drift.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function fmtDate(s) {
+  if (!s) return '';
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return s;
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+}
+
 function Season({ id, show, season }) {
   const [eps, setEps] = useState(null);
   const [open, setOpen] = useState(false);
@@ -40,17 +49,37 @@ function Season({ id, show, season }) {
   ).length;
   const allSeen = season.count > 0 && seenInSeason >= season.count;
 
+  // A season hasn't been released if its air date is still in the future, or
+  // (when TMDB hasn't dated it) it has no episodes and nothing watched. The
+  // per-season air date comes from a sync; the show's nextAir covers the
+  // upcoming season even on data synced before that field existed.
+  const today = new Date().toISOString().slice(0, 10);
+  const airDate =
+    season.air ||
+    (show.nextAir && show.nextAir.season === season.n ? show.nextAir.date : null);
+  const isFuture = airDate && airDate > today;
+  const upcoming = isFuture || (!airDate && season.count === 0 && seenInSeason === 0);
+
   return (
-    <div className="season-block">
+    <div className={'season-block' + (upcoming ? ' upcoming' : '')}>
       <div className="season-head">
         <h3>
           Season {season.n}{' '}
-          <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-            {seenInSeason}/{season.count}
-          </span>
+          {upcoming ? (
+            <>
+              <span className="badge-soon">Upcoming</span>{' '}
+              <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
+                {airDate ? `Premieres ${fmtDate(airDate)}` : 'Not released yet'}
+              </span>
+            </>
+          ) : (
+            <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
+              {seenInSeason}/{season.count}
+            </span>
+          )}
         </h3>
         <div className="row">
-          {eps && (
+          {eps && !upcoming && (
             <button
               className="btn"
               onClick={() => markSeason(id, season.n, eps, !allSeen)}
