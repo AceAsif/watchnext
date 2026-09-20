@@ -58,6 +58,7 @@ export function update(mutator) {
 
 let dirtyShows = new Set();
 let dirtyMovies = false;
+let deletedShows = new Set();
 
 export function markShowDirty(id) {
   dirtyShows.add(id);
@@ -67,12 +68,19 @@ export function markMoviesDirty() {
   dirtyMovies = true;
 }
 
+export function markShowDeleted(id) {
+  deletedShows.add(id);
+  dirtyShows.delete(id); // a deleted show must not also be pushed as an update
+}
+
 export function takeDirty() {
   const showIds = dirtyShows;
   const movies = dirtyMovies;
+  const deletedIds = deletedShows;
   dirtyShows = new Set();
   dirtyMovies = false;
-  return { showIds, movies };
+  deletedShows = new Set();
+  return { showIds, movies, deletedIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +142,16 @@ export function setShowRating(id, rating) {
     if (show) s.shows[id] = { ...show, rating: rating || 0 };
   });
   markShowDirty(id);
+}
+
+export function deleteShow(id) {
+  // True delete: remove the record from local state now, and from Firestore on
+  // the next sync flush (see cloud.js). Unlike unfollow, which only hides a
+  // show, this leaves no lingering record behind on any device.
+  update((s) => {
+    delete s.shows[id];
+  });
+  markShowDeleted(id);
 }
 
 // ---------------------------------------------------------------------------

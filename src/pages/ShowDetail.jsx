@@ -6,6 +6,7 @@ import {
   markSeason,
   toggleFollow,
   setShowRating,
+  deleteShow,
   applyTmdbDetails,
   watchedCount,
 } from '../store/db.js';
@@ -219,6 +220,22 @@ export default function ShowDetail({ id, onBack }) {
                 Fix match
               </button>
             )}
+            <button
+              className="btn danger"
+              onClick={() => {
+                if (
+                  confirm(
+                    `Delete "${show.name}" and its watch history? This removes it ` +
+                      `from your library and every signed-in device, and can't be undone.`
+                  )
+                ) {
+                  deleteShow(id);
+                  onBack();
+                }
+              }}
+            >
+              Delete
+            </button>
             {syncing && <span className="muted">Syncing with TMDB…</span>}
           </div>
           <div className="rate-row">

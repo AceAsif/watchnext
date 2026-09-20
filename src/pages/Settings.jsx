@@ -1,6 +1,6 @@
 import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { useStore } from '../store/useStore.js';
-import { setTmdbKey, importTvTime, getState, resetAll } from '../store/db.js';
+import { setTmdbKey, importTvTime, getState, resetAll, deleteShow, watchedCount } from '../store/db.js';
 import {
   isCloudAvailable,
   getCloudUser,
@@ -16,6 +16,12 @@ export default function Settings() {
   const fileRef = useRef();
   const cloudUser = useSyncExternalStore(subscribeCloudUser, getCloudUser);
   const [cloudBusy, setCloudBusy] = useState(false);
+
+  // Shows sitting in the data but not in the library or watchlist — leftovers
+  // from unfollowing or old imports (unfollow only hides; it never deletes).
+  const orphans = Object.entries(state.shows)
+    .filter(([, sh]) => !sh.followed && !sh.watchlist)
+    .sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
 
   async function handleSignIn() {
     setCloudBusy(true);
@@ -148,6 +154,44 @@ export default function Settings() {
       </button>
 
       {msg && <div className="notice accent">{msg}</div>}
+
+      {orphans.length > 0 && (
+        <>
+          <h2 className="section">Clean up shows</h2>
+          <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+            These {orphans.length} show{orphans.length === 1 ? ' is' : 's are'} in
+            your data but not in your library or watchlist — usually leftovers
+            from unfollowing or old test imports. Deleting one removes it for
+            good, including from the cloud and your other devices.
+          </p>
+          {orphans.map(([id, sh]) => {
+            const seen = watchedCount(sh);
+            return (
+              <div
+                key={id}
+                className="row"
+                style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}
+              >
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {sh.name}
+                </span>
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {seen ? `${seen} watched` : 'no history'}
+                </span>
+                <div className="spacer" />
+                <button
+                  className="btn danger"
+                  onClick={() => {
+                    if (confirm(`Delete "${sh.name}" for good?`)) deleteShow(id);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            );
+          })}
+        </>
+      )}
 
       <h2 className="section">Backup</h2>
       <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>

@@ -26,7 +26,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
-import { getState, update, takeDirty, markShowDirty, markMoviesDirty } from './db.js';
+import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markShowDeleted } from './db.js';
 
 export function isCloudAvailable() {
   return hasFirebaseConfig;
@@ -144,15 +144,22 @@ async function pullAndMerge(forUid) {
 
 async function flush() {
   if (!uid || applyingRemote) return;
-  const { showIds, movies } = takeDirty();
-  if (showIds.size === 0 && !movies) return;
+  const { showIds, movies, deletedIds } = takeDirty();
+  const hasDeletes = deletedIds && deletedIds.size > 0;
+  if (showIds.size === 0 && !movies && !hasDeletes) return;
 
   const state = getState();
   const batch = writeBatch(db);
   showIds.forEach((id) => {
+    if (hasDeletes && deletedIds.has(id)) return; // a delete wins over an update
     const show = state.shows[id];
     if (show) batch.set(doc(db, 'users', uid, 'shows', id), show);
   });
+  if (hasDeletes) {
+    deletedIds.forEach((id) => {
+      batch.delete(doc(db, 'users', uid, 'shows', id));
+    });
+  }
   if (movies) {
     batch.set(doc(db, 'users', uid, 'library', 'movies'), { movies: state.movies });
   }
@@ -161,8 +168,9 @@ async function flush() {
     await batch.commit();
   } catch (err) {
     console.error('Cloud sync failed, will retry on next change:', err);
-    // put the ids back so the next flush retries them
+    // put everything back so the next flush retries it
     showIds.forEach(markShowDirty);
+    if (hasDeletes) deletedIds.forEach(markShowDeleted);
     if (movies) markMoviesDirty();
   }
 }
