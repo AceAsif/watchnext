@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore.js';
 import {
   watchedCount,
+  lastWatchDate,
   addShowFromTmdb,
   addShowToWatchlist,
   applyTmdbDetails,
@@ -11,6 +12,7 @@ import { searchShows, showDetails, resolveShow, hasKey, img } from '../api/tmdb.
 import PosterCard from '../components/PosterCard.jsx';
 
 const FILTERS = ['All', 'Watching', 'Finished', 'Not started'];
+const SORTS = ['Alphabetical', 'Recently watched', 'Progress'];
 
 export default function Shows({ openShow }) {
   const state = useStore();
@@ -18,12 +20,21 @@ export default function Shows({ openShow }) {
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState('All');
+  const [libQuery, setLibQuery] = useState(''); // filters the followed library
+  const [sortBy, setSortBy] = useState('Alphabetical');
   const [sync, setSync] = useState(null); // {done, total} while syncing
 
+  const hasFollowed = useMemo(
+    () => Object.values(state.shows).some((s) => s.followed),
+    [state.shows]
+  );
+
   const library = useMemo(() => {
-    const list = Object.entries(state.shows).filter(([, s]) => s.followed);
-    list.sort((a, b) => a[1].name.localeCompare(b[1].name));
-    return list.filter(([, s]) => {
+    const q = libQuery.trim().toLowerCase();
+    let list = Object.entries(state.shows).filter(([, s]) => s.followed);
+
+    // status filter
+    list = list.filter(([, s]) => {
       const seen = watchedCount(s);
       const total = s.totalEpisodes;
       if (filter === 'Watching') return seen > 0 && (!total || seen < total);
@@ -31,7 +42,27 @@ export default function Shows({ openShow }) {
       if (filter === 'Not started') return seen === 0;
       return true;
     });
-  }, [state.shows, filter]);
+
+    // name search
+    if (q) list = list.filter(([, s]) => (s.name || '').toLowerCase().includes(q));
+
+    // sort — fraction watched, guarding shows with no episode count
+    const frac = (s) => (s.totalEpisodes ? watchedCount(s) / s.totalEpisodes : 0);
+    if (sortBy === 'Recently watched') {
+      list.sort(
+        (a, b) =>
+          (lastWatchDate(b[1]) || '').localeCompare(lastWatchDate(a[1]) || '') ||
+          a[1].name.localeCompare(b[1].name)
+      );
+    } else if (sortBy === 'Progress') {
+      list.sort(
+        (a, b) => frac(b[1]) - frac(a[1]) || a[1].name.localeCompare(b[1].name)
+      );
+    } else {
+      list.sort((a, b) => a[1].name.localeCompare(b[1].name));
+    }
+    return list;
+  }, [state.shows, filter, libQuery, sortBy]);
 
   const unsynced = useMemo(
     () => Object.entries(state.shows).filter(([, s]) => s.followed && !s.lastSynced),
@@ -246,7 +277,15 @@ export default function Shows({ openShow }) {
         </button>
       </div>
 
-      <div className="row" style={{ margin: '10px 0 14px' }}>
+      <input
+        type="search"
+        placeholder="Filter your library by name"
+        value={libQuery}
+        onChange={(e) => setLibQuery(e.target.value)}
+        style={{ width: '100%', margin: '12px 0 4px' }}
+      />
+
+      <div className="row" style={{ margin: '10px 0 6px', flexWrap: 'wrap' }}>
         {FILTERS.map((f) => (
           <button
             key={f}
@@ -263,6 +302,26 @@ export default function Shows({ openShow }) {
         ))}
       </div>
 
+      <div className="row" style={{ margin: '0 0 14px', flexWrap: 'wrap' }}>
+        <span className="muted" style={{ fontSize: 12, alignSelf: 'center' }}>
+          Sort
+        </span>
+        {SORTS.map((sName) => (
+          <button
+            key={sName}
+            className="btn"
+            style={
+              sortBy === sName
+                ? { borderColor: 'var(--amber)', color: 'var(--amber)' }
+                : {}
+            }
+            onClick={() => setSortBy(sName)}
+          >
+            {sName}
+          </button>
+        ))}
+      </div>
+
       <div className="grid">
         {library.map(([id, show]) => (
           <PosterCard key={id} show={show} onOpen={() => openShow(id)} />
@@ -270,7 +329,11 @@ export default function Shows({ openShow }) {
       </div>
 
       {library.length === 0 && (
-        <p className="muted">No shows here yet. Search above or import in Settings.</p>
+        <p className="muted">
+          {hasFollowed
+            ? 'No shows match your filter.'
+            : 'No shows here yet. Search above or import in Settings.'}
+        </p>
       )}
     </div>
   );
