@@ -1,54 +1,66 @@
-const CACHE = 'watchnext-v2';
+// BUILD is replaced with the commit SHA by the deploy workflow (see
+// .github/workflows/deploy.yml). Because the value changes on every deploy,
+// this file's bytes change too, so the browser installs a fresh service
+// worker each release — which skips waiting, claims clients and purges the
+// old app cache. Result: new code loads on the next visit with no manual
+// cache clearing. Left as the literal placeholder for local `npm run deploy`.
+const BUILD = '__BUILD_ID__';
+const APP_CACHE = 'watchnext-app-' + BUILD;
+const IMG_CACHE = 'watchnext-img'; // stable across deploys — posters never change
 
-self.addEventListener('install', (e) => {
-  self.skipWaiting();
-});
+self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((k) => k !== APP_CACHE && k !== IMG_CACHE)
+          .map((k) => caches.delete(k))
+      );
+      await self.clients.claim();
+    })()
   );
-  self.clients.claim();
 });
 
-// Network-first for the app shell (HTML/JS/CSS) so a new deploy is always
-// picked up on next load. Cache-first only for images (posters etc.), which
-// never change once fetched, so serving stale ones has no downside.
 self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
-  if (e.request.method !== 'GET') return;
-  if (url.hostname === 'api.themoviedb.org') return; // always fresh
+  const req = e.request;
+  const url = new URL(req.url);
+  if (req.method !== 'GET') return;
+  if (url.hostname === 'api.themoviedb.org') return; // API responses always fresh
 
   const isImage = url.hostname === 'image.tmdb.org';
   const isOwnOrigin = url.origin === self.location.origin;
   if (!isImage && !isOwnOrigin) return;
 
   if (isImage) {
-    // Cache-first: images are immutable once fetched.
+    // Cache-first: posters are immutable once fetched, kept in a cache that
+    // survives deploys so they aren't re-downloaded on every release.
     e.respondWith(
-      caches.match(e.request).then(
+      caches.match(req).then(
         (hit) =>
           hit ||
-          fetch(e.request).then((res) => {
+          fetch(req).then((res) => {
             const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
+            caches.open(IMG_CACHE).then((c) => c.put(req, copy));
             return res;
           })
       )
     );
-  } else {
-    // Network-first: always try to get the latest app code. Fall back to
-    // cache only if the network is unavailable (offline use).
-    e.respondWith(
-      fetch(e.request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy));
-          return res;
-        })
-        .catch(() => caches.match(e.request))
-    );
+    return;
   }
+
+  // App shell (HTML/JS/CSS): network-first with cache:'no-store' so the
+  // browser's HTTP cache can never mask a fresh deploy. Falls back to the
+  // cached copy only when offline.
+  e.respondWith(
+    fetch(req, { cache: 'no-store' })
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(APP_CACHE).then((c) => c.put(req, copy));
+        return res;
+      })
+      .catch(() => caches.match(req))
+  );
 });
