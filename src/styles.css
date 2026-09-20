@@ -274,6 +274,47 @@ input:focus { outline: none; border-color: var(--amber); }
   margin-bottom: 12px;
 }
 .season-block { margin-top: 18px; }
+
+/* library filter + sort controls (Shows tab) */
+.lib-filter { margin: 12px 0; }
+.lib-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+}
+.sort-field { display: inline-flex; align-items: center; gap: 8px; }
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--bg-raise);
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='12'%20height='12'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%238b95a5'%20stroke-width='3'%3E%3Cpath%20d='M6%209l6%206%206-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  font: 400 13px var(--font-body);
+  padding: 8px 30px 8px 12px;
+  cursor: pointer;
+}
+.select:focus { outline: none; border-color: var(--amber); }
+
+/* upcoming-episodes agenda (Up Next tab) */
+.agenda-date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.agenda-date .rel { color: var(--amber); }
+
 .badge-soon {
   display: inline-block;
   vertical-align: middle;

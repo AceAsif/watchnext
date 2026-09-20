@@ -282,44 +282,41 @@ export default function Shows({ openShow }) {
         placeholder="Filter your library by name"
         value={libQuery}
         onChange={(e) => setLibQuery(e.target.value)}
-        style={{ width: '100%', margin: '12px 0 4px' }}
+        className="lib-filter"
       />
 
-      <div className="row" style={{ margin: '10px 0 6px', flexWrap: 'wrap' }}>
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            className="btn"
-            style={
-              filter === f
-                ? { borderColor: 'var(--amber)', color: 'var(--amber)' }
-                : {}
-            }
-            onClick={() => setFilter(f)}
+      <div className="lib-controls">
+        <div className="row">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              className="btn"
+              style={
+                filter === f
+                  ? { borderColor: 'var(--amber)', color: 'var(--amber)' }
+                  : {}
+              }
+              onClick={() => setFilter(f)}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        <label className="sort-field">
+          <span className="muted" style={{ fontSize: 12 }}>Sort</span>
+          <select
+            className="select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            aria-label="Sort library"
           >
-            {f}
-          </button>
-        ))}
-      </div>
-
-      <div className="row" style={{ margin: '0 0 14px', flexWrap: 'wrap' }}>
-        <span className="muted" style={{ fontSize: 12, alignSelf: 'center' }}>
-          Sort
-        </span>
-        {SORTS.map((sName) => (
-          <button
-            key={sName}
-            className="btn"
-            style={
-              sortBy === sName
-                ? { borderColor: 'var(--amber)', color: 'var(--amber)' }
-                : {}
-            }
-            onClick={() => setSortBy(sName)}
-          >
-            {sName}
-          </button>
-        ))}
+            {SORTS.map((sName) => (
+              <option key={sName} value={sName}>
+                {sName}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="grid">
