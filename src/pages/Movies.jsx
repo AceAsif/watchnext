@@ -152,7 +152,11 @@ export default function Movies() {
           type="search"
           placeholder="Search TMDB for a movie you watched"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setQuery(v);
+            if (!v.trim()) setResults(null); // emptying the box clears the list
+          }}
           style={{ flex: 1 }}
         />
         <button className="btn" type="submit" disabled={busy || !hasKey()}>

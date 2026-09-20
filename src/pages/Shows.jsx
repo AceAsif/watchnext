@@ -185,7 +185,11 @@ export default function Shows({ openShow }) {
           type="search"
           placeholder="Search TMDB for a show to add"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setQuery(v);
+            if (!v.trim()) setResults(null); // emptying the box clears the list
+          }}
           style={{ flex: 1 }}
         />
         <button className="btn" type="submit" disabled={busy || !hasKey()}>
