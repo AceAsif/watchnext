@@ -56,6 +56,16 @@ let unsubShows = null;
 let flushTimer = null;
 let applyingRemote = false;
 
+// Flush is normally on a 2.5s timer, but that timer is throttled or paused
+// while the tab is in the background — so a change made right before switching
+// away (or reloading) could be lost. These fire a flush the moment the tab is
+// hidden or the page is being unloaded, which matters most for deletes: an
+// un-flushed delete leaves the Firestore doc in place, and the next sign-in
+// pulls the "deleted" show straight back.
+function flushOnLeave() {
+  if (document.visibilityState === 'hidden') flush();
+}
+
 export function initCloudSync() {
   if (!hasFirebaseConfig) return () => {};
   return onAuthStateChanged(auth, (user) => {
@@ -94,6 +104,9 @@ function startSync(newUid) {
 
   clearInterval(flushTimer);
   flushTimer = setInterval(flush, 2500);
+
+  document.addEventListener('visibilitychange', flushOnLeave);
+  window.addEventListener('pagehide', flush);
 }
 
 function stopSync() {
@@ -102,6 +115,8 @@ function stopSync() {
   uid = null;
   clearInterval(flushTimer);
   flushTimer = null;
+  document.removeEventListener('visibilitychange', flushOnLeave);
+  window.removeEventListener('pagehide', flush);
 }
 
 async function pullAndMerge(forUid) {
