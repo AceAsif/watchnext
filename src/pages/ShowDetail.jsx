@@ -107,7 +107,8 @@ function Season({ id, show, season }) {
         eps &&
         eps.map((ep) => {
           const k = epKey(season.n, ep.episode_number);
-          const on = !!(show.watched || {})[k];
+          const w = (show.watched || {})[k];
+          const on = !!w;
           return (
             <div className="ep-row" key={ep.id}>
               <Check
@@ -123,7 +124,13 @@ function Season({ id, show, season }) {
               </span>
               <div className="ep-name">
                 {ep.name}
-                {ep.air_date && <div className="airdate">{ep.air_date}</div>}
+                {on && w.at ? (
+                  <div className="airdate" style={{ color: 'var(--amber)' }}>
+                    Watched {fmtDate(w.at.slice(0, 10))}
+                  </div>
+                ) : ep.air_date ? (
+                  <div className="airdate">Aired {ep.air_date}</div>
+                ) : null}
               </div>
             </div>
           );
