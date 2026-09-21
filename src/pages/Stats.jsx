@@ -3,6 +3,25 @@ import { useStore } from '../store/useStore.js';
 import { movieStatus } from '../store/db.js';
 import Stars from '../components/Stars.jsx';
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function fmtDay(ds) {
+  if (!ds) return '';
+  const [y, m, d] = ds.split('-').map(Number);
+  if (!y || !m || !d) return ds;
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+}
+function weekdayOf(ds) {
+  const [y, m, d] = ds.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+// whole-day number, for consecutive-day math (UTC-based so no DST drift)
+function dayNum(ds) {
+  const [y, m, d] = ds.split('-').map(Number);
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+}
+
 function RatedList({ rows }) {
   return (
     <div className="rated-list">
@@ -50,6 +69,8 @@ export default function Stats() {
     let notStarted = 0;
     let genreDataMissing = 0;
     const ratedShows = [];
+    const perDate = {}; // "YYYY-MM-DD" -> number of watch events that day
+    const dowCount = [0, 0, 0, 0, 0, 0, 0]; // Sun..Sat
 
     for (const show of Object.values(state.shows)) {
       const entries = Object.values(show.watched || {});
@@ -63,6 +84,9 @@ export default function Stats() {
         if (w.at) {
           const y = w.at.slice(0, 4);
           perYear[y] = (perYear[y] || 0) + n;
+          const day = w.at.slice(0, 10);
+          perDate[day] = (perDate[day] || 0) + 1;
+          dowCount[weekdayOf(day)]++;
         }
       }
       if (entries.length) perShow.push({ label: show.name, value: count });
@@ -99,6 +123,9 @@ export default function Stats() {
       if (m.watchedAt) {
         const y = m.watchedAt.slice(0, 4);
         moviesPerYear[y] = (moviesPerYear[y] || 0) + 1;
+        const day = m.watchedAt.slice(0, 10);
+        perDate[day] = (perDate[day] || 0) + 1;
+        dowCount[weekdayOf(day)]++;
       }
     }
 
@@ -113,6 +140,48 @@ export default function Stats() {
     const byRating = (a, b) => b.rating - a.rating || a.name.localeCompare(b.name);
     ratedShows.sort(byRating);
     ratedMovies.sort(byRating);
+
+    // --- habits: streaks, busiest day, day-of-week ---
+    const dayKeys = Object.keys(perDate).sort(); // ISO dates sort chronologically
+    const nums = dayKeys.map(dayNum);
+    let longest = 0;
+    let longestEndNum = null;
+    let run = 0;
+    for (let i = 0; i < nums.length; i++) {
+      run = i > 0 && nums[i] === nums[i - 1] + 1 ? run + 1 : 1;
+      if (run > longest) {
+        longest = run;
+        longestEndNum = nums[i];
+      }
+    }
+    const numToDate = (n) => new Date(n * 86400000).toISOString().slice(0, 10);
+    const longestRange =
+      longest > 0
+        ? { len: longest, from: numToDate(longestEndNum - longest + 1), to: numToDate(longestEndNum) }
+        : null;
+
+    // Current streak: consecutive active days ending today or yesterday (so it
+    // doesn't read as broken just because you haven't watched yet today).
+    const todayNum = dayNum(new Date().toISOString().slice(0, 10));
+    let current = 0;
+    if (nums.length) {
+      const last = nums[nums.length - 1];
+      if (last === todayNum || last === todayNum - 1) {
+        current = 1;
+        for (let i = nums.length - 2; i >= 0; i--) {
+          if (nums[i] === nums[i + 1] - 1) current++;
+          else break;
+        }
+      }
+    }
+
+    let busiest = null;
+    for (const [d, c] of Object.entries(perDate)) {
+      if (!busiest || c > busiest.count) busiest = { date: d, count: c };
+    }
+
+    // Display Mon-first; DOW/dowCount are indexed Sun..Sat.
+    const dowRows = [1, 2, 3, 4, 5, 6, 0].map((i) => ({ label: DOW[i], value: dowCount[i] }));
     const years = Object.entries(perYear)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([label, value]) => ({ label, value }));
@@ -140,6 +209,12 @@ export default function Stats() {
       watchlistMovies,
       topRatedShows: ratedShows.slice(0, 10),
       topRatedMovies: ratedMovies.slice(0, 10),
+      currentStreak: current,
+      longestStreak: longest,
+      longestRange,
+      busiest,
+      dowRows,
+      activeDays: dayKeys.length,
       completion: [
         { label: 'Finished', value: finished },
         { label: 'Watching', value: inProgress },
@@ -192,6 +267,51 @@ export default function Stats() {
           On your watchlist: {s.watchlistShows} show{s.watchlistShows === 1 ? '' : 's'},{' '}
           {s.watchlistMovies} movie{s.watchlistMovies === 1 ? '' : 's'}.
         </p>
+      )}
+
+      {s.activeDays > 0 && (
+        <>
+          <h2 className="section">Habits</h2>
+          <div className="stat-cards">
+            <div className="stat-card">
+              <div className="big">{s.currentStreak}</div>
+              <div className="label">Current streak (days)</div>
+            </div>
+            <div className="stat-card">
+              <div className="big">{s.longestStreak}</div>
+              <div className="label">Longest streak (days)</div>
+            </div>
+            <div className="stat-card">
+              <div className="big">{s.busiest ? s.busiest.count : 0}</div>
+              <div className="label">Most in one day</div>
+            </div>
+            <div className="stat-card">
+              <div className="big">{s.activeDays.toLocaleString()}</div>
+              <div className="label">Days with a watch</div>
+            </div>
+          </div>
+          {(s.busiest || s.longestRange) && (
+            <p className="muted" style={{ fontSize: 13, marginTop: -6 }}>
+              {s.busiest
+                ? `Busiest day: ${s.busiest.count} watched on ${fmtDay(s.busiest.date)}. `
+                : ''}
+              {s.longestRange
+                ? `Longest streak ran ${fmtDay(s.longestRange.from)} – ${fmtDay(
+                    s.longestRange.to
+                  )}.`
+                : ''}
+            </p>
+          )}
+          <h3 className="subsection">By day of week</h3>
+          <Bars rows={s.dowRows} />
+          {s.busiest && s.busiest.count > 50 && (
+            <p className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
+              Heads up: a very high "most in one day" is almost always a batch of
+              history that was imported or bulk-marked on a single date, not a
+              real one-day binge — the same skew affects the day-of-week totals.
+            </p>
+          )}
+        </>
       )}
 
       {(s.topRatedShows.length > 0 || s.topRatedMovies.length > 0) && (
