@@ -119,6 +119,27 @@ export default function Movies() {
     }
   }
 
+  function removeLoggedMovie(r) {
+    // Delete the most recent watched entry for this TMDB film (used to clear a
+    // wrongly-matched movie straight from search). Leaves older rewatches, if
+    // any, in place. Reads the current array each call so the index is fresh.
+    const matches = state.movies
+      .map((m, index) => ({ ...m, index }))
+      .filter((m) => m.tmdbId === r.id && movieStatus(m) === 'watched');
+    if (matches.length === 0) return;
+    matches.sort((a, b) => (b.watchedAt || '').localeCompare(a.watchedAt || ''));
+    const target = matches[0];
+    if (
+      confirm(
+        `Remove your logged watch of "${target.name}"` +
+          (target.watchedAt ? ` (${target.watchedAt.slice(0, 10)})` : '') +
+          '? This deletes it from your history.'
+      )
+    ) {
+      removeMovie(target.index);
+    }
+  }
+
   async function addToWatchlistFromSearch(r) {
     setBusy(true);
     try {
@@ -205,14 +226,24 @@ export default function Movies() {
                   ) : null}
                   <div className="actions">
                     {seen ? (
-                      <button
-                        className="btn"
-                        onClick={() => addFromSearch(r, true)}
-                        disabled={busy}
-                        title="Add another watch with today's date"
-                      >
-                        Log rewatch
-                      </button>
+                      <>
+                        <button
+                          className="btn"
+                          onClick={() => addFromSearch(r, true)}
+                          disabled={busy}
+                          title="Add another watch with today's date"
+                        >
+                          Log rewatch
+                        </button>
+                        <button
+                          className="btn danger"
+                          onClick={() => removeLoggedMovie(r)}
+                          disabled={busy}
+                          title="Delete this logged watch"
+                        >
+                          {seen.count > 1 ? 'Remove latest' : 'Remove'}
+                        </button>
+                      </>
                     ) : (
                       <button
                         className="btn primary"
