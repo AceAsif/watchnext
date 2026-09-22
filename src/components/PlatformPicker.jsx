@@ -11,6 +11,10 @@ export const PLATFORMS = [
   { id: 'appletv', label: 'Apple TV+', color: '#B0B3B8', dark: true },
   { id: 'hulu', label: 'Hulu', color: '#1CE783', dark: true },
   { id: 'crunchyroll', label: 'Crunchyroll', color: '#F47521', dark: true },
+  { id: 'stan', label: 'Stan', color: '#EC4899', dark: false },
+  { id: 'binge', label: 'Binge', color: '#FF5A36', dark: false },
+  { id: 'iview', label: 'ABC iview', color: '#00B2A9', dark: true },
+  { id: 'youtube', label: 'YouTube', color: '#FF0000', dark: false },
   { id: 'other', label: 'Other / unofficial', color: '#9AA4B2', dark: true },
 ];
 
