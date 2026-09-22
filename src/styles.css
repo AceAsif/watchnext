@@ -291,6 +291,25 @@ input:focus { outline: none; border-color: var(--amber); }
 span.chip { cursor: default; }
 button.chip { -webkit-appearance: none; appearance: none; }
 
+/* Unselected picker chips read as neutral grey, so only the platform you've
+   actually chosen is colour-coded. On hover they preview their brand colour
+   (passed in as the --chip custom property). The read-only span.chip and the
+   selected button.chip.on keep their inline brand styles and are untouched. */
+button.chip:not(.on) {
+  background: var(--bg-raise);
+  border-color: var(--line);
+  color: var(--text-dim);
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+button.chip:not(.on):hover {
+  color: var(--text);
+  border-color: var(--chip, var(--amber));
+}
+button.chip:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
 /* star ratings */
 .stars { display: inline-flex; gap: 2px; color: var(--text-dim); line-height: 0; }
 .stars .star {

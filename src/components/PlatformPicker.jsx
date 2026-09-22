@@ -22,7 +22,8 @@ export function platformById(id) {
   return PLATFORMS.find((p) => p.id === id) || null;
 }
 
-// Small read-only pill for showing the chosen platform.
+// Small read-only pill for showing the chosen platform. Always brand-coloured,
+// because it only ever renders the one platform you actually picked.
 export function PlatformChip({ id }) {
   const p = platformById(id);
   if (!p) return null;
@@ -38,6 +39,12 @@ export function PlatformChip({ id }) {
 
 // Interactive picker. value is a platform id or ''. Clicking the selected chip
 // again clears it back to ''.
+//
+// Selected chip = full brand colour (inline styles below). Unselected chips are
+// neutral grey — styled in styles.css via `button.chip:not(.on)` — so only your
+// pick stands out. The brand colour is still handed to CSS as the `--chip`
+// custom property, which drives a subtle hover tint (nice on desktop; harmless
+// on touch).
 export default function PlatformPicker({ value, onChange }) {
   return (
     <div className="chips">
@@ -45,7 +52,7 @@ export default function PlatformPicker({ value, onChange }) {
         const on = value === p.id;
         const style = on
           ? { background: p.color, borderColor: p.color, color: p.dark ? '#0b0f17' : '#fff' }
-          : { background: p.color + '22', borderColor: p.color + '66', color: p.color };
+          : { '--chip': p.color };
         return (
           <button
             key={p.id}
