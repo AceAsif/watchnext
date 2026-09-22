@@ -1,10 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore.js';
 import { movieStatus } from '../store/db.js';
 import Stars from '../components/Stars.jsx';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// A "minute" holding this many watches or more is treated as one bulk/import
+// batch (marking a backlog on a single date), not real viewing. Real binges
+// carry their own per-episode timestamps and stay untouched. See the Habits
+// de-skew below. Chosen from the data: real days top out around a few watches
+// per minute, while import batches pack hundreds into one timestamp.
+const BATCH_MIN = 15;
 
 function fmtDay(ds) {
   if (!ds) return '';
@@ -20,6 +27,52 @@ function weekdayOf(ds) {
 function dayNum(ds) {
   const [y, m, d] = ds.split('-').map(Number);
   return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+// De-skewed timing stats for a scope (all years or one year).
+// - By day of week: each bulk batch (a minute with >= BATCH_MIN watches)
+//   contributes ONE event instead of its full size, so a 1,000-watch backlog
+//   dump doesn't bury the real weekly rhythm.
+// - Most in one day: the busiest day measured by DISTINCT timestamps, i.e. the
+//   biggest genuine sitting — 200 episodes stamped the same second count as 1.
+function computeHabits(events, year) {
+  const evs = year === 'all' ? events : events.filter((e) => e.year === year);
+
+  const minuteCount = {};
+  for (const e of evs) minuteCount[e.minute] = (minuteCount[e.minute] || 0) + 1;
+
+  const dow = [0, 0, 0, 0, 0, 0, 0]; // Sun..Sat
+  const distinctTsPerDay = {}; // day -> Set of timestamps
+  const days = new Set();
+  const seenBatchMinute = new Set();
+  let batchMinutes = 0; // how many batches we collapsed
+  let batchWatches = 0; // how many raw watches those batches represented
+
+  for (const e of evs) {
+    days.add(e.day);
+    (distinctTsPerDay[e.day] || (distinctTsPerDay[e.day] = new Set())).add(e.ts);
+
+    if (minuteCount[e.minute] >= BATCH_MIN) {
+      batchWatches++;
+      if (!seenBatchMinute.has(e.minute)) {
+        seenBatchMinute.add(e.minute);
+        batchMinutes++;
+        dow[e.wd] += 1; // whole batch = a single event
+      }
+    } else {
+      dow[e.wd] += 1;
+    }
+  }
+
+  let busiest = null;
+  for (const [d, set] of Object.entries(distinctTsPerDay)) {
+    if (!busiest || set.size > busiest.count) busiest = { date: d, count: set.size };
+  }
+
+  // Display Mon-first; DOW/dow are indexed Sun..Sat.
+  const dowRows = [1, 2, 3, 4, 5, 6, 0].map((i) => ({ label: DOW[i], value: dow[i] }));
+
+  return { dowRows, busiest, activeDays: days.size, batchMinutes, batchWatches };
 }
 
 function RatedList({ rows }) {
@@ -56,8 +109,9 @@ function Bars({ rows, unit }) {
 
 export default function Stats() {
   const state = useStore();
+  const [year, setYear] = useState('all');
 
-  const s = useMemo(() => {
+  const base = useMemo(() => {
     let episodes = 0;
     let minutes = 0;
     const perShow = [];
@@ -69,8 +123,7 @@ export default function Stats() {
     let notStarted = 0;
     let genreDataMissing = 0;
     const ratedShows = [];
-    const perDate = {}; // "YYYY-MM-DD" -> number of watch events that day
-    const dowCount = [0, 0, 0, 0, 0, 0, 0]; // Sun..Sat
+    const events = []; // one per dated watch: { year, day, wd, minute, ts }
 
     for (const show of Object.values(state.shows)) {
       const entries = Object.values(show.watched || {});
@@ -85,8 +138,7 @@ export default function Stats() {
           const y = w.at.slice(0, 4);
           perYear[y] = (perYear[y] || 0) + n;
           const day = w.at.slice(0, 10);
-          perDate[day] = (perDate[day] || 0) + 1;
-          dowCount[weekdayOf(day)]++;
+          events.push({ year: y, day, wd: weekdayOf(day), minute: w.at.slice(0, 16), ts: w.at });
         }
       }
       if (entries.length) perShow.push({ label: show.name, value: count });
@@ -124,8 +176,7 @@ export default function Stats() {
         const y = m.watchedAt.slice(0, 4);
         moviesPerYear[y] = (moviesPerYear[y] || 0) + 1;
         const day = m.watchedAt.slice(0, 10);
-        perDate[day] = (perDate[day] || 0) + 1;
-        dowCount[weekdayOf(day)]++;
+        events.push({ year: y, day, wd: weekdayOf(day), minute: m.watchedAt.slice(0, 16), ts: m.watchedAt });
       }
     }
 
@@ -141,8 +192,8 @@ export default function Stats() {
     ratedShows.sort(byRating);
     ratedMovies.sort(byRating);
 
-    // --- habits: streaks, busiest day, day-of-week ---
-    const dayKeys = Object.keys(perDate).sort(); // ISO dates sort chronologically
+    // --- streaks (all-time; unaffected by the batch skew since they're day-based) ---
+    const dayKeys = [...new Set(events.map((e) => e.day))].sort(); // ISO dates sort chronologically
     const nums = dayKeys.map(dayNum);
     let longest = 0;
     let longestEndNum = null;
@@ -175,14 +226,8 @@ export default function Stats() {
       }
     }
 
-    let busiest = null;
-    for (const [d, c] of Object.entries(perDate)) {
-      if (!busiest || c > busiest.count) busiest = { date: d, count: c };
-    }
-
-    // Display Mon-first; DOW/dowCount are indexed Sun..Sat.
-    const dowRows = [1, 2, 3, 4, 5, 6, 0].map((i) => ({ label: DOW[i], value: dowCount[i] }));
-    const years = Object.entries(perYear)
+    const years = [...new Set(events.map((e) => e.year))].sort((a, b) => b.localeCompare(a));
+    const yearList = Object.entries(perYear)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([label, value]) => ({ label, value }));
     const movieYears = Object.entries(moviesPerYear)
@@ -201,7 +246,8 @@ export default function Stats() {
       movieCount: watchedMovieCount,
       movieHours: Math.round(movieMinutes / 60),
       topShows: perShow.slice(0, 12),
-      years,
+      years,          // list of year strings for the selector (newest first)
+      yearBars: yearList,
       movieYears,
       genres,
       genreDataMissing,
@@ -212,9 +258,8 @@ export default function Stats() {
       currentStreak: current,
       longestStreak: longest,
       longestRange,
-      busiest,
-      dowRows,
-      activeDays: dayKeys.length,
+      events,
+      hasHabits: events.length > 0,
       completion: [
         { label: 'Finished', value: finished },
         { label: 'Watching', value: inProgress },
@@ -223,7 +268,9 @@ export default function Stats() {
     };
   }, [state.shows, state.movies]);
 
-  if (s.episodes === 0 && s.movieCount === 0) {
+  const habits = useMemo(() => computeHabits(base.events, year), [base.events, year]);
+
+  if (base.episodes === 0 && base.movieCount === 0) {
     return (
       <div className="notice">
         No watch history yet. Import your TV Time data in Settings, or start
@@ -232,137 +279,160 @@ export default function Stats() {
     );
   }
 
+  const scopeLabel = year === 'all' ? 'all years' : year;
+
   return (
     <div>
       <h2 className="section">All time</h2>
       <div className="stat-cards">
         <div className="stat-card">
-          <div className="big">{s.episodes.toLocaleString()}</div>
+          <div className="big">{base.episodes.toLocaleString()}</div>
           <div className="label">Episodes watched</div>
         </div>
         <div className="stat-card">
-          <div className="big">{s.hours.toLocaleString()}</div>
+          <div className="big">{base.hours.toLocaleString()}</div>
           <div className="label">Hours of TV</div>
         </div>
         <div className="stat-card">
-          <div className="big">{s.days}</div>
+          <div className="big">{base.days}</div>
           <div className="label">Days of TV</div>
         </div>
         <div className="stat-card">
-          <div className="big">{s.showCount}</div>
+          <div className="big">{base.showCount}</div>
           <div className="label">Shows started</div>
         </div>
         <div className="stat-card">
-          <div className="big">{s.movieCount}</div>
+          <div className="big">{base.movieCount}</div>
           <div className="label">Movies watched</div>
         </div>
         <div className="stat-card">
-          <div className="big">{s.movieHours.toLocaleString()}</div>
+          <div className="big">{base.movieHours.toLocaleString()}</div>
           <div className="label">Movie hours</div>
         </div>
       </div>
 
-      {(s.watchlistShows > 0 || s.watchlistMovies > 0) && (
+      {(base.watchlistShows > 0 || base.watchlistMovies > 0) && (
         <p className="muted" style={{ fontSize: 13, marginTop: -6 }}>
-          On your watchlist: {s.watchlistShows} show{s.watchlistShows === 1 ? '' : 's'},{' '}
-          {s.watchlistMovies} movie{s.watchlistMovies === 1 ? '' : 's'}.
+          On your watchlist: {base.watchlistShows} show{base.watchlistShows === 1 ? '' : 's'},{' '}
+          {base.watchlistMovies} movie{base.watchlistMovies === 1 ? '' : 's'}.
         </p>
       )}
 
-      {s.activeDays > 0 && (
+      {base.hasHabits && (
         <>
           <h2 className="section">Habits</h2>
           <div className="stat-cards">
             <div className="stat-card">
-              <div className="big">{s.currentStreak}</div>
+              <div className="big">{base.currentStreak}</div>
               <div className="label">Current streak (days)</div>
             </div>
             <div className="stat-card">
-              <div className="big">{s.longestStreak}</div>
+              <div className="big">{base.longestStreak}</div>
               <div className="label">Longest streak (days)</div>
             </div>
+          </div>
+          {base.longestRange && (
+            <p className="muted" style={{ fontSize: 13, marginTop: -6 }}>
+              Longest streak ran {fmtDay(base.longestRange.from)} – {fmtDay(base.longestRange.to)}.
+            </p>
+          )}
+
+          <div className="lib-controls" style={{ marginTop: 18 }}>
+            <h3 className="subsection" style={{ margin: 0 }}>Viewing pattern</h3>
+            <div className="sort-field">
+              <label htmlFor="habit-year" className="muted" style={{ fontSize: 13 }}>Year</label>
+              <select
+                id="habit-year"
+                className="select"
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+              >
+                <option value="all">All years</option>
+                {base.years.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="stat-cards">
             <div className="stat-card">
-              <div className="big">{s.busiest ? s.busiest.count : 0}</div>
+              <div className="big">{habits.busiest ? habits.busiest.count : 0}</div>
               <div className="label">Most in one day</div>
             </div>
             <div className="stat-card">
-              <div className="big">{s.activeDays.toLocaleString()}</div>
+              <div className="big">{habits.activeDays.toLocaleString()}</div>
               <div className="label">Days with a watch</div>
             </div>
           </div>
-          {(s.busiest || s.longestRange) && (
+          {habits.busiest && (
             <p className="muted" style={{ fontSize: 13, marginTop: -6 }}>
-              {s.busiest
-                ? `Busiest day: ${s.busiest.count} watched on ${fmtDay(s.busiest.date)}. `
-                : ''}
-              {s.longestRange
-                ? `Longest streak ran ${fmtDay(s.longestRange.from)} – ${fmtDay(
-                    s.longestRange.to
-                  )}.`
-                : ''}
+              Busiest day: {habits.busiest.count} watched on {fmtDay(habits.busiest.date)}{' '}
+              (counting only separately-timed watches, {scopeLabel}).
             </p>
           )}
+
           <h3 className="subsection">By day of week</h3>
-          <Bars rows={s.dowRows} />
-          {s.busiest && s.busiest.count > 50 && (
+          <Bars rows={habits.dowRows} />
+          {habits.batchMinutes > 0 && (
             <p className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
-              Heads up: a very high "most in one day" is almost always a batch of
-              history that was imported or bulk-marked on a single date, not a
-              real one-day binge — the same skew affects the day-of-week totals.
+              Smoothed {habits.batchMinutes} bulk-marked batch{habits.batchMinutes === 1 ? '' : 'es'}{' '}
+              ({habits.batchWatches.toLocaleString()} watches marked together on a single date) out of
+              this view, so a one-off backlog import doesn't drown out your real day-to-day pattern.
             </p>
           )}
         </>
       )}
 
-      {(s.topRatedShows.length > 0 || s.topRatedMovies.length > 0) && (
+      {(base.topRatedShows.length > 0 || base.topRatedMovies.length > 0) && (
         <>
           <h2 className="section">Top rated</h2>
-          {s.topRatedShows.length > 0 && (
+          {base.topRatedShows.length > 0 && (
             <>
               <h3 className="subsection">Shows</h3>
-              <RatedList rows={s.topRatedShows} />
+              <RatedList rows={base.topRatedShows} />
             </>
           )}
-          {s.topRatedMovies.length > 0 && (
+          {base.topRatedMovies.length > 0 && (
             <>
               <h3 className="subsection">Movies</h3>
-              <RatedList rows={s.topRatedMovies} />
+              <RatedList rows={base.topRatedMovies} />
             </>
           )}
         </>
       )}
 
-      {s.topShows.length > 0 && (
+      {base.topShows.length > 0 && (
         <>
           <h2 className="section">Most watched shows</h2>
-          <Bars rows={s.topShows} />
+          <Bars rows={base.topShows} />
         </>
       )}
 
-      {s.years.length > 0 && (
+      {base.yearBars.length > 0 && (
         <>
           <h2 className="section">Episodes per year</h2>
-          <Bars rows={s.years} />
+          <Bars rows={base.yearBars} />
         </>
       )}
 
-      {s.movieYears.length > 0 && (
+      {base.movieYears.length > 0 && (
         <>
           <h2 className="section">Movies per year</h2>
-          <Bars rows={s.movieYears} />
+          <Bars rows={base.movieYears} />
         </>
       )}
 
       <h2 className="section">Library completion</h2>
-      <Bars rows={s.completion} />
+      <Bars rows={base.completion} />
 
       <h2 className="section">Genres</h2>
-      {s.genres.length > 0 ? (
+      {base.genres.length > 0 ? (
         <>
-          <Bars rows={s.genres} unit=" eps" />
-          {s.genreDataMissing > 0 && (
+          <Bars rows={base.genres} unit=" eps" />
+          {base.genreDataMissing > 0 && (
             <p className="muted" style={{ fontSize: 13 }}>
-              {s.genreDataMissing} shows have no genre data yet — run "Refresh
+              {base.genreDataMissing} shows have no genre data yet — run "Refresh
               all from TMDB" on the Shows tab to fill them in.
             </p>
           )}
