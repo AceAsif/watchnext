@@ -6,12 +6,14 @@ import {
   markSeason,
   toggleFollow,
   setShowRating,
+  setShowPlatform,
   deleteShow,
   applyTmdbDetails,
   watchedCount,
 } from '../store/db.js';
 import { seasonDetails, resolveShow, searchShows, showDetails, hasKey, img } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
+import PlatformPicker from '../components/PlatformPicker.jsx';
 
 function Check({ on, onClick, label }) {
   return (
@@ -248,6 +250,15 @@ export default function ShowDetail({ id, onBack }) {
           <div className="rate-row">
             <span className="muted" style={{ fontSize: 12 }}>Your rating</span>
             <Stars value={show.rating || 0} onChange={(n) => setShowRating(id, n)} />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+              Where you watch it
+            </div>
+            <PlatformPicker
+              value={show.platform || ''}
+              onChange={(p) => setShowPlatform(id, p)}
+            />
           </div>
         </div>
       </div>

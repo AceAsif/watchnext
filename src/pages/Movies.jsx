@@ -6,10 +6,12 @@ import {
   removeMovie,
   updateMovie,
   setMovieRating,
+  setMoviePlatform,
   movieStatus,
 } from '../store/db.js';
 import { searchMovies, movieDetails, hasKey, img } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
+import PlatformPicker, { PlatformChip } from '../components/PlatformPicker.jsx';
 
 export default function Movies() {
   const state = useStore();
@@ -308,6 +310,11 @@ export default function Movies() {
                   {m.year ? `${m.year} · ` : ''}
                   watched {(m.watchedAt || '').slice(0, 10) || 'sometime'}
                 </div>
+                {m.platform ? (
+                  <div style={{ margin: '6px 0 2px' }}>
+                    <PlatformChip id={m.platform} />
+                  </div>
+                ) : null}
 
                 <div style={{ margin: '4px 0 2px' }}>
                   <Stars
@@ -350,6 +357,15 @@ export default function Movies() {
                         </p>
                       </>
                     )}
+                    <div style={{ marginTop: 10 }}>
+                      <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+                        Where you watched it
+                      </div>
+                      <PlatformPicker
+                        value={m.platform || ''}
+                        onChange={(p) => setMoviePlatform(m.index, p)}
+                      />
+                    </div>
                   </>
                 )}
 

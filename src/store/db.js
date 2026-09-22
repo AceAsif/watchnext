@@ -144,6 +144,15 @@ export function setShowRating(id, rating) {
   markShowDirty(id);
 }
 
+export function setShowPlatform(id, platform) {
+  // platform: a PlatformPicker id, or '' to clear. Rides the per-show doc.
+  update((s) => {
+    const show = s.shows[id];
+    if (show) s.shows[id] = { ...show, platform: platform || '' };
+  });
+  markShowDirty(id);
+}
+
 export function deleteShow(id) {
   // True delete: remove the record from local state now, and from Firestore on
   // the next sync flush (see cloud.js). Unlike unfollow, which only hides a
@@ -435,6 +444,15 @@ export function setMovieRating(index, rating) {
   update((s) => {
     s.movies = s.movies.map((m, i) =>
       i === index ? { ...m, rating: rating || 0 } : m
+    );
+  });
+  markMoviesDirty();
+}
+
+export function setMoviePlatform(index, platform) {
+  update((s) => {
+    s.movies = s.movies.map((m, i) =>
+      i === index ? { ...m, platform: platform || '' } : m
     );
   });
   markMoviesDirty();
