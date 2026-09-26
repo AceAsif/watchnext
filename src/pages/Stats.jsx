@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore.js';
 import { movieStatus } from '../store/db.js';
 import Stars from '../components/Stars.jsx';
+import YearInReview from '../components/YearInReview.jsx';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -75,6 +76,34 @@ function computeHabits(events, year) {
   return { dowRows, busiest, activeDays: days.size, batchMinutes, batchWatches };
 }
 
+// Busiest month for a single year, de-skewed the same way (a bulk batch counts
+// once). Returns { name, count } or null.
+function busiestMonthOf(events, year) {
+  const evs = events.filter((e) => e.year === year);
+  if (!evs.length) return null;
+  const minuteCount = {};
+  for (const e of evs) minuteCount[e.minute] = (minuteCount[e.minute] || 0) + 1;
+  const months = new Array(12).fill(0);
+  const seen = new Set();
+  for (const e of evs) {
+    const mi = Number(e.day.slice(5, 7)) - 1;
+    if (minuteCount[e.minute] >= BATCH_MIN) {
+      if (!seen.has(e.minute)) { seen.add(e.minute); months[mi]++; }
+    } else {
+      months[mi]++;
+    }
+  }
+  let best = 0;
+  for (let i = 1; i < 12; i++) if (months[i] > months[best]) best = i;
+  return { name: MONTHS[best], count: months[best] };
+}
+
+function activeDaysOf(events, year) {
+  const days = new Set();
+  for (const e of events) if (e.year === year) days.add(e.day);
+  return days.size;
+}
+
 function RatedList({ rows }) {
   return (
     <div className="rated-list">
@@ -109,13 +138,17 @@ function Bars({ rows, unit }) {
 
 export default function Stats() {
   const state = useStore();
-  const [year, setYear] = useState('all');
+  const [year, setYear] = useState('all');       // Habits day-of-week scope
+  const [reviewYear, setReviewYear] = useState(null); // Year in review scope
 
   const base = useMemo(() => {
     let episodes = 0;
     let minutes = 0;
     const perShow = [];
-    const perYear = {};
+    const perYear = {};       // year -> episodes watched
+    const perYearMin = {};    // year -> minutes watched (TV + movies)
+    const perYearShows = {};  // year -> [{ name, poster, count }]
+    const perYearGenre = {};  // year -> { genre: episodes }
     const moviesPerYear = {};
     const perGenre = {};
     let finished = 0;
@@ -129,6 +162,7 @@ export default function Stats() {
       const entries = Object.values(show.watched || {});
       if (show.rating) ratedShows.push({ name: show.name, rating: show.rating });
       let count = 0;
+      const showYear = {}; // this show's episodes per year
       for (const w of entries) {
         const n = w.n || 1;
         count += n;
@@ -137,11 +171,22 @@ export default function Stats() {
         if (w.at) {
           const y = w.at.slice(0, 4);
           perYear[y] = (perYear[y] || 0) + n;
+          perYearMin[y] = (perYearMin[y] || 0) + (w.min || 40) * n;
           const day = w.at.slice(0, 10);
           events.push({ year: y, day, wd: weekdayOf(day), minute: w.at.slice(0, 16), ts: w.at });
+          showYear[y] = (showYear[y] || 0) + n;
         }
       }
       if (entries.length) perShow.push({ label: show.name, value: count });
+
+      // Per-year "top shows" + genre tallies (for the Year in review card)
+      for (const [y, c] of Object.entries(showYear)) {
+        (perYearShows[y] || (perYearShows[y] = [])).push({ name: show.name, poster: show.poster || null, count: c });
+        if (show.genres && show.genres.length) {
+          const gm = perYearGenre[y] || (perYearGenre[y] = {});
+          for (const g of show.genres) gm[g] = (gm[g] || 0) + c;
+        }
+      }
 
       // Completion buckets (followed shows only, so the numbers match Library)
       if (show.followed) {
@@ -152,7 +197,7 @@ export default function Stats() {
         else notStarted++;
       }
 
-      // Genre tally, weighted by episodes watched of that show
+      // Genre tally (all-time), weighted by episodes watched of that show
       if (count > 0) {
         if (show.genres && show.genres.length) {
           for (const g of show.genres) {
@@ -175,9 +220,21 @@ export default function Stats() {
       if (m.watchedAt) {
         const y = m.watchedAt.slice(0, 4);
         moviesPerYear[y] = (moviesPerYear[y] || 0) + 1;
+        perYearMin[y] = (perYearMin[y] || 0) + (m.runtimeMin || 110);
         const day = m.watchedAt.slice(0, 10);
         events.push({ year: y, day, wd: weekdayOf(day), minute: m.watchedAt.slice(0, 16), ts: m.watchedAt });
       }
+    }
+
+    // Sort per-year top shows, and pick each year's top genre
+    for (const y of Object.keys(perYearShows)) {
+      perYearShows[y].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    }
+    const perYearTopGenre = {};
+    for (const [y, gm] of Object.entries(perYearGenre)) {
+      let best = null;
+      for (const [g, c] of Object.entries(gm)) if (!best || c > best.c) best = { g, c };
+      if (best) perYearTopGenre[y] = best.g;
     }
 
     const watchlistShows = Object.values(state.shows).filter(
@@ -227,7 +284,7 @@ export default function Stats() {
     }
 
     const years = [...new Set(events.map((e) => e.year))].sort((a, b) => b.localeCompare(a));
-    const yearList = Object.entries(perYear)
+    const yearBars = Object.entries(perYear)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([label, value]) => ({ label, value }));
     const movieYears = Object.entries(moviesPerYear)
@@ -246,8 +303,8 @@ export default function Stats() {
       movieCount: watchedMovieCount,
       movieHours: Math.round(movieMinutes / 60),
       topShows: perShow.slice(0, 12),
-      years,          // list of year strings for the selector (newest first)
-      yearBars: yearList,
+      years,          // year strings for the selectors (newest first)
+      yearBars,
       movieYears,
       genres,
       genreDataMissing,
@@ -260,6 +317,12 @@ export default function Stats() {
       longestRange,
       events,
       hasHabits: events.length > 0,
+      // per-year data for the Year in review card
+      perYearEpisodes: perYear,
+      perYearMin,
+      moviesPerYear,
+      perYearShows,
+      perYearTopGenre,
       completion: [
         { label: 'Finished', value: finished },
         { label: 'Watching', value: inProgress },
@@ -269,6 +332,27 @@ export default function Stats() {
   }, [state.shows, state.movies]);
 
   const habits = useMemo(() => computeHabits(base.events, year), [base.events, year]);
+
+  const activeReviewYear = reviewYear ?? base.years[0] ?? null;
+  const review = useMemo(() => {
+    const y = activeReviewYear;
+    if (!y) return null;
+    const prev = String(Number(y) - 1);
+    const ep = base.perYearEpisodes[y] || 0;
+    const epPrev = base.perYearEpisodes[prev] || 0;
+    return {
+      year: y,
+      episodes: ep,
+      hours: Math.round((base.perYearMin[y] || 0) / 60),
+      movies: base.moviesPerYear[y] || 0,
+      activeDays: activeDaysOf(base.events, y),
+      topShows: (base.perYearShows[y] || []).slice(0, 3),
+      topGenre: base.perYearTopGenre[y] || null,
+      busiestMonth: busiestMonthOf(base.events, y),
+      prevYear: epPrev ? prev : null,
+      epDelta: epPrev ? Math.round(((ep - epPrev) / epPrev) * 100) : null,
+    };
+  }, [base, activeReviewYear]);
 
   if (base.episodes === 0 && base.movieCount === 0) {
     return (
@@ -316,6 +400,10 @@ export default function Stats() {
           On your watchlist: {base.watchlistShows} show{base.watchlistShows === 1 ? '' : 's'},{' '}
           {base.watchlistMovies} movie{base.watchlistMovies === 1 ? '' : 's'}.
         </p>
+      )}
+
+      {review && (
+        <YearInReview data={review} years={base.years} onYear={setReviewYear} />
       )}
 
       {base.hasHabits && (
