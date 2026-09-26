@@ -12,7 +12,7 @@ import { searchShows, showDetails, resolveShow, hasKey, img } from '../api/tmdb.
 import PosterCard from '../components/PosterCard.jsx';
 
 const FILTERS = ['All', 'Watching', 'Finished', 'Not started'];
-const SORTS = ['Alphabetical', 'Recently watched', 'Progress', 'Rating'];
+const SORTS = ['Alphabetical', 'Recently added', 'Recently watched', 'Progress', 'Rating'];
 
 export default function Shows({ openShow }) {
   const state = useStore();
@@ -52,6 +52,14 @@ export default function Shows({ openShow }) {
       list.sort(
         (a, b) =>
           (lastWatchDate(b[1]) || '').localeCompare(lastWatchDate(a[1]) || '') ||
+          a[1].name.localeCompare(b[1].name)
+      );
+    } else if (sortBy === 'Recently added') {
+      // Newest addedAt first. Imported shows have no addedAt, so they fall to
+      // the bottom, ordered alphabetically among themselves.
+      list.sort(
+        (a, b) =>
+          (b[1].addedAt || '').localeCompare(a[1].addedAt || '') ||
           a[1].name.localeCompare(b[1].name)
       );
     } else if (sortBy === 'Progress') {
