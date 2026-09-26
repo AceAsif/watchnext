@@ -153,6 +153,18 @@ export function setShowPlatform(id, platform) {
   markShowDirty(id);
 }
 
+export function setShowUpcoming(id, upcoming) {
+  // upcoming: cached list of still-to-air episodes for the calendar/agenda,
+  //   [{ s, e, name, air }] sorted-agnostic (the UI sorts). Populated from
+  //   TMDB season details (see fetchUpcomingEpisodes in api/tmdb.js). Rides
+  //   the per-show sync doc like any other field — no cloud.js change needed.
+  update((s) => {
+    const show = s.shows[id];
+    if (show) s.shows[id] = { ...show, upcoming: upcoming || [], upcomingSynced: new Date().toISOString() };
+  });
+  markShowDirty(id);
+}
+
 export function deleteShow(id) {
   // True delete: remove the record from local state now, and from Firestore on
   // the next sync flush (see cloud.js). Unlike unfollow, which only hides a

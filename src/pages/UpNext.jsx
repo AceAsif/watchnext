@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore.js';
-import { watchedCount, lastWatched, lastWatchDate } from '../store/db.js';
-import { img, hasKey } from '../api/tmdb.js';
+import { watchedCount, lastWatched, lastWatchDate, setShowUpcoming } from '../store/db.js';
+import { img, hasKey, fetchUpcomingEpisodes } from '../api/tmdb.js';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -59,37 +59,85 @@ function NextRow({ show, onOpen }) {
 export default function UpNext({ openShow }) {
   const state = useStore();
   const shows = Object.entries(state.shows);
+  const [refresh, setRefresh] = useState(null); // {done, total} while refreshing
 
-  const { inProgress, upcoming, agenda } = useMemo(() => {
+  const { inProgress, agenda, upcomingCount, syncTargets } = useMemo(() => {
     const inProgress = [];
-    const upcoming = [];
     const today = new Date().toISOString().slice(0, 10);
+
+    // Every still-to-air episode across the library. Prefer the cached
+    // `upcoming` list (all episodes of the airing season); fall back to the
+    // single `nextAir` so the agenda still works before the first refresh.
+    const items = [];
+    const syncTargets = []; // shows we can pull upcoming episodes for
     for (const [id, show] of shows) {
       if (!show.followed) continue;
+
       const seen = watchedCount(show);
       const total = show.totalEpisodes;
       if (seen > 0 && (!total || seen < total)) inProgress.push([id, show]);
-      if (show.nextAir && show.nextAir.date >= today) upcoming.push([id, show]);
+
+      if (show.tmdbId && show.nextAir) syncTargets.push([id, show]);
+
+      const cached = Array.isArray(show.upcoming)
+        ? show.upcoming.filter((ep) => ep.air >= today)
+        : [];
+      if (cached.length) {
+        for (const ep of cached) {
+          items.push({ id, show, s: ep.s, e: ep.e, name: ep.name, date: ep.air });
+        }
+      } else if (show.nextAir && show.nextAir.date >= today) {
+        items.push({
+          id,
+          show,
+          s: show.nextAir.season,
+          e: show.nextAir.episode,
+          name: show.nextAir.name,
+          date: show.nextAir.date,
+        });
+      }
     }
+
     inProgress.sort(
       (a, b) => (lastWatchDate(b[1]) || '').localeCompare(lastWatchDate(a[1]) || '')
     );
-    upcoming.sort((a, b) => a[1].nextAir.date.localeCompare(b[1].nextAir.date));
+    items.sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        a.show.name.localeCompare(b.show.name) ||
+        a.s - b.s ||
+        a.e - b.e
+    );
 
-    // Group upcoming shows by their air date so the section reads like a
-    // dated agenda instead of a flat list.
+    // Group by air date so it reads like a dated agenda.
     const byDate = new Map();
-    for (const entry of upcoming) {
-      const date = entry[1].nextAir.date;
-      if (!byDate.has(date)) byDate.set(date, []);
-      byDate.get(date).push(entry);
+    for (const it of items) {
+      if (!byDate.has(it.date)) byDate.set(it.date, []);
+      byDate.get(it.date).push(it);
     }
-    const agenda = [...byDate.entries()]; // already date-ascending from the sort
+    const agenda = [...byDate.entries()]; // already date-ascending
 
-    return { inProgress, upcoming, agenda };
+    return { inProgress, agenda, upcomingCount: items.length, syncTargets };
   }, [state.shows]);
 
   const empty = shows.length === 0;
+
+  async function refreshUpcoming() {
+    if (!syncTargets.length) return;
+    setRefresh({ done: 0, total: syncTargets.length });
+    let done = 0;
+    for (const [id, show] of syncTargets) {
+      try {
+        const eps = await fetchUpcomingEpisodes(show);
+        setShowUpcoming(id, eps);
+      } catch (err) {
+        console.warn('upcoming fetch failed for', show.name, err);
+      }
+      done++;
+      setRefresh({ done, total: syncTargets.length });
+    }
+    setRefresh(null);
+  }
 
   return (
     <div>
@@ -109,39 +157,67 @@ export default function UpNext({ openShow }) {
         </div>
       )}
 
-      {upcoming.length > 0 && (
+      {!empty && (syncTargets.length > 0 || upcomingCount > 0) && (
         <>
-          <h2 className="section">On the way</h2>
-          {agenda.map(([date, rows]) => {
-            const rel = relHint(date);
-            return (
-              <div key={date}>
-                <div className="agenda-date">
-                  {fmtAgenda(date)}
-                  {rel && <span className="rel"> · {rel}</span>}
-                </div>
-                {rows.map(([id, show]) => (
-                  <button key={id} className="next-row" onClick={() => openShow(id)}>
-                    {show.poster ? (
-                      <img src={img(show.poster, 'w154')} alt="" loading="lazy" />
-                    ) : (
-                      <div className="thumb" />
-                    )}
-                    <div className="info">
-                      <div className="name">{show.name}</div>
-                      <div className="detail">
-                        <span className="epcode">
-                          S{String(show.nextAir.season).padStart(2, '0')}·E
-                          {String(show.nextAir.episode).padStart(2, '0')}
-                        </span>
-                        {show.nextAir.name ? ` — ${show.nextAir.name}` : ''}
+          <div className="row" style={{ marginTop: 4 }}>
+            <h2 className="section" style={{ margin: 0 }}>
+              On the way{' '}
+              {upcomingCount > 0 && (
+                <span className="muted">({upcomingCount} episode{upcomingCount === 1 ? '' : 's'})</span>
+              )}
+            </h2>
+            <div className="spacer" />
+            <button
+              className="btn"
+              onClick={refreshUpcoming}
+              disabled={!hasKey() || !!refresh || syncTargets.length === 0}
+              title="Pull every scheduled episode for your airing shows from TMDB"
+            >
+              {refresh ? `Refreshing ${refresh.done}/${refresh.total}` : 'Refresh upcoming'}
+            </button>
+          </div>
+
+          {agenda.length === 0 ? (
+            <p className="muted" style={{ fontSize: 13.5 }}>
+              No upcoming episodes scheduled. Tap "Refresh upcoming" to check TMDB
+              for newly-dated episodes (sync your library in the Shows tab first if
+              you haven't).
+            </p>
+          ) : (
+            agenda.map(([date, rows]) => {
+              const rel = relHint(date);
+              return (
+                <div key={date}>
+                  <div className="agenda-date">
+                    {fmtAgenda(date)}
+                    {rel && <span className="rel"> · {rel}</span>}
+                  </div>
+                  {rows.map((it) => (
+                    <button
+                      key={`${it.id}:${it.s}x${it.e}`}
+                      className="next-row"
+                      onClick={() => openShow(it.id)}
+                    >
+                      {it.show.poster ? (
+                        <img src={img(it.show.poster, 'w154')} alt="" loading="lazy" />
+                      ) : (
+                        <div className="thumb" />
+                      )}
+                      <div className="info">
+                        <div className="name">{it.show.name}</div>
+                        <div className="detail">
+                          <span className="epcode">
+                            S{String(it.s).padStart(2, '0')}·E{String(it.e).padStart(2, '0')}
+                          </span>
+                          {it.name ? ` — ${it.name}` : ''}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            );
-          })}
+                    </button>
+                  ))}
+                </div>
+              );
+            })
+          )}
         </>
       )}
 
@@ -154,7 +230,7 @@ export default function UpNext({ openShow }) {
         </>
       )}
 
-      {!empty && inProgress.length === 0 && upcoming.length === 0 && (
+      {!empty && inProgress.length === 0 && upcomingCount === 0 && syncTargets.length === 0 && (
         <div className="notice">
           Nothing in progress. Sync with TMDB in the Shows tab to load episode
           counts, or open a show to mark where you're up to.

@@ -55,6 +55,27 @@ export function seasonDetails(tmdbId, seasonNumber) {
   return get(`/tv/${tmdbId}/season/${seasonNumber}`);
 }
 
+// Every still-to-air episode of a show's currently-airing season, for the
+// Up Next agenda / calendar. Needs the show to have been TMDB-synced already
+// (so nextAir tells us which season to pull). Returns [{ s, e, name, air }],
+// only episodes with an air date of today or later. Shows with no scheduled
+// next episode (ended, or between seasons) return []. One API call per show.
+export async function fetchUpcomingEpisodes(show) {
+  const tmdbId = show.tmdbId;
+  const season = show.nextAir && show.nextAir.season;
+  if (!tmdbId || !season) return [];
+  const data = await seasonDetails(tmdbId, season);
+  const today = new Date().toISOString().slice(0, 10);
+  return (data.episodes || [])
+    .filter((ep) => ep.air_date && ep.air_date >= today)
+    .map((ep) => ({
+      s: ep.season_number,
+      e: ep.episode_number,
+      name: ep.name || '',
+      air: ep.air_date,
+    }));
+}
+
 // Resolve + enrich one show record. Returns TMDB details or null.
 export async function resolveShow(show) {
   let tmdbId = show.tmdbId;
