@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore.js';
 import { watchedCount, lastWatched, lastWatchDate, setShowUpcoming } from '../store/db.js';
 import { img, hasKey, fetchUpcomingEpisodes } from '../api/tmdb.js';
+import CalendarGrid from '../components/CalendarGrid.jsx';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -60,8 +61,9 @@ export default function UpNext({ openShow }) {
   const state = useStore();
   const shows = Object.entries(state.shows);
   const [refresh, setRefresh] = useState(null); // {done, total} while refreshing
+  const [view, setView] = useState('list'); // 'list' | 'calendar'
 
-  const { inProgress, agenda, upcomingCount, syncTargets } = useMemo(() => {
+  const { inProgress, agenda, upcomingCount, syncTargets, items } = useMemo(() => {
     const inProgress = [];
     const today = new Date().toISOString().slice(0, 10);
 
@@ -117,7 +119,7 @@ export default function UpNext({ openShow }) {
     }
     const agenda = [...byDate.entries()]; // already date-ascending
 
-    return { inProgress, agenda, upcomingCount: items.length, syncTargets };
+    return { inProgress, agenda, upcomingCount: items.length, syncTargets, items };
   }, [state.shows]);
 
   const empty = shows.length === 0;
@@ -167,17 +169,35 @@ export default function UpNext({ openShow }) {
               )}
             </h2>
             <div className="spacer" />
-            <button
-              className="btn"
-              onClick={refreshUpcoming}
-              disabled={!hasKey() || !!refresh || syncTargets.length === 0}
-              title="Pull every scheduled episode for your airing shows from TMDB"
-            >
-              {refresh ? `Refreshing ${refresh.done}/${refresh.total}` : 'Refresh upcoming'}
-            </button>
+            <div className="row" style={{ gap: 6 }}>
+              <button
+                className="btn"
+                style={view === 'list' ? { borderColor: 'var(--amber)', color: 'var(--amber)' } : {}}
+                onClick={() => setView('list')}
+              >
+                List
+              </button>
+              <button
+                className="btn"
+                style={view === 'calendar' ? { borderColor: 'var(--amber)', color: 'var(--amber)' } : {}}
+                onClick={() => setView('calendar')}
+              >
+                Calendar
+              </button>
+              <button
+                className="btn"
+                onClick={refreshUpcoming}
+                disabled={!hasKey() || !!refresh || syncTargets.length === 0}
+                title="Pull every scheduled episode for your airing shows from TMDB"
+              >
+                {refresh ? `Refreshing ${refresh.done}/${refresh.total}` : 'Refresh upcoming'}
+              </button>
+            </div>
           </div>
 
-          {agenda.length === 0 ? (
+          {view === 'calendar' ? (
+            <CalendarGrid items={items} onOpen={openShow} />
+          ) : agenda.length === 0 ? (
             <p className="muted" style={{ fontSize: 13.5 }}>
               No upcoming episodes scheduled. Tap "Refresh upcoming" to check TMDB
               for newly-dated episodes (sync your library in the Shows tab first if

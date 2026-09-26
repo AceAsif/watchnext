@@ -26,7 +26,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
-import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markShowDeleted } from './db.js';
+import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markShowDeleted, isTombstoned } from './db.js';
 
 export function isCloudAvailable() {
   return hasFirebaseConfig;
@@ -96,6 +96,13 @@ function startSync(newUid) {
           delete s.shows[id];
           return;
         }
+        // A remote add/update for a show we've deleted locally must not
+        // resurrect it — drop it and re-queue the Firestore delete.
+        if (isTombstoned(id)) {
+          delete s.shows[id];
+          markShowDeleted(id);
+          return;
+        }
         s.shows[id] = { ...(s.shows[id] || {}), ...change.doc.data() };
       });
     });
@@ -127,6 +134,12 @@ async function pullAndMerge(forUid) {
 
   update((s) => {
     showsSnap.forEach((d) => {
+      // Skip shows the user deleted for good: don't merge them back in, and
+      // re-queue the Firestore delete so the remote doc gets cleaned up.
+      if (isTombstoned(d.id)) {
+        markShowDeleted(d.id);
+        return;
+      }
       const remote = d.data();
       const local = s.shows[d.id];
       if (!local) {

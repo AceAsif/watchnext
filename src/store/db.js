@@ -60,6 +60,38 @@ let dirtyShows = new Set();
 let dirtyMovies = false;
 let deletedShows = new Set();
 
+// Persistent tombstones: ids the user has deleted for good. Kept in
+// localStorage (unlike deletedShows, which is an in-memory flush queue that
+// resets on reload) so a delete survives a reload/redeploy even when the async
+// Firestore delete didn't land before the page unloaded. Without this,
+// pullAndMerge (cloud.js) sees the still-present remote doc, finds it missing
+// locally, and resurrects it. A tombstone is lifted only when the user
+// deliberately re-adds a show with that id (see the add/import paths below).
+const TOMB_KEY = 'watchnext-tombstones-v1';
+function loadTombstones() {
+  try {
+    const raw = localStorage.getItem(TOMB_KEY);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch (e) {
+    console.error('Failed to load tombstones', e);
+  }
+  return new Set();
+}
+let tombstones = loadTombstones();
+function persistTombstones() {
+  try {
+    localStorage.setItem(TOMB_KEY, JSON.stringify([...tombstones]));
+  } catch (e) {
+    console.error('Failed to save tombstones', e);
+  }
+}
+export function isTombstoned(id) {
+  return tombstones.has(id);
+}
+export function clearTombstone(id) {
+  if (tombstones.delete(id)) persistTombstones();
+}
+
 export function markShowDirty(id) {
   dirtyShows.add(id);
 }
@@ -71,6 +103,8 @@ export function markMoviesDirty() {
 export function markShowDeleted(id) {
   deletedShows.add(id);
   dirtyShows.delete(id); // a deleted show must not also be pushed as an update
+  tombstones.add(id); // remember it across reloads so it can't be resurrected
+  persistTombstones();
 }
 
 export function takeDirty() {
@@ -203,6 +237,7 @@ export function addShowToWatchlist(details) {
       ...tmdbFields(details),
     };
   });
+  clearTombstone(id); // deliberately (re-)adding lifts any delete tombstone
   markShowDirty(id);
 }
 
@@ -283,6 +318,7 @@ export function addShowFromTmdb(details) {
       ...tmdbFields(details),
     };
   });
+  clearTombstone(id); // deliberately (re-)adding lifts any delete tombstone
   markShowDirty(id);
 }
 
@@ -365,6 +401,7 @@ export function importTvTime(json) {
     }
   });
   touchedIds.forEach(markShowDirty);
+  touchedIds.forEach(clearTombstone); // re-importing a show lifts its tombstone
   if ((json.movies || []).length) markMoviesDirty();
   return { shows, watches };
 }
