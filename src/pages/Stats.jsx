@@ -7,6 +7,7 @@ import { platformById } from '../components/PlatformPicker.jsx';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const TABS = ['Overview', 'Habits', 'Rankings', 'Breakdown'];
 
 // A "minute" holding this many watches or more is treated as one bulk/import
 // batch (marking a backlog on a single date), not real viewing. Real binges
@@ -141,6 +142,7 @@ export default function Stats() {
   const state = useStore();
   const [year, setYear] = useState('all');       // Habits day-of-week scope
   const [reviewYear, setReviewYear] = useState(null); // Year in review scope
+  const [tab, setTab] = useState('Overview'); // Stats sub-tab
 
   const base = useMemo(() => {
     let episodes = 0;
@@ -409,6 +411,21 @@ export default function Stats() {
 
   return (
     <div>
+      <div className="row" style={{ gap: 6, marginTop: 4, marginBottom: 4, flexWrap: 'wrap' }}>
+        {TABS.map((t) => (
+          <button
+            key={t}
+            className="btn"
+            style={tab === t ? { borderColor: 'var(--amber)', color: 'var(--amber)' } : {}}
+            onClick={() => setTab(t)}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'Overview' && (
+        <>
       <h2 className="section">All time</h2>
       <div className="stat-cards">
         <div className="stat-card">
@@ -447,8 +464,10 @@ export default function Stats() {
       {review && (
         <YearInReview data={review} years={base.years} onYear={setReviewYear} />
       )}
+        </>
+      )}
 
-      {base.hasHabits && (
+      {tab === 'Habits' && base.hasHabits && (
         <>
           <h2 className="section">Habits</h2>
           <div className="stat-cards">
@@ -514,7 +533,7 @@ export default function Stats() {
         </>
       )}
 
-      {(base.topRatedShows.length > 0 || base.topRatedMovies.length > 0) && (
+      {tab === 'Rankings' && (base.topRatedShows.length > 0 || base.topRatedMovies.length > 0) && (
         <>
           <h2 className="section">Top rated</h2>
           {base.topRatedShows.length > 0 && (
@@ -532,28 +551,28 @@ export default function Stats() {
         </>
       )}
 
-      {base.topShows.length > 0 && (
+      {tab === 'Rankings' && base.topShows.length > 0 && (
         <>
           <h2 className="section">Most watched shows</h2>
           <Bars rows={base.topShows} />
         </>
       )}
 
-      {base.yearBars.length > 0 && (
+      {tab === 'Breakdown' && base.yearBars.length > 0 && (
         <>
           <h2 className="section">Episodes per year</h2>
           <Bars rows={base.yearBars} />
         </>
       )}
 
-      {base.movieYears.length > 0 && (
+      {tab === 'Breakdown' && base.movieYears.length > 0 && (
         <>
           <h2 className="section">Movies per year</h2>
           <Bars rows={base.movieYears} />
         </>
       )}
 
-      {(base.platformRows.length > 0 || base.untaggedTitles > 0) && (
+      {tab === 'Breakdown' && (base.platformRows.length > 0 || base.untaggedTitles > 0) && (
         <>
           <h2 className="section">Where you watch</h2>
           {base.platformRows.length > 0 ? (
@@ -576,25 +595,29 @@ export default function Stats() {
         </>
       )}
 
-      <h2 className="section">Library completion</h2>
-      <Bars rows={base.completion} />
-
-      <h2 className="section">Genres</h2>
-      {base.genres.length > 0 ? (
+      {tab === 'Breakdown' && (
         <>
-          <Bars rows={base.genres} unit=" eps" />
-          {base.genreDataMissing > 0 && (
-            <p className="muted" style={{ fontSize: 13 }}>
-              {base.genreDataMissing} shows have no genre data yet — run "Refresh
-              all from TMDB" on the Shows tab to fill them in.
+          <h2 className="section">Library completion</h2>
+          <Bars rows={base.completion} />
+
+          <h2 className="section">Genres</h2>
+          {base.genres.length > 0 ? (
+            <>
+              <Bars rows={base.genres} unit=" eps" />
+              {base.genreDataMissing > 0 && (
+                <p className="muted" style={{ fontSize: 13 }}>
+                  {base.genreDataMissing} shows have no genre data yet — run "Refresh
+                  all from TMDB" on the Shows tab to fill them in.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="muted" style={{ fontSize: 13.5 }}>
+              No genre data yet. Run "Refresh all from TMDB" on the Shows tab
+              once, and genres will appear here.
             </p>
           )}
         </>
-      ) : (
-        <p className="muted" style={{ fontSize: 13.5 }}>
-          No genre data yet. Run "Refresh all from TMDB" on the Shows tab
-          once, and genres will appear here.
-        </p>
       )}
     </div>
   );
