@@ -4,6 +4,7 @@ import { movieStatus } from '../store/db.js';
 import Stars from '../components/Stars.jsx';
 import YearInReview from '../components/YearInReview.jsx';
 import { platformById } from '../components/PlatformPicker.jsx';
+import Heatmap from '../components/Heatmap.jsx';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -166,7 +167,7 @@ export default function Stats() {
 
     for (const show of Object.values(state.shows)) {
       const entries = Object.values(show.watched || {});
-      if (show.rating) ratedShows.push({ name: show.name, rating: show.rating });
+      if (show.rating) ratedShows.push({ name: show.name, rating: show.rating, ratedAt: show.ratedAt || '' });
       let count = 0;
       let showMin = 0;
       const showYear = {}; // this show's episodes per year
@@ -238,7 +239,7 @@ export default function Stats() {
     for (const m of state.movies) {
       if (movieStatus(m) !== 'watched') continue; // still on the watchlist
       watchedMovieCount++;
-      if (m.rating) ratedMovies.push({ name: m.name, rating: m.rating });
+      if (m.rating) ratedMovies.push({ name: m.name, rating: m.rating, ratedAt: m.ratedAt || '' });
       movieMinutes += m.runtimeMin || 110;
       // Per-platform tally (movies count as one title each)
       if (m.platform) {
@@ -278,6 +279,24 @@ export default function Stats() {
       .filter((r) => r.value > 0)
       .sort((a, b) => b.value - a.value);
 
+    // De-skewed watches per day for the activity heatmap: a bulk-import batch
+    // (a minute with >= BATCH_MIN watches) counts once, so a backlog dump on
+    // one date doesn't saturate the whole grid.
+    const dailyMinuteCount = {};
+    for (const e of events) dailyMinuteCount[e.minute] = (dailyMinuteCount[e.minute] || 0) + 1;
+    const dailyCounts = {};
+    const dailySeenBatch = new Set();
+    for (const e of events) {
+      if (dailyMinuteCount[e.minute] >= BATCH_MIN) {
+        if (!dailySeenBatch.has(e.minute)) {
+          dailySeenBatch.add(e.minute);
+          dailyCounts[e.day] = (dailyCounts[e.day] || 0) + 1;
+        }
+      } else {
+        dailyCounts[e.day] = (dailyCounts[e.day] || 0) + 1;
+      }
+    }
+
     const watchlistShows = Object.values(state.shows).filter(
       (sh) => sh.watchlist && !sh.followed
     ).length;
@@ -286,9 +305,14 @@ export default function Stats() {
     ).length;
 
     perShow.sort((a, b) => b.value - a.value);
-    const byRating = (a, b) => b.rating - a.rating || a.name.localeCompare(b.name);
-    ratedShows.sort(byRating);
-    ratedMovies.sort(byRating);
+    // Recently rated first; fall back to rating then name for items with no
+    // ratedAt yet (existing ratings from before this was tracked).
+    const byRecent = (a, b) =>
+      (b.ratedAt || '').localeCompare(a.ratedAt || '') ||
+      b.rating - a.rating ||
+      a.name.localeCompare(b.name);
+    ratedShows.sort(byRecent);
+    ratedMovies.sort(byRecent);
 
     // --- streaks (all-time; unaffected by the batch skew since they're day-based) ---
     const dayKeys = [...new Set(events.map((e) => e.day))].sort(); // ISO dates sort chronologically
@@ -351,8 +375,8 @@ export default function Stats() {
       genreDataMissing,
       watchlistShows,
       watchlistMovies,
-      topRatedShows: ratedShows.slice(0, 10),
-      topRatedMovies: ratedMovies.slice(0, 10),
+      topRatedShows: ratedShows.slice(0, 8),
+      topRatedMovies: ratedMovies.slice(0, 8),
       currentStreak: current,
       longestStreak: longest,
       longestRange,
@@ -367,6 +391,7 @@ export default function Stats() {
       platformRows,
       untaggedHours: Math.round(untaggedMin / 60),
       untaggedTitles,
+      dailyCounts,
       completion: [
         { label: 'Finished', value: finished },
         { label: 'Watching', value: inProgress },
@@ -530,12 +555,15 @@ export default function Stats() {
               this view, so a one-off backlog import doesn't drown out your real day-to-day pattern.
             </p>
           )}
+
+          <h3 className="subsection" style={{ marginTop: 22 }}>Watch activity</h3>
+          <Heatmap countsByDay={base.dailyCounts} years={base.years} />
         </>
       )}
 
       {tab === 'Rankings' && (base.topRatedShows.length > 0 || base.topRatedMovies.length > 0) && (
         <>
-          <h2 className="section">Top rated</h2>
+          <h2 className="section">Recently rated</h2>
           {base.topRatedShows.length > 0 && (
             <>
               <h3 className="subsection">Shows</h3>

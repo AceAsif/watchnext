@@ -170,10 +170,15 @@ export function toggleFollow(id) {
 }
 
 export function setShowRating(id, rating) {
-  // rating: 0–5. 0 clears it. Rides the existing per-show sync doc.
+  // rating: 0–5. 0 clears it. ratedAt records when you rated it (for the
+  // "Recently rated" list). Rides the existing per-show sync doc.
   update((s) => {
     const show = s.shows[id];
-    if (show) s.shows[id] = { ...show, rating: rating || 0 };
+    if (show) {
+      s.shows[id] = rating
+        ? { ...show, rating, ratedAt: new Date().toISOString() }
+        : { ...show, rating: 0 };
+    }
   });
   markShowDirty(id);
 }
@@ -507,10 +512,13 @@ export function markPlannedMovieWatched(index) {
 }
 
 export function setMovieRating(index, rating) {
-  // rating: 0–5. 0 clears it. Rides the existing movies sync doc.
+  // rating: 0–5. 0 clears it. ratedAt records when you rated it. Rides the
+  // existing movies sync doc.
   update((s) => {
     s.movies = s.movies.map((m, i) =>
-      i === index ? { ...m, rating: rating || 0 } : m
+      i === index
+        ? (rating ? { ...m, rating, ratedAt: new Date().toISOString() } : { ...m, rating: 0 })
+        : m
     );
   });
   markMoviesDirty();
