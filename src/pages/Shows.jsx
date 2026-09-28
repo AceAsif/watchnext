@@ -6,10 +6,13 @@ import {
   addShowFromTmdb,
   addShowToWatchlist,
   applyTmdbDetails,
+  setShowPlatform,
+  setShowProviders,
   showId,
 } from '../store/db.js';
-import { searchShows, showDetails, resolveShow, hasKey, img } from '../api/tmdb.js';
+import { searchShows, showDetails, resolveShow, hasKey, img, watchProviders } from '../api/tmdb.js';
 import PosterCard from '../components/PosterCard.jsx';
+import { platformFromProviders } from '../components/PlatformPicker.jsx';
 
 const FILTERS = ['All', 'Watching', 'Finished', 'Not started'];
 const SORTS = ['Alphabetical', 'Recently added', 'Recently watched', 'Progress', 'Rating'];
@@ -23,6 +26,7 @@ export default function Shows({ openShow }) {
   const [libQuery, setLibQuery] = useState(''); // filters the followed library
   const [sortBy, setSortBy] = useState('Alphabetical');
   const [sync, setSync] = useState(null); // {done, total} while syncing
+  const [detect, setDetect] = useState(null); // {done, total} while detecting platforms
 
   const hasFollowed = useMemo(
     () => Object.values(state.shows).some((s) => s.followed),
@@ -186,6 +190,35 @@ export default function Shows({ openShow }) {
     setSync(null);
   }
 
+  async function detectPlatforms() {
+    // Fill empty platform chips from TMDB's AU streaming providers, and cache
+    // the provider list on each show for the detail page. Only touches shows
+    // that don't already have a platform set, so it never overrides your picks.
+    const targets = Object.entries(state.shows).filter(
+      ([, s]) => s.followed && s.tmdbId && !s.platform
+    );
+    setDetect({ done: 0, total: targets.length });
+    let done = 0;
+    for (const [id, show] of targets) {
+      try {
+        const au = await watchProviders('tv', show.tmdbId);
+        const flatrate = (au && au.flatrate) || [];
+        setShowProviders(
+          id,
+          flatrate.map((p) => ({ name: p.provider_name, logo: p.logo_path })),
+          au && au.link
+        );
+        const pid = platformFromProviders(flatrate);
+        if (pid) setShowPlatform(id, pid);
+      } catch (err) {
+        console.warn('provider lookup failed for', show.name, err);
+      }
+      done++;
+      setDetect({ done, total: targets.length });
+    }
+    setDetect(null);
+  }
+
   return (
     <div>
       <form onSubmit={runSearch} className="row" style={{ marginTop: 4 }}>
@@ -286,13 +319,23 @@ export default function Shows({ openShow }) {
           Library <span className="muted">({library.length})</span>
         </h2>
         <div className="spacer" />
-        <button className="btn" onClick={syncAll} disabled={!hasKey() || !!sync}>
-          {sync
-            ? `Syncing ${sync.done}/${sync.total}`
-            : unsynced.length
-              ? `Sync ${unsynced.length} new with TMDB`
-              : 'Refresh all from TMDB'}
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn" onClick={syncAll} disabled={!hasKey() || !!sync}>
+            {sync
+              ? `Syncing ${sync.done}/${sync.total}`
+              : unsynced.length
+                ? `Sync ${unsynced.length} new with TMDB`
+                : 'Refresh all from TMDB'}
+          </button>
+          <button
+            className="btn"
+            onClick={detectPlatforms}
+            disabled={!hasKey() || !!detect}
+            title="Fill empty platform chips from TMDB's Australian streaming providers"
+          >
+            {detect ? `Detecting ${detect.done}/${detect.total}` : 'Detect platforms'}
+          </button>
+        </div>
       </div>
 
       <input

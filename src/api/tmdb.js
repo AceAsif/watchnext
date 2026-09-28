@@ -87,3 +87,11 @@ export async function resolveShow(show) {
   if (!tmdbId) return null;
   return showDetails(tmdbId);
 }
+
+export function watchProviders(kind, tmdbId) {
+  // kind: 'tv' | 'movie'. Returns the Australian providers block
+  // ({ flatrate, rent, buy, link, ... }) or null when TMDB has none for AU.
+  return get(`/${kind}/${tmdbId}/watch/providers`).then(
+    (d) => (d && d.results && d.results.AU) || null
+  );
+}

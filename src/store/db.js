@@ -199,6 +199,24 @@ export function setShowUpcoming(id, upcoming) {
   markShowDirty(id);
 }
 
+export function setShowProviders(id, providers, link) {
+  // providers: cached AU streaming list [{ name, logo }] for the show detail
+  //   "streaming in Australia" display; link: the TMDB/JustWatch URL. Filled by
+  //   the Detect platforms action (see Shows.jsx). Rides the per-show sync doc.
+  update((s) => {
+    const show = s.shows[id];
+    if (show) {
+      s.shows[id] = {
+        ...show,
+        providers: providers || [],
+        providersLink: link || '',
+        providersSynced: new Date().toISOString(),
+      };
+    }
+  });
+  markShowDirty(id);
+}
+
 export function deleteShow(id) {
   // True delete: remove the record from local state now, and from Firestore on
   // the next sync flush (see cloud.js). Unlike unfollow, which only hides a

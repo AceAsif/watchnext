@@ -22,6 +22,34 @@ export function platformById(id) {
   return PLATFORMS.find((p) => p.id === id) || null;
 }
 
+// Map a TMDB watch-provider name to one of our chip ids, or null if we have no
+// chip for it (e.g. Paramount+). Order matters — 'max' is matched loosely and
+// last so it doesn't swallow other names.
+export function providerToPlatform(name) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('netflix')) return 'netflix';
+  if (n.includes('disney')) return 'disney';
+  if (n.includes('prime video') || n.includes('amazon')) return 'prime';
+  if (n.includes('apple tv')) return 'appletv';
+  if (n.includes('crunchyroll')) return 'crunchyroll';
+  if (n.includes('binge')) return 'binge';
+  if (n.includes('stan')) return 'stan';
+  if (n.includes('iview')) return 'iview';
+  if (n.includes('hulu')) return 'hulu';
+  if (n.includes('youtube')) return 'youtube';
+  if (n === 'max' || n.includes('hbo max')) return 'max';
+  return null;
+}
+
+// Given a TMDB AU flatrate list, return the first recognized chip id, or null.
+export function platformFromProviders(flatrate) {
+  for (const p of flatrate || []) {
+    const id = providerToPlatform(p.provider_name || p.name);
+    if (id) return id;
+  }
+  return null;
+}
+
 // Small read-only pill for showing the chosen platform. Always brand-coloured,
 // because it only ever renders the one platform you actually picked.
 export function PlatformChip({ id }) {

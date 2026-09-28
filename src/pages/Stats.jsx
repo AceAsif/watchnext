@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore.js';
 import { movieStatus } from '../store/db.js';
 import Stars from '../components/Stars.jsx';
 import YearInReview from '../components/YearInReview.jsx';
+import { platformById } from '../components/PlatformPicker.jsx';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -125,7 +126,7 @@ function Bars({ rows, unit }) {
         <div className="bar-row" key={r.label}>
           <div className="bar-label" title={r.label}>{r.label}</div>
           <div className="bar-track">
-            <div className="bar-fill" style={{ width: (r.value / max) * 100 + '%' }} />
+            <div className="bar-fill" style={{ width: (r.value / max) * 100 + '%', background: r.color }} />
           </div>
           <div className="bar-val">
             {r.value.toLocaleString()}{unit || ''}
@@ -151,6 +152,9 @@ export default function Stats() {
     const perYearGenre = {};  // year -> { genre: episodes }
     const moviesPerYear = {};
     const perGenre = {};
+    const perPlatform = {}; // platform id -> { min, eps, titles }
+    let untaggedMin = 0;    // watched minutes on shows/movies with no platform
+    let untaggedTitles = 0;
     let finished = 0;
     let inProgress = 0;
     let notStarted = 0;
@@ -162,11 +166,13 @@ export default function Stats() {
       const entries = Object.values(show.watched || {});
       if (show.rating) ratedShows.push({ name: show.name, rating: show.rating });
       let count = 0;
+      let showMin = 0;
       const showYear = {}; // this show's episodes per year
       for (const w of entries) {
         const n = w.n || 1;
         count += n;
         episodes += n;
+        showMin += (w.min || 40) * n;
         minutes += (w.min || 40) * n;
         if (w.at) {
           const y = w.at.slice(0, 4);
@@ -185,6 +191,21 @@ export default function Stats() {
         if (show.genres && show.genres.length) {
           const gm = perYearGenre[y] || (perYearGenre[y] = {});
           for (const g of show.genres) gm[g] = (gm[g] || 0) + c;
+        }
+      }
+
+      // Per-platform tally (where you watch). A show's platform applies to all
+      // its watched episodes; shows with no platform go to the untagged bucket.
+      if (count > 0) {
+        const pid = show.platform;
+        if (pid) {
+          const p = perPlatform[pid] || (perPlatform[pid] = { min: 0, eps: 0, titles: 0 });
+          p.min += showMin;
+          p.eps += count;
+          p.titles += 1;
+        } else {
+          untaggedMin += showMin;
+          untaggedTitles += 1;
         }
       }
 
@@ -217,6 +238,15 @@ export default function Stats() {
       watchedMovieCount++;
       if (m.rating) ratedMovies.push({ name: m.name, rating: m.rating });
       movieMinutes += m.runtimeMin || 110;
+      // Per-platform tally (movies count as one title each)
+      if (m.platform) {
+        const p = perPlatform[m.platform] || (perPlatform[m.platform] = { min: 0, eps: 0, titles: 0 });
+        p.min += m.runtimeMin || 110;
+        p.titles += 1;
+      } else {
+        untaggedMin += m.runtimeMin || 110;
+        untaggedTitles += 1;
+      }
       if (m.watchedAt) {
         const y = m.watchedAt.slice(0, 4);
         moviesPerYear[y] = (moviesPerYear[y] || 0) + 1;
@@ -236,6 +266,15 @@ export default function Stats() {
       for (const [g, c] of Object.entries(gm)) if (!best || c > best.c) best = { g, c };
       if (best) perYearTopGenre[y] = best.g;
     }
+
+    // Where you watch: hours per platform, brand-coloured, most-watched first.
+    const platformRows = Object.entries(perPlatform)
+      .map(([id, v]) => {
+        const p = platformById(id);
+        return { label: p ? p.label : id, value: Math.round(v.min / 60), color: p ? p.color : undefined };
+      })
+      .filter((r) => r.value > 0)
+      .sort((a, b) => b.value - a.value);
 
     const watchlistShows = Object.values(state.shows).filter(
       (sh) => sh.watchlist && !sh.followed
@@ -323,6 +362,9 @@ export default function Stats() {
       moviesPerYear,
       perYearShows,
       perYearTopGenre,
+      platformRows,
+      untaggedHours: Math.round(untaggedMin / 60),
+      untaggedTitles,
       completion: [
         { label: 'Finished', value: finished },
         { label: 'Watching', value: inProgress },
@@ -508,6 +550,29 @@ export default function Stats() {
         <>
           <h2 className="section">Movies per year</h2>
           <Bars rows={base.movieYears} />
+        </>
+      )}
+
+      {(base.platformRows.length > 0 || base.untaggedTitles > 0) && (
+        <>
+          <h2 className="section">Where you watch</h2>
+          {base.platformRows.length > 0 ? (
+            <>
+              <Bars rows={base.platformRows} unit=" hrs" />
+              {base.untaggedHours > 0 && (
+                <p className="muted" style={{ fontSize: 13 }}>
+                  {base.untaggedHours.toLocaleString()} hrs across {base.untaggedTitles} title
+                  {base.untaggedTitles === 1 ? '' : 's'} have no platform set — run "Detect
+                  platforms" on the Shows tab to fill them in.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="muted" style={{ fontSize: 13.5 }}>
+              No platforms tagged yet. Run "Detect platforms" on the Shows tab (or set one on a
+              show's page), and your viewing-by-platform breakdown will appear here.
+            </p>
+          )}
         </>
       )}
 
