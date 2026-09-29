@@ -12,7 +12,7 @@ import {
 } from '../store/db.js';
 import { searchShows, showDetails, resolveShow, hasKey, img, watchProviders } from '../api/tmdb.js';
 import PosterCard from '../components/PosterCard.jsx';
-import { platformFromProviders } from '../components/PlatformPicker.jsx';
+import { platformFromProviders, PLATFORMS } from '../components/PlatformPicker.jsx';
 
 const FILTERS = ['All', 'Watching', 'Finished', 'Not started'];
 const SORTS = ['Alphabetical', 'Recently added', 'Recently watched', 'Progress', 'Rating'];
@@ -23,8 +23,10 @@ export default function Shows({ openShow }) {
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState('All');
+  const [platformFilter, setPlatformFilter] = useState('All');
   const [libQuery, setLibQuery] = useState(''); // filters the followed library
   const [sortBy, setSortBy] = useState('Alphabetical');
+  const [sortDir, setSortDir] = useState('asc');
   const [sync, setSync] = useState(null); // {done, total} while syncing
   const [detect, setDetect] = useState(null); // {done, total} while detecting platforms
 
@@ -46,6 +48,11 @@ export default function Shows({ openShow }) {
       if (filter === 'Not started') return seen === 0;
       return true;
     });
+
+    // platform filter
+    if (platformFilter !== 'All') {
+      list = list.filter(([, s]) => s.platform === platformFilter);
+    }
 
     // name search
     if (q) list = list.filter(([, s]) => (s.name || '').toLowerCase().includes(q));
@@ -79,8 +86,24 @@ export default function Shows({ openShow }) {
     } else {
       list.sort((a, b) => a[1].name.localeCompare(b[1].name));
     }
+    // Every comparator above already tie-breaks by name, so it defines a
+    // total order — reversing the sorted array is a correct, exact "other
+    // direction" for whichever field is active (Z→A for Alphabetical, oldest
+    // first for Recently added/watched, lowest first for Progress/Rating).
+    if (sortDir === 'desc') list.reverse();
     return list;
-  }, [state.shows, filter, libQuery, sortBy]);
+  }, [state.shows, filter, platformFilter, libQuery, sortBy, sortDir]);
+
+  // Only platforms actually in use in the library, in PLATFORMS' canonical
+  // order, so the filter row never offers a chip that would show zero shows.
+  const availablePlatforms = useMemo(() => {
+    const present = new Set(
+      Object.values(state.shows)
+        .filter((s) => s.followed && s.platform)
+        .map((s) => s.platform)
+    );
+    return PLATFORMS.filter((p) => present.has(p.id));
+  }, [state.shows]);
 
   const unsynced = useMemo(
     () => Object.entries(state.shows).filter(([, s]) => s.followed && !s.lastSynced),
@@ -363,7 +386,7 @@ export default function Shows({ openShow }) {
             </button>
           ))}
         </div>
-        <label className="sort-field">
+        <div className="sort-field">
           <span className="muted" style={{ fontSize: 12 }}>Sort</span>
           <select
             className="select"
@@ -377,8 +400,51 @@ export default function Shows({ openShow }) {
               </option>
             ))}
           </select>
-        </label>
+          <button
+            className="btn"
+            onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+            title="Reverse sort order"
+            aria-label="Reverse sort order"
+            style={{ padding: '6px 10px', fontSize: 12 }}
+          >
+            {sortBy === 'Alphabetical'
+              ? sortDir === 'asc' ? 'A → Z' : 'Z → A'
+              : sortDir === 'asc' ? '↓ Asc' : '↑ Desc'}
+          </button>
+        </div>
       </div>
+
+      {availablePlatforms.length > 0 && (
+        <div className="chips" style={{ marginTop: -8, marginBottom: 16 }}>
+          <button
+            className={'chip' + (platformFilter === 'All' ? ' on' : '')}
+            style={
+              platformFilter === 'All'
+                ? { background: 'var(--amber)', borderColor: 'var(--amber)', color: '#16110a' }
+                : {}
+            }
+            onClick={() => setPlatformFilter('All')}
+          >
+            All platforms
+          </button>
+          {availablePlatforms.map((p) => {
+            const on = platformFilter === p.id;
+            const style = on
+              ? { background: p.color, borderColor: p.color, color: p.dark ? '#0b0f17' : '#fff' }
+              : { '--chip': p.color };
+            return (
+              <button
+                key={p.id}
+                className={'chip' + (on ? ' on' : '')}
+                style={style}
+                onClick={() => setPlatformFilter(on ? 'All' : p.id)}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="grid">
         {library.map(([id, show]) => (
