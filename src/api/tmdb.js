@@ -111,3 +111,22 @@ export function tvSimilar(tmdbId, page = 1) {
 export function movieSimilar(tmdbId, page = 1) {
   return get(`/movie/${tmdbId}/similar`, { page });
 }
+
+export function tvVideos(tmdbId) {
+  return get(`/tv/${tmdbId}/videos`);
+}
+export function movieVideos(tmdbId) {
+  return get(`/movie/${tmdbId}/videos`);
+}
+
+// Picks the best trailer/teaser from a TMDB videos response: an official
+// YouTube trailer first, then any YouTube trailer, then a teaser, then
+// whatever YouTube video is left. Returns { key, name } or null.
+export function pickTrailer(videosResponse) {
+  const yt = ((videosResponse && videosResponse.results) || []).filter(
+    (v) => v.site === 'YouTube'
+  );
+  const byType = (t) =>
+    yt.find((v) => v.type === t && v.official) || yt.find((v) => v.type === t);
+  return byType('Trailer') || byType('Teaser') || yt[0] || null;
+}

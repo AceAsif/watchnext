@@ -9,7 +9,7 @@ import {
   setMoviePlatform,
   movieStatus,
 } from '../store/db.js';
-import { searchMovies, movieDetails, hasKey, img } from '../api/tmdb.js';
+import { searchMovies, movieDetails, hasKey, img, movieVideos, pickTrailer } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
 import PlatformPicker, { PlatformChip } from '../components/PlatformPicker.jsx';
 
@@ -39,6 +39,31 @@ export default function Movies() {
       setDetails((prev) => ({ ...prev, [m.tmdbId]: d }));
     } catch (err) {
       setDetails((prev) => ({ ...prev, [m.tmdbId]: { error: err.message } }));
+    }
+  }
+
+  const [trailerBusy, setTrailerBusy] = useState(null); // movie index while looking up
+
+  // Opens a blank tab synchronously (before any await) so it isn't blocked as
+  // a popup, then points it at YouTube once the trailer lookup resolves.
+  async function openTrailer(m) {
+    if (!m.tmdbId) return;
+    const win = window.open('', '_blank', 'noopener,noreferrer');
+    setTrailerBusy(m.index);
+    try {
+      const data = await movieVideos(m.tmdbId);
+      const v = pickTrailer(data);
+      if (v) {
+        win.location = `https://www.youtube.com/watch?v=${v.key}`;
+      } else {
+        win.close();
+        alert(`No trailer found on TMDB for "${m.name}".`);
+      }
+    } catch (err) {
+      win.close();
+      alert('Could not load trailer: ' + err.message);
+    } finally {
+      setTrailerBusy(null);
     }
   }
 
@@ -373,6 +398,15 @@ export default function Movies() {
                   <button className="btn" onClick={() => toggleDetails(m)}>
                     {isOpen ? 'Hide' : 'Details'}
                   </button>
+                  {m.tmdbId && (
+                    <button
+                      className="btn"
+                      onClick={() => openTrailer(m)}
+                      disabled={trailerBusy === m.index}
+                    >
+                      {trailerBusy === m.index ? 'Loading…' : '▶ Trailer'}
+                    </button>
+                  )}
                   <button
                     className="btn"
                     onClick={() => {

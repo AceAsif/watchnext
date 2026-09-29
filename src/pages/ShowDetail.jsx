@@ -13,7 +13,7 @@ import {
   applyTmdbDetails,
   watchedCount,
 } from '../store/db.js';
-import { seasonDetails, resolveShow, searchShows, showDetails, hasKey, img, watchProviders } from '../api/tmdb.js';
+import { seasonDetails, resolveShow, searchShows, showDetails, hasKey, img, watchProviders, tvVideos, pickTrailer } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
 import PlatformPicker from '../components/PlatformPicker.jsx';
 
@@ -163,6 +163,33 @@ export default function ShowDetail({ id, onBack }) {
   const [fixQuery, setFixQuery] = useState('');
   const [fixResults, setFixResults] = useState(null);
   const [streamLoading, setStreamLoading] = useState(false);
+  const [trailerLoading, setTrailerLoading] = useState(false);
+
+  // Opens a blank tab synchronously (within the click handler, before any
+  // await) so browsers treat it as a direct result of the user's click and
+  // don't block it as a popup; once the trailer lookup resolves, we point
+  // that already-open tab at YouTube. Not persisted on the show — trailers
+  // are cheap to re-fetch and rarely worth syncing across devices.
+  async function openTrailer() {
+    if (!show.tmdbId) return;
+    const win = window.open('', '_blank', 'noopener,noreferrer');
+    setTrailerLoading(true);
+    try {
+      const data = await tvVideos(show.tmdbId);
+      const v = pickTrailer(data);
+      if (v) {
+        win.location = `https://www.youtube.com/watch?v=${v.key}`;
+      } else {
+        win.close();
+        alert(`No trailer found on TMDB for "${show.name}".`);
+      }
+    } catch (err) {
+      win.close();
+      alert('Could not load trailer: ' + err.message);
+    } finally {
+      setTrailerLoading(false);
+    }
+  }
 
   async function refreshStreaming() {
     if (!show.tmdbId) return;
@@ -250,6 +277,11 @@ export default function ShowDetail({ id, onBack }) {
             <button className="btn" onClick={() => toggleFollow(id)}>
               {show.followed ? 'Unfollow' : 'Follow'}
             </button>
+            {hasKey() && show.tmdbId && (
+              <button className="btn" onClick={openTrailer} disabled={trailerLoading}>
+                {trailerLoading ? 'Loading trailer…' : '▶ Trailer'}
+              </button>
+            )}
             {hasKey() && (
               <button
                 className="btn"
