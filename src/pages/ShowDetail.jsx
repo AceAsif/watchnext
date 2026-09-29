@@ -4,6 +4,7 @@ import {
   epKey,
   markEpisode,
   markSeason,
+  logEpisodeRewatch,
   toggleFollow,
   setShowRating,
   setShowPlatform,
@@ -112,6 +113,7 @@ function Season({ id, show, season }) {
           const k = epKey(season.n, ep.episode_number);
           const w = (show.watched || {})[k];
           const on = !!w;
+          const n = w && w.n ? w.n : 0;
           return (
             <div className="ep-row" key={ep.id}>
               <Check
@@ -130,11 +132,22 @@ function Season({ id, show, season }) {
                 {on && w.at ? (
                   <div className="airdate" style={{ color: 'var(--amber)' }}>
                     Watched {fmtDate(w.at.slice(0, 10))}
+                    {n > 1 ? ` (${n}×)` : ''}
                   </div>
                 ) : ep.air_date ? (
                   <div className="airdate">Aired {ep.air_date}</div>
                 ) : null}
               </div>
+              {on && (
+                <button
+                  className="btn"
+                  title="Log another watch of this episode"
+                  style={{ padding: '4px 9px', fontSize: 11.5, flex: 'none' }}
+                  onClick={() => logEpisodeRewatch(id, season.n, ep.episode_number, ep.runtime)}
+                >
+                  + Rewatch
+                </button>
+              )}
             </div>
           );
         })}

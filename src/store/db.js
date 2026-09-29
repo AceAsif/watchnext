@@ -319,6 +319,30 @@ export function markSeason(id, season, episodes, watched = true) {
   markShowDirty(id);
 }
 
+// Log an extra watch of an episode you've already seen. markEpisode/markSeason
+// are deliberately no-ops on an already-watched episode (map[k] || {...}), so
+// this is the only path that bumps the count. `n` is a running total, not a
+// per-date history (that's the movies model instead — each movie rewatch is
+// its own array entry with its own date) — so Episodes watched / Hours of TV /
+// Most watched shows all correctly include every rewatch (they already read
+// `n`), but Habits/the activity heatmap only see the most recent watch date,
+// since that's all a single map entry can hold. `at` is bumped to now so
+// "Watched <date>" on the episode row reflects the latest viewing.
+export function logEpisodeRewatch(id, season, episode, runtimeMin) {
+  update((s) => {
+    const show = s.shows[id];
+    if (!show) return;
+    const map = { ...(show.watched || {}) };
+    const k = epKey(season, episode);
+    const existing = map[k];
+    map[k] = existing
+      ? { ...existing, at: new Date().toISOString(), n: (existing.n || 1) + 1, min: runtimeMin || existing.min }
+      : { at: new Date().toISOString(), min: runtimeMin || show.runtimeMin || null, n: 1 };
+    s.shows[id] = { ...show, watched: map };
+  });
+  markShowDirty(id);
+}
+
 export function addShowFromTmdb(details) {
   // details: TMDB /tv/{id} response
   // If a show with this TMDB id already exists (e.g. imported from TV Time
