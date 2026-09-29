@@ -1,38 +1,22 @@
-// Cloud sync: mirrors the local store to Firestore under the signed-in
-// user's account, so every device that signs in sees the same data.
-//
-// Design: localStorage stays the source of truth for instant, offline-first
-// reads and writes (see store/db.js). This module is a thin layer on top:
-//   - pulls remote data down and merges it into the local store on sign-in
-//   - listens for remote changes (from other devices) and applies them locally
-//   - watches the local store for changes and pushes only what changed
-//     ("dirty" show ids / movies, tracked in db.js) up to Firestore
-//
-// Merging watched episodes is a union (if either device marked an episode
-// watched, it stays watched) rather than a last-write-wins overwrite, since
-// that matches how a single person actually uses two devices.
+// Public cloud-sync API. This is the ONLY module App.jsx and Settings.jsx
+// import from — its own exports are tiny and firebase-free, so it costs
+// nothing in the main bundle. The real work (and the firebase/auth +
+// firebase/firestore SDKs) live in store/cloudEngine.js, loaded on demand via
+// dynamic import(); Rollup turns that import() boundary into a separate
+// chunk, which is the whole point of this split (see the original >500kB
+// bundle-size note). Every exported function here keeps the exact signature
+// the old, non-split cloud.js had, so nothing else in the app needed to
+// change.
 
-import {
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut,
-} from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  writeBatch,
-} from 'firebase/firestore';
-import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
-import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markShowDeleted, isTombstoned } from './db.js';
+import { hasFirebaseConfig } from '../firebaseConfig.js';
 
 export function isCloudAvailable() {
   return hasFirebaseConfig;
 }
 
 // --- tiny pub/sub for the signed-in user, so UI can react to auth state ---
+// Lives here (not in cloudEngine.js) so useSyncExternalStore works correctly
+// even in the moment before the engine chunk has finished loading.
 let currentUser = null;
 const userListeners = new Set();
 
@@ -50,155 +34,29 @@ export function subscribeCloudUser(fn) {
   return () => userListeners.delete(fn);
 }
 
-// --- sync engine state ---
-let uid = null;
-let unsubShows = null;
-let flushTimer = null;
-let applyingRemote = false;
-
-// Flush is normally on a 2.5s timer, but that timer is throttled or paused
-// while the tab is in the background — so a change made right before switching
-// away (or reloading) could be lost. These fire a flush the moment the tab is
-// hidden or the page is being unloaded, which matters most for deletes: an
-// un-flushed delete leaves the Firestore doc in place, and the next sign-in
-// pulls the "deleted" show straight back.
-function flushOnLeave() {
-  if (document.visibilityState === 'hidden') flush();
-}
-
+// Kicks off cloud sync on app mount. Returns an unsubscribe function
+// immediately (as the old synchronous version did), even though the real
+// listener attaches once the lazy chunk resolves a moment later.
 export function initCloudSync() {
   if (!hasFirebaseConfig) return () => {};
-  return onAuthStateChanged(auth, (user) => {
-    setUser(user);
-    if (user) startSync(user.uid);
-    else stopSync();
+  let unsub = () => {};
+  let cancelled = false;
+  import('./cloudEngine.js').then((mod) => {
+    if (cancelled) return;
+    unsub = mod.initCloudSyncEngine(setUser);
   });
+  return () => {
+    cancelled = true;
+    unsub();
+  };
 }
 
-export function signIn() {
-  return signInWithPopup(auth, googleProvider);
+export async function signIn() {
+  const mod = await import('./cloudEngine.js');
+  return mod.signIn();
 }
 
-export function signOutCloud() {
-  return signOut(auth);
-}
-
-function startSync(newUid) {
-  uid = newUid;
-  pullAndMerge(uid);
-
-  unsubShows = onSnapshot(collection(db, 'users', uid, 'shows'), (snap) => {
-    applyingRemote = true;
-    update((s) => {
-      snap.docChanges().forEach((change) => {
-        const id = change.doc.id;
-        if (change.type === 'removed') {
-          delete s.shows[id];
-          return;
-        }
-        // A remote add/update for a show we've deleted locally must not
-        // resurrect it — drop it and re-queue the Firestore delete.
-        if (isTombstoned(id)) {
-          delete s.shows[id];
-          markShowDeleted(id);
-          return;
-        }
-        s.shows[id] = { ...(s.shows[id] || {}), ...change.doc.data() };
-      });
-    });
-    applyingRemote = false;
-  });
-
-  clearInterval(flushTimer);
-  flushTimer = setInterval(flush, 2500);
-
-  document.addEventListener('visibilitychange', flushOnLeave);
-  window.addEventListener('pagehide', flush);
-}
-
-function stopSync() {
-  if (unsubShows) unsubShows();
-  unsubShows = null;
-  uid = null;
-  clearInterval(flushTimer);
-  flushTimer = null;
-  document.removeEventListener('visibilitychange', flushOnLeave);
-  window.removeEventListener('pagehide', flush);
-}
-
-async function pullAndMerge(forUid) {
-  const [showsSnap, moviesSnap] = await Promise.all([
-    getDocs(collection(db, 'users', forUid, 'shows')),
-    getDoc(doc(db, 'users', forUid, 'library', 'movies')),
-  ]);
-
-  update((s) => {
-    showsSnap.forEach((d) => {
-      // Skip shows the user deleted for good: don't merge them back in, and
-      // re-queue the Firestore delete so the remote doc gets cleaned up.
-      if (isTombstoned(d.id)) {
-        markShowDeleted(d.id);
-        return;
-      }
-      const remote = d.data();
-      const local = s.shows[d.id];
-      if (!local) {
-        s.shows[d.id] = remote;
-        return;
-      }
-      // Union watched maps so an episode marked on either device stays marked.
-      const watched = { ...(remote.watched || {}), ...(local.watched || {}) };
-      s.shows[d.id] = { ...remote, ...local, watched };
-    });
-
-    if (moviesSnap.exists()) {
-      const remoteMovies = moviesSnap.data().movies || [];
-      const seen = new Set(s.movies.map((m) => `${m.name}|${m.watchedAt}`));
-      for (const m of remoteMovies) {
-        const k = `${m.name}|${m.watchedAt}`;
-        if (!seen.has(k)) {
-          s.movies = [...s.movies, m];
-          seen.add(k);
-        }
-      }
-    }
-  });
-
-  // Push the merged result back up once, so both sides converge.
-  Object.keys(getState().shows).forEach(markShowDirty);
-  markMoviesDirty();
-  flush();
-}
-
-async function flush() {
-  if (!uid || applyingRemote) return;
-  const { showIds, movies, deletedIds } = takeDirty();
-  const hasDeletes = deletedIds && deletedIds.size > 0;
-  if (showIds.size === 0 && !movies && !hasDeletes) return;
-
-  const state = getState();
-  const batch = writeBatch(db);
-  showIds.forEach((id) => {
-    if (hasDeletes && deletedIds.has(id)) return; // a delete wins over an update
-    const show = state.shows[id];
-    if (show) batch.set(doc(db, 'users', uid, 'shows', id), show);
-  });
-  if (hasDeletes) {
-    deletedIds.forEach((id) => {
-      batch.delete(doc(db, 'users', uid, 'shows', id));
-    });
-  }
-  if (movies) {
-    batch.set(doc(db, 'users', uid, 'library', 'movies'), { movies: state.movies });
-  }
-
-  try {
-    await batch.commit();
-  } catch (err) {
-    console.error('Cloud sync failed, will retry on next change:', err);
-    // put everything back so the next flush retries it
-    showIds.forEach(markShowDirty);
-    if (hasDeletes) deletedIds.forEach(markShowDeleted);
-    if (movies) markMoviesDirty();
-  }
+export async function signOutCloud() {
+  const mod = await import('./cloudEngine.js');
+  return mod.signOutCloud();
 }
