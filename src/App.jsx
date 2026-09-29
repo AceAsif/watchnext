@@ -7,6 +7,7 @@ import Movies from './pages/Movies.jsx';
 import Watchlist from './pages/Watchlist.jsx';
 import Stats from './pages/Stats.jsx';
 import Settings from './pages/Settings.jsx';
+import Search from './pages/Search.jsx';
 
 const TABS = [
   {
@@ -71,6 +72,7 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState('next');
   const [showOpen, setShowOpen] = useState(null); // show id or null
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     const unsub = initCloudSync();
@@ -87,9 +89,37 @@ export default function App() {
           Watch<span>Next</span>
         </h1>
         <span className="sub">personal tracker</span>
+        <button
+          onClick={() => {
+            setSearching(true);
+            setShowOpen(null);
+          }}
+          aria-label="Search shows and movies"
+          title="Search"
+          style={{
+            marginLeft: 'auto',
+            alignSelf: 'center',
+            background: 'none',
+            border: 'none',
+            color: searching ? 'var(--amber)' : 'var(--text-dim)',
+            cursor: 'pointer',
+            padding: 6,
+            lineHeight: 0,
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+        </button>
       </header>
 
-      {showOpen ? (
+      {searching ? (
+        <Search
+          openShow={openShow}
+          onClose={() => setSearching(false)}
+        />
+      ) : showOpen ? (
         <ShowDetail id={showOpen} onBack={closeShow} />
       ) : (
         <>
@@ -106,10 +136,11 @@ export default function App() {
         {TABS.map((t) => (
           <button
             key={t.id}
-            className={tab === t.id && !showOpen ? 'active' : ''}
+            className={tab === t.id && !showOpen && !searching ? 'active' : ''}
             onClick={() => {
               setTab(t.id);
               closeShow();
+              setSearching(false);
             }}
           >
             {t.icon}

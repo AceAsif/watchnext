@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore.js';
-import { watchedCount, lastWatched, lastWatchDate, setShowUpcoming } from '../store/db.js';
+import { watchedCount, lastWatched, lastWatchDate, setShowUpcoming, epKey, markEpisode } from '../store/db.js';
 import { img, hasKey, fetchUpcomingEpisodes } from '../api/tmdb.js';
 import CalendarGrid from '../components/CalendarGrid.jsx';
 
@@ -29,31 +29,78 @@ function relHint(dateStr) {
   return null;
 }
 
-function NextRow({ show, onOpen }) {
+// Earliest unwatched episode from stored season data (fills gaps), or null if
+// the show is fully watched or has no season data yet. Season 0 (specials) is
+// skipped. No network call — reads the per-season counts already synced from
+// TMDB, so this works entirely from local state.
+function nextUnwatched(show) {
+  const watched = show.watched || {};
+  const seasons = (show.seasons || [])
+    .filter((se) => se.n >= 1)
+    .sort((a, b) => a.n - b.n);
+  for (const se of seasons) {
+    for (let e = 1; e <= (se.count || 0); e++) {
+      if (!watched[epKey(se.n, e)]) return { season: se.n, episode: e };
+    }
+  }
+  return null;
+}
+
+function NextRow({ id, show, onOpen }) {
   const seen = watchedCount(show);
   const last = lastWatched(show);
   const total = show.totalEpisodes;
+  const next = nextUnwatched(show);
   return (
-    <button className="next-row" onClick={onOpen}>
-      {show.poster ? (
-        <img src={img(show.poster, 'w154')} alt="" loading="lazy" />
-      ) : (
-        <div className="thumb" />
-      )}
-      <div className="info">
-        <div className="name">{show.name}</div>
-        <div className="detail">
-          {last ? (
-            <>
-              last watched <span className="epcode">S{String(last[0]).padStart(2, '0')}·E{String(last[1]).padStart(2, '0')}</span>
-              {total ? ` — ${total - seen} to go` : ''}
-            </>
-          ) : (
-            'not started yet'
-          )}
+    <div className="next-row" style={{ cursor: 'default' }}>
+      <button
+        onClick={onOpen}
+        style={{
+          display: 'flex',
+          gap: 14,
+          alignItems: 'center',
+          flex: 1,
+          minWidth: 0,
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'pointer',
+          color: 'var(--text)',
+          textAlign: 'left',
+          font: 'inherit',
+        }}
+      >
+        {show.poster ? (
+          <img src={img(show.poster, 'w154')} alt="" loading="lazy" />
+        ) : (
+          <div className="thumb" />
+        )}
+        <div className="info">
+          <div className="name">{show.name}</div>
+          <div className="detail">
+            {last ? (
+              <>
+                last watched <span className="epcode">S{String(last[0]).padStart(2, '0')}·E{String(last[1]).padStart(2, '0')}</span>
+                {total ? ` — ${total - seen} to go` : ''}
+              </>
+            ) : (
+              'not started yet'
+            )}
+          </div>
         </div>
-      </div>
-    </button>
+      </button>
+      {next && (
+        <button
+          className="btn"
+          style={{ flex: 'none' }}
+          title={`Mark Season ${next.season}, Episode ${next.episode} watched`}
+          onClick={() => markEpisode(id, next.season, next.episode, show.runtimeMin, true)}
+        >
+          ✓ S{String(next.season).padStart(2, '0')}·E{String(next.episode).padStart(2, '0')}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -245,7 +292,7 @@ export default function UpNext({ openShow }) {
         <>
           <h2 className="section">Continue watching</h2>
           {inProgress.slice(0, 30).map(([id, show]) => (
-            <NextRow key={id} show={show} onOpen={() => openShow(id)} />
+            <NextRow key={id} id={id} show={show} onOpen={() => openShow(id)} />
           ))}
         </>
       )}
