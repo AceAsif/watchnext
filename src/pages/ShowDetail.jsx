@@ -7,11 +7,12 @@ import {
   toggleFollow,
   setShowRating,
   setShowPlatform,
+  setShowProviders,
   deleteShow,
   applyTmdbDetails,
   watchedCount,
 } from '../store/db.js';
-import { seasonDetails, resolveShow, searchShows, showDetails, hasKey, img } from '../api/tmdb.js';
+import { seasonDetails, resolveShow, searchShows, showDetails, hasKey, img, watchProviders } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
 import PlatformPicker from '../components/PlatformPicker.jsx';
 
@@ -148,6 +149,25 @@ export default function ShowDetail({ id, onBack }) {
   const [fixing, setFixing] = useState(false);
   const [fixQuery, setFixQuery] = useState('');
   const [fixResults, setFixResults] = useState(null);
+  const [streamLoading, setStreamLoading] = useState(false);
+
+  async function refreshStreaming() {
+    if (!show.tmdbId) return;
+    setStreamLoading(true);
+    try {
+      const au = await watchProviders('tv', show.tmdbId);
+      const flatrate = (au && au.flatrate) || [];
+      setShowProviders(
+        id,
+        flatrate.map((p) => ({ name: p.provider_name, logo: p.logo_path })),
+        au && au.link
+      );
+    } catch (err) {
+      alert('Could not load streaming info: ' + err.message);
+    } finally {
+      setStreamLoading(false);
+    }
+  }
 
   async function runFixSearch(e) {
     e && e.preventDefault();
@@ -259,6 +279,77 @@ export default function ShowDetail({ id, onBack }) {
               value={show.platform || ''}
               onChange={(p) => setShowPlatform(id, p)}
             />
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            <div className="row" style={{ marginBottom: 7 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Streaming in Australia</div>
+              <div className="spacer" />
+              {hasKey() && show.tmdbId && (
+                <button
+                  className="btn"
+                  onClick={refreshStreaming}
+                  disabled={streamLoading}
+                  style={{ padding: '3px 10px', fontSize: 11.5 }}
+                >
+                  {streamLoading ? 'Checking…' : show.providersSynced ? 'Refresh' : 'Check'}
+                </button>
+              )}
+            </div>
+
+            {show.providers && show.providers.length > 0 ? (
+              <>
+                <div className="chips">
+                  {show.providers.map((p) => (
+                    <span
+                      key={p.name}
+                      className="chip"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        cursor: 'default',
+                        paddingLeft: p.logo ? 4 : 12,
+                      }}
+                    >
+                      {p.logo && (
+                        <img
+                          src={img(p.logo, 'w45')}
+                          alt=""
+                          style={{ width: 18, height: 18, borderRadius: 4, display: 'block' }}
+                        />
+                      )}
+                      {p.name}
+                    </span>
+                  ))}
+                </div>
+                {show.providersLink && (
+                  <a
+                    href={show.providersLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="muted"
+                    style={{ fontSize: 11.5, display: 'inline-block', marginTop: 8 }}
+                  >
+                    Streaming data by JustWatch →
+                  </a>
+                )}
+              </>
+            ) : show.providersSynced ? (
+              <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+                Not currently streaming anywhere in Australia, per TMDB/JustWatch.
+              </p>
+            ) : show.tmdbId ? (
+              <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+                {hasKey()
+                  ? 'Not checked yet — tap "Check" to see where this is streaming.'
+                  : 'Add a TMDB API key in Settings to check streaming availability.'}
+              </p>
+            ) : (
+              <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+                Link this show to TMDB (Fix match) to check streaming availability.
+              </p>
+            )}
           </div>
         </div>
       </div>
