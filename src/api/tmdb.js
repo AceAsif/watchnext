@@ -95,3 +95,19 @@ export function watchProviders(kind, tmdbId) {
     (d) => (d && d.results && d.results.AU) || null
   );
 }
+
+// Discover: "because you liked X" recommendations, with a similar-titles
+// fallback for shows/movies too niche to have recommendation data. page lets
+// callers vary the results on refresh; not required otherwise.
+export function tvRecommendations(tmdbId, page = 1) {
+  return get(`/tv/${tmdbId}/recommendations`, { page });
+}
+export function movieRecommendations(tmdbId, page = 1) {
+  return get(`/movie/${tmdbId}/recommendations`, { page });
+}
+export function tvSimilar(tmdbId, page = 1) {
+  return get(`/tv/${tmdbId}/similar`, { page });
+}
+export function movieSimilar(tmdbId, page = 1) {
+  return get(`/movie/${tmdbId}/similar`, { page });
+}

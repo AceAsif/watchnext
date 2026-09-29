@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore.js';
 import {
   toggleWatchlist,
@@ -8,9 +8,11 @@ import {
   movieStatus,
 } from '../store/db.js';
 import { img } from '../api/tmdb.js';
+import Discover from '../components/Discover.jsx';
 
 export default function Watchlist({ openShow }) {
   const state = useStore();
+  const [tab, setTab] = useState('queue'); // 'queue' | 'discover'
 
   // A show can only be a watchlist item while it isn't followed yet —
   // once "Start watching" clears watchlist and sets followed, it belongs
@@ -35,6 +37,27 @@ export default function Watchlist({ openShow }) {
 
   return (
     <div>
+      <div className="row" style={{ gap: 6, marginBottom: 4 }}>
+        <button
+          className="btn"
+          style={tab === 'queue' ? { borderColor: 'var(--amber)', color: 'var(--amber)' } : {}}
+          onClick={() => setTab('queue')}
+        >
+          Queue{!empty ? ` (${shows.length + movies.length})` : ''}
+        </button>
+        <button
+          className="btn"
+          style={tab === 'discover' ? { borderColor: 'var(--amber)', color: 'var(--amber)' } : {}}
+          onClick={() => setTab('discover')}
+        >
+          Discover
+        </button>
+      </div>
+
+      {tab === 'discover' ? (
+        <Discover />
+      ) : (
+        <>
       {empty && (
         <div className="notice accent">
           <strong>Nothing queued up yet.</strong>
@@ -116,6 +139,8 @@ export default function Watchlist({ openShow }) {
               </div>
             </div>
           ))}
+        </>
+      )}
         </>
       )}
     </div>
