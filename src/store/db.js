@@ -45,7 +45,17 @@ function commit() {
 }
 
 export function update(mutator) {
-  state = { ...state };
+  // shows/movies get fresh container references on every update, even though
+  // individual mutators only reassign one key (`s.shows[id] = {...}`) rather
+  // than replacing the whole object. Without this, `state.shows` is the same
+  // object reference before and after a mutation, so anything memoized on
+  // `[state.shows]` (Stats' big useMemo, for one) never recomputes unless the
+  // component happens to fully remount — which mostly hides the bug, except
+  // when a page is already open and a change arrives in the background (a
+  // cloud-sync update from another device/tab is the main way this happens).
+  // Individual show/movie objects inside stay reference-stable when unchanged,
+  // which is the correct, standard immutable-update shape.
+  state = { ...state, shows: { ...state.shows }, movies: [...state.movies] };
   mutator(state);
   commit();
 }

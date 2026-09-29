@@ -48,7 +48,13 @@ export default function Movies() {
   // a popup, then points it at YouTube once the trailer lookup resolves.
   async function openTrailer(m) {
     if (!m.tmdbId) return;
-    const win = window.open('', '_blank', 'noopener,noreferrer');
+    // See ShowDetail.jsx's openTrailer for why 'noopener' is deliberately not
+    // used here — it makes window.open() return null.
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert('Your browser blocked the new tab — please allow pop-ups for this site.');
+      return;
+    }
     setTrailerBusy(m.index);
     try {
       const data = await movieVideos(m.tmdbId);

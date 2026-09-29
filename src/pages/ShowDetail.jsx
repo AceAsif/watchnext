@@ -172,7 +172,16 @@ export default function ShowDetail({ id, onBack }) {
   // are cheap to re-fetch and rarely worth syncing across devices.
   async function openTrailer() {
     if (!show.tmdbId) return;
-    const win = window.open('', '_blank', 'noopener,noreferrer');
+    // No 'noopener' here — we need the window reference back to navigate it
+    // once the async lookup resolves. 'noopener' makes window.open() return
+    // null, which is why the tab used to open and stay stuck on about:blank.
+    // The destination is a hardcoded, trusted YouTube URL, so the usual
+    // reverse-tabnabbing reason to use noopener doesn't apply.
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert('Your browser blocked the new tab — please allow pop-ups for this site.');
+      return;
+    }
     setTrailerLoading(true);
     try {
       const data = await tvVideos(show.tmdbId);
