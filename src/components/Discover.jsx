@@ -204,42 +204,105 @@ export default function Discover() {
             </p>
           )}
 
-          <div className="grid">
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gap: 14,
+            }}
+          >
             {items.map((it) => (
-              <div key={it.key} style={{ position: 'relative' }}>
-                <button
-                  onClick={() => dismiss(it.key)}
-                  title="Not interested"
-                  aria-label="Dismiss"
-                  style={{
-                    position: 'absolute', top: 6, right: 6, zIndex: 1,
-                    width: 24, height: 24, borderRadius: 999,
-                    background: 'rgba(13,16,21,0.75)', border: '1px solid var(--line)',
-                    color: 'var(--text-dim)', cursor: 'pointer', fontSize: 13, lineHeight: 1,
-                  }}
-                >
-                  ×
-                </button>
-                {it.poster ? (
-                  <img className="poster" src={img(it.poster)} alt="" loading="lazy" />
-                ) : (
-                  <div className="noposter">{it.name}</div>
-                )}
-                <div className="title">{it.name}</div>
-                <div className="meta">
-                  {it.year || ''}{it.year ? ' · ' : ''}{it.type === 'show' ? 'Show' : 'Movie'}
+              <div
+                key={it.key}
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 'var(--radius)',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => dismiss(it.key)}
+                    title="Not interested"
+                    aria-label="Dismiss"
+                    style={{
+                      position: 'absolute', top: 6, right: 6, zIndex: 1,
+                      width: 24, height: 24, borderRadius: 999,
+                      background: 'rgba(13,16,21,0.75)', border: '1px solid var(--line)',
+                      color: '#fff', cursor: 'pointer', fontSize: 13, lineHeight: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                  {it.poster ? (
+                    <img
+                      src={img(it.poster)}
+                      alt=""
+                      loading="lazy"
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        aspectRatio: '2 / 3',
+                        objectFit: 'cover',
+                        background: 'var(--bg-raise)',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        aspectRatio: '2 / 3',
+                        background: 'var(--bg-raise)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 10,
+                        textAlign: 'center',
+                        fontFamily: 'var(--font-display)',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        color: 'var(--text-dim)',
+                      }}
+                    >
+                      {it.name}
+                    </div>
+                  )}
                 </div>
-                <div className="muted" style={{ fontSize: 10.5, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Because you rated ${it.because.join(', ')}`}>
-                  Because you liked {it.because[0]}
+
+                <div style={{ padding: '9px 10px 10px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: 12.5, fontWeight: 600, lineHeight: 1.3,
+                      overflow: 'hidden', textOverflow: 'ellipsis',
+                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    }}
+                    title={it.name}
+                  >
+                    {it.name}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--text-dim)' }}>
+                    {it.year || ''}{it.year ? ' · ' : ''}{it.type === 'show' ? 'Show' : 'Movie'}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10.5, color: 'var(--amber)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}
+                    title={`Because you rated ${it.because.join(', ')}`}
+                  >
+                    Because you liked {it.because[0]}
+                  </div>
+                  <button
+                    className="btn"
+                    style={{ width: '100%', marginTop: 'auto', padding: '6px 0', fontSize: 12 }}
+                    onClick={() => addItem(it)}
+                    disabled={adding === it.key || added[it.key]}
+                  >
+                    {added[it.key] ? 'Added ✓' : adding === it.key ? 'Adding…' : '+ Watchlist'}
+                  </button>
                 </div>
-                <button
-                  className="btn"
-                  style={{ width: '100%', marginTop: 6, padding: '6px 0', fontSize: 12 }}
-                  onClick={() => addItem(it)}
-                  disabled={adding === it.key || added[it.key]}
-                >
-                  {added[it.key] ? 'Added ✓' : adding === it.key ? 'Adding…' : '+ Watchlist'}
-                </button>
               </div>
             ))}
           </div>
