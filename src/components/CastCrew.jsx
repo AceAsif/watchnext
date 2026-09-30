@@ -1,54 +1,25 @@
-import React, { useState } from 'react';
-import { img, tvAggregateCredits, personCombinedCredits } from '../api/tmdb.js';
+import React, { useEffect, useState } from 'react';
+import { img, tvDetailsWithCredits, personCombinedCredits } from '../api/tmdb.js';
+import { Avatar, Chevron, Sheet } from './ui.jsx';
+import { summarizeCredits, mergeCredits } from './creditsLogic.js';
 
-// Tap-through cast & crew for a show. Lazy-loaded (one extra TMDB call) behind
-// a "Cast & crew" button so opening a show stays cheap. Tapping a person opens
-// an overlay of everything else they're in, with titles already in the user's
-// library flagged. Self-contained + inline-styled per the project convention.
+// Cast & crew card for the show page.
+//   card:   avatar stack + first names → "See all" cast sheet
+//           "Created by" row
+//           "Full crew · N directors" → crew sheet
+//   sheets: cast grid, crew list, and (tapping anyone) that person's other
+//           titles with anything already in the library flagged.
+// One TMDB request loads details + credits together (see tvDetailsWithCredits).
 
-const YEAR = (s) => (s || '').slice(0, 4);
-const nameOf = (c) => c.title || c.name || '';
-const dateOf = (c) => c.release_date || c.first_air_date || '';
-
-// A person's other work: merge their acting + crew credits, one row per title,
-// drop the show we're already on, and sort so their better-known work leads.
-function mergeCredits(combined, excludeTvId) {
-  const byKey = new Map();
-  const push = (c, role) => {
-    if (!c || !c.id || !c.media_type) return;
-    if (c.media_type !== 'tv' && c.media_type !== 'movie') return;
-    if (c.media_type === 'tv' && c.id === excludeTvId) return;
-    const key = c.media_type + ':' + c.id;
-    const existing = byKey.get(key);
-    if (existing) {
-      if (role && !existing.roles.includes(role)) existing.roles.push(role);
-      return;
-    }
-    byKey.set(key, {
-      key,
-      id: c.id,
-      media_type: c.media_type,
-      name: nameOf(c),
-      year: YEAR(dateOf(c)),
-      poster: c.poster_path || null,
-      vote: c.vote_count || 0,
-      pop: c.popularity || 0,
-      roles: role ? [role] : [],
-    });
-  };
-  (combined.cast || []).forEach((c) => push(c, c.character));
-  (combined.crew || []).forEach((c) => push(c, c.job));
-  return [...byKey.values()].sort(
-    (a, b) => b.vote - a.vote || b.pop - a.pop
-  );
-}
-
-function PersonOverlay({ person, excludeTvId, trackedTv, trackedMovie, onClose }) {
+// ---------------------------------------------------------------- person sheet
+function PersonSheet({ person, excludeTvId, trackedTv, trackedMovie, onClose }) {
   const [credits, setCredits] = useState(null);
   const [err, setErr] = useState(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     let alive = true;
+    setCredits(null);
+    setErr(null);
     personCombinedCredits(person.id)
       .then((d) => alive && setCredits(mergeCredits(d, excludeTvId)))
       .catch((e) => alive && setErr(e.message));
@@ -57,257 +28,252 @@ function PersonOverlay({ person, excludeTvId, trackedTv, trackedMovie, onClose }
     };
   }, [person.id]);
 
-  const scrim = {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.55)',
-    zIndex: 50,
-    display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  };
-  const sheet = {
-    background: 'var(--bg-raise)',
-    border: '1px solid var(--line)',
-    borderRadius: 'var(--radius) var(--radius) 0 0',
-    width: '100%',
-    maxWidth: 640,
-    maxHeight: '85vh',
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '16px 16px calc(16px + env(safe-area-inset-bottom, 0px))',
-  };
-
   return (
-    <div style={scrim} onClick={onClose}>
-      <div style={sheet} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          {person.profile ? (
-            <img
-              src={img(person.profile, 'w185')}
-              alt=""
-              style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
-            />
-          ) : (
-            <div
-              style={{
-                width: 46, height: 46, borderRadius: '50%', flex: 'none',
-                background: 'var(--bg-card)', border: '1px solid var(--line)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 16,
-              }}
-            >
-              {(person.name || '?').slice(0, 1)}
-            </div>
-          )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, lineHeight: 1.15 }}>
-              {person.name}
-            </div>
-            {person.sub && (
-              <div className="muted" style={{ fontSize: 12.5 }}>{person.sub}</div>
-            )}
-          </div>
-          <button className="btn" onClick={onClose} style={{ flex: 'none' }}>Close</button>
-        </div>
-
-        {err && <p className="muted">Couldn’t load credits: {err}</p>}
-        {!credits && !err && <p className="muted">Loading credits…</p>}
-
-        {credits && credits.length === 0 && (
-          <p className="muted">No other titles found.</p>
-        )}
-
-        {credits && credits.length > 0 && (
-          <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {credits.map((c) => {
-              const tracked =
-                c.media_type === 'tv' ? trackedTv.has(c.id) : trackedMovie.has(c.id);
-              return (
-                <div
-                  key={c.key}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'var(--bg-card)', border: '1px solid var(--line)',
-                    borderRadius: 10, padding: 8,
-                  }}
-                >
-                  {c.poster ? (
-                    <img
-                      src={img(c.poster, 'w92')}
-                      alt=""
-                      style={{ width: 34, aspectRatio: '2/3', borderRadius: 5, objectFit: 'cover', display: 'block', flex: 'none' }}
-                    />
-                  ) : (
-                    <div style={{ width: 34, aspectRatio: '2/3', borderRadius: 5, background: 'var(--bg-raise)', flex: 'none' }} />
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {c.name}
-                    </div>
-                    <div className="muted" style={{ fontSize: 11.5 }}>
-                      {c.media_type === 'tv' ? 'TV' : 'Film'}
-                      {c.year ? ` · ${c.year}` : ''}
-                      {c.roles.length ? ` · ${c.roles.slice(0, 2).join(', ')}` : ''}
-                    </div>
+    <Sheet open title={person.name} subtitle={person.sub || 'Other titles'} onClose={onClose}>
+      {err && <p className="muted">Couldn’t load credits: {err}</p>}
+      {!credits && !err && <p className="muted">Loading credits…</p>}
+      {credits && credits.length === 0 && <p className="muted">No other titles found.</p>}
+      {credits && credits.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {credits.map((c) => {
+            const tracked = c.media_type === 'tv' ? trackedTv.has(c.id) : trackedMovie.has(c.id);
+            return (
+              <div
+                key={c.key}
+                className="sd-card"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8 }}
+              >
+                {c.poster ? (
+                  <img
+                    src={img(c.poster, 'w92')}
+                    alt=""
+                    loading="lazy"
+                    style={{ width: 34, aspectRatio: '2/3', borderRadius: 5, objectFit: 'cover', flex: 'none' }}
+                  />
+                ) : (
+                  <div style={{ width: 34, aspectRatio: '2/3', borderRadius: 5, background: 'var(--bg-card)', flex: 'none' }} />
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="sd-ell" style={{ fontSize: 14 }}>{c.name}</div>
+                  <div className="sd-ell" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                    {c.media_type === 'tv' ? 'TV' : 'Film'}
+                    {c.year ? ` · ${c.year}` : ''}
+                    {c.roles.length ? ` · ${c.roles.slice(0, 2).join(', ')}` : ''}
                   </div>
-                  {tracked && (
-                    <span
-                      className="chip"
-                      style={{
-                        flex: 'none', cursor: 'default', fontSize: 11,
-                        color: 'var(--amber)', borderColor: 'var(--amber)',
-                        background: 'var(--amber-soft)', padding: '3px 9px',
-                      }}
-                    >
-                      ✓ In library
-                    </span>
-                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+                {tracked && (
+                  <span
+                    className="sd-mono"
+                    style={{
+                      flex: 'none', fontSize: 11, color: 'var(--amber)', background: 'var(--amber-soft)',
+                      border: '1px solid var(--amber)', borderRadius: 999, padding: '3px 9px',
+                    }}
+                  >
+                    ✓ In library
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Sheet>
   );
 }
 
+// ---------------------------------------------------------------- the card
 export default function CastCrew({ tmdbId, trackedTv, trackedMovie }) {
-  const [open, setOpen] = useState(false);
-  const [data, setData] = useState(null);
+  const [data, setData] = useState(null); // summarizeCredits() output
   const [err, setErr] = useState(null);
+  const [sheet, setSheet] = useState(null); // 'cast' | 'crew' | null
   const [person, setPerson] = useState(null);
 
-  async function load() {
-    if (data || !tmdbId) return;
-    try {
-      setData(await tvAggregateCredits(tmdbId));
-    } catch (e) {
-      setErr(e.message);
-    }
+  useEffect(() => {
+    let alive = true;
+    setData(null);
+    setErr(null);
+    tvDetailsWithCredits(tmdbId)
+      .then((d) => alive && setData(summarizeCredits(d)))
+      .catch((e) => alive && setErr(e.message));
+    return () => {
+      alive = false;
+    };
+  }, [tmdbId]);
+
+  const openPerson = (p, sub) => setPerson({ id: p.id, name: p.name, sub: sub || '' });
+
+  // ---- loading / error: keep the card's footprint so the page doesn't jump
+  if (err || !data) {
+    return (
+      <section className="sd-card" style={{ margin: '16px 0 0' }}>
+        <div className="sd-row" style={{ minHeight: 72, cursor: 'default' }}>
+          <span className="sd-h2" style={{ fontSize: 16 }}>Cast</span>
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+            {err ? `Couldn’t load cast: ${err}` : 'Loading…'}
+          </span>
+        </div>
+      </section>
+    );
   }
 
-  if (!tmdbId) return null;
-
-  const cast = (data && data.cast ? data.cast : []).slice(0, 30);
-  // Crew rolled up per person, jobs joined, key roles first.
-  const crewMap = new Map();
-  (data && data.crew ? data.crew : []).forEach((c) => {
-    const jobs = (c.jobs || []).map((j) => j.job);
-    const ex = crewMap.get(c.id);
-    if (ex) {
-      jobs.forEach((j) => ex.jobs.add(j));
-    } else {
-      crewMap.set(c.id, {
-        id: c.id, name: c.name, profile: c.profile_path,
-        department: c.department, jobs: new Set(jobs),
-      });
-    }
-  });
-  const KEY_JOBS = ['Director', 'Creator', 'Writer', 'Screenplay', 'Executive Producer'];
-  const crew = [...crewMap.values()]
-    .map((c) => ({ ...c, jobList: [...c.jobs] }))
-    .filter((c) => c.jobList.some((j) => KEY_JOBS.includes(j)))
-    .slice(0, 12);
+  const { cast, created, directors, groups, crewTotal } = data;
+  // Seven circles fit a phone-width row. When there's more cast than that, the
+  // seventh circle becomes a "+N" chip instead of a second line of text (a
+  // separate "+ 5" label plus "SEE ALL" doesn't fit in 328px and wraps).
+  const SLOTS = 7;
+  const overflow = cast.length > SLOTS;
+  const stack = cast.slice(0, overflow ? SLOTS - 1 : SLOTS);
+  const more = cast.length - stack.length;
+  const names = cast.slice(0, 3).map((c) => c.name).join(', ');
+  const crewLabel = directors.length
+    ? `${directors.length} director${directors.length === 1 ? '' : 's'}`
+    : `${crewTotal} credited`;
 
   return (
-    <div className="section" style={{ marginTop: 18 }}>
-      <div className="row" style={{ marginBottom: open ? 10 : 0 }}>
-        <div className="muted" style={{ fontSize: 12 }}>Cast &amp; crew</div>
-        <div className="spacer" />
-        <button
-          className="btn"
-          onClick={() => {
-            setOpen(!open);
-            if (!open) load();
-          }}
-          style={{ padding: '3px 10px', fontSize: 11.5 }}
-        >
-          {open ? 'Hide' : 'Show'}
-        </button>
-      </div>
+    <>
+      <section className="sd-card" style={{ margin: '16px 0 0' }}>
+        {cast.length > 0 && (
+          <button
+            className="sd-row"
+            style={{ paddingTop: 12, paddingBottom: 12 }}
+            onClick={() => setSheet('cast')}
+            aria-label="Cast: see all"
+          >
+            <span style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span className="sd-h2" style={{ fontSize: 16 }}>Cast</span>
+              <span style={{ display: 'flex', alignItems: 'center' }}>
+                {stack.map((p, i) => (
+                  <Avatar
+                    key={p.id}
+                    name={p.name}
+                    path={p.profile}
+                    size={40}
+                    tint={i}
+                    ring
+                    style={{ marginLeft: i === 0 ? 0 : -10 }}
+                  />
+                ))}
+                {overflow && (
+                  <span
+                    className="sd-avatar sd-mono"
+                    aria-label={`${more} more`}
+                    style={{
+                      width: 40, height: 40, marginLeft: -10, boxSizing: 'border-box',
+                      border: '2px solid var(--bg-raise)', background: 'var(--line)',
+                      fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 12,
+                      color: 'var(--text-dim)', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {more > 99 ? '99+' : `+${more}`}
+                  </span>
+                )}
+              </span>
+              <span className="sd-ell" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                {names}
+                {cast.length > 3 ? '…' : ''}
+              </span>
+            </span>
+            <span className="sd-mono" style={{ fontSize: 11, color: 'var(--amber)', whiteSpace: 'nowrap', flex: 'none' }}>SEE ALL</span>
+            <Chevron />
+          </button>
+        )}
 
-      {open && err && <p className="muted">Couldn’t load cast: {err}</p>}
-      {open && !data && !err && <p className="muted">Loading cast…</p>}
+        {created.length > 0 && (
+          <div
+            className={'sd-row' + (cast.length > 0 ? ' sd-sep' : '')}
+            style={{ alignItems: 'baseline', paddingTop: 14, paddingBottom: 14, cursor: 'default' }}
+          >
+            <span className="sd-lbl" style={{ width: 84, flexShrink: 0, fontSize: 10 }}>Created by</span>
+            <span style={{ fontWeight: 500 }}>{created.join(', ')}</span>
+          </div>
+        )}
 
-      {open && data && (
-        <>
-          {cast.length === 0 ? (
-            <p className="muted" style={{ fontSize: 12.5 }}>No cast listed on TMDB.</p>
-          ) : (
-            <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 6 }}>
-              {cast.map((c) => (
+        {groups.length > 0 && (
+          <button
+            className={'sd-row' + (cast.length > 0 || created.length > 0 ? ' sd-sep' : '')}
+            onClick={() => setSheet('crew')}
+          >
+            <span style={{ flexGrow: 1 }}>
+              Full crew{' '}
+              <span className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                · {crewLabel}
+              </span>
+            </span>
+            <Chevron />
+          </button>
+        )}
+
+        {cast.length === 0 && groups.length === 0 && created.length === 0 && (
+          <div className="sd-row" style={{ color: 'var(--text-dim)', cursor: 'default' }}>
+            No cast or crew listed on TMDB.
+          </div>
+        )}
+      </section>
+
+      {/* ---- cast sheet */}
+      <Sheet
+        open={sheet === 'cast'}
+        title="Cast"
+        subtitle="Tap a person for their other titles"
+        onClose={() => setSheet(null)}
+      >
+        <div className="sd-cast-grid">
+          {cast.slice(0, 60).map((c, i) => (
+            <button key={c.id} className="sd-cast-cell" onClick={() => openPerson(c, c.character)}>
+              <Avatar name={c.name} path={c.profile} size={56} tint={i} />
+              <span style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.2 }}>{c.name}</span>
+              {c.character && (
+                <span className="sd-ell" style={{ fontSize: 11, color: 'var(--text-dim)', maxWidth: '100%' }}>
+                  {c.character}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </Sheet>
+
+      {/* ---- crew sheet */}
+      <Sheet
+        open={sheet === 'crew'}
+        title="Crew"
+        subtitle="Tap a person for their other titles"
+        onClose={() => setSheet(null)}
+      >
+        {created.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div className="sd-lbl" style={{ marginBottom: 6 }}>Created by</div>
+            <div style={{ fontSize: 15, fontWeight: 500 }}>{created.join(', ')}</div>
+          </div>
+        )}
+        {groups.map((g) => (
+          <div key={g.title} style={{ marginBottom: 14 }}>
+            <div className="sd-lbl" style={{ marginBottom: 6 }}>
+              {g.title} · {g.people.length}
+            </div>
+            <div className="sd-card">
+              {g.people.slice(0, 40).map((p, i) => (
                 <button
-                  key={c.id}
-                  onClick={() =>
-                    setPerson({
-                      id: c.id,
-                      name: c.name,
-                      profile: c.profile_path,
-                      sub: (c.roles || []).map((r) => r.character).filter(Boolean).slice(0, 2).join(', '),
-                    })
-                  }
-                  style={{
-                    flex: 'none', width: 78, background: 'none', border: 'none',
-                    padding: 0, cursor: 'pointer', textAlign: 'center', color: 'var(--text)',
-                  }}
+                  key={p.id}
+                  className={'sd-row' + (i > 0 ? ' sd-sep' : '')}
+                  style={{ minHeight: 52 }}
+                  onClick={() => openPerson(p, p.jobs.join(', '))}
                 >
-                  {c.profile_path ? (
-                    <img
-                      src={img(c.profile_path, 'w185')}
-                      alt=""
-                      style={{ width: 78, height: 78, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: 78, height: 78, borderRadius: '50%',
-                        background: 'var(--bg-card)', border: '1px solid var(--line)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 22,
-                      }}
-                    >
-                      {(c.name || '?').slice(0, 1)}
-                    </div>
-                  )}
-                  <div style={{ fontSize: 12, marginTop: 6, lineHeight: 1.2 }}>{c.name}</div>
-                  {(c.roles || [])[0] && (
-                    <div className="muted" style={{ fontSize: 10.5, lineHeight: 1.2 }}>
-                      {c.roles[0].character}
-                    </div>
-                  )}
+                  <Avatar name={p.name} path={p.profile} size={32} tint={i} />
+                  <span className="sd-ell" style={{ flexGrow: 1 }}>{p.name}</span>
+                  <span className="sd-mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                    {p.eps ? `${p.eps} ep` : ''}
+                  </span>
+                  <Chevron />
                 </button>
               ))}
             </div>
-          )}
+          </div>
+        ))}
+      </Sheet>
 
-          {crew.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <div className="muted" style={{ fontSize: 11.5, marginBottom: 7 }}>Crew</div>
-              <div className="chips">
-                {crew.map((c) => (
-                  <button
-                    key={c.id}
-                    className="chip"
-                    onClick={() => setPerson({ id: c.id, name: c.name, profile: c.profile, sub: c.jobList.slice(0, 3).join(', ') })}
-                    style={{ cursor: 'pointer' }}
-                    title={c.jobList.join(', ')}
-                  >
-                    {c.name}
-                    <span className="muted" style={{ fontSize: 10.5, marginLeft: 6 }}>
-                      {c.jobList.filter((j) => KEY_JOBS.includes(j))[0] || c.department}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
+      {/* ---- a person's other titles (opens on top of whichever sheet is up) */}
       {person && (
-        <PersonOverlay
+        <PersonSheet
           person={person}
           excludeTvId={tmdbId}
           trackedTv={trackedTv}
@@ -315,6 +281,6 @@ export default function CastCrew({ tmdbId, trackedTv, trackedMovie }) {
           onClose={() => setPerson(null)}
         />
       )}
-    </div>
+    </>
   );
 }

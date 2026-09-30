@@ -1,0 +1,338 @@
+/* Show-detail redesign (Claude Design v2 C).
+ *
+ * Everything here is `sd-*` namespaced so it can't collide with the older
+ * rules in styles.css (.row, .btn, .card-*, .chip …), which other pages still
+ * use. Tokens reuse the existing :root vars (--bg-raise, --line, --amber …);
+ * the three extras below are the only new values the design needed.
+ * Nothing in this file is imported globally — ui.jsx pulls it in.
+ */
+
+:root {
+  --sd-text-2: #c3cad5;      /* secondary text (row values, season codes) */
+  --sd-line-soft: #1c2230;   /* hairline between episode rows */
+  --sd-line-strong: #3a4352; /* empty check circle, sheet handle */
+}
+
+.sd-page {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+/* ------------------------------------------------ small text helpers */
+.sd-lbl {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.sd-mono { font-family: var(--font-mono); }
+.sd-h2 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+}
+.sd-ell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ------------------------------------------------ card + list rows */
+.sd-card {
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.sd-row {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 14px 0 16px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.sd-row:disabled { cursor: default; opacity: 0.75; }
+.sd-row:focus-visible,
+.sd-btn:focus-visible,
+.sd-ib:focus-visible,
+.sd-opt:focus-visible,
+.sd-check:focus-visible,
+.sd-star:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: -2px;
+}
+.sd-sep { border-top: 1px solid var(--line); }
+
+/* ------------------------------------------------ buttons */
+.sd-btn {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-raise);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.sd-btn:disabled { opacity: 0.6; cursor: default; }
+.sd-btn.teal {
+  color: var(--teal);
+  border-color: rgba(86, 200, 181, 0.4);
+  background: rgba(86, 200, 181, 0.08);
+}
+.sd-btn.primary {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #0d1015;
+}
+.sd-back {
+  height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.sd-linkbtn {
+  border: none;
+  background: transparent;
+  color: var(--amber);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------ rating stars */
+.sd-star {
+  width: 40px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------ progress bars */
+.sd-bar {
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+  display: block;
+  /* Without this the bar collapses to 0 wide when it's a flex item in a row
+     (the season rows) — it only looked right in a column (the hero). */
+  width: 100%;
+}
+.sd-bar > span { display: block; height: 100%; }
+
+/* ------------------------------------------------ seasons + episodes */
+.sd-season-head {
+  height: 52px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.sd-ep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px 0 16px;
+  min-height: 48px;
+  border-top: 1px solid var(--sd-line-soft);
+}
+.sd-check {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  flex: none;
+}
+.sd-check > span {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  border: 1.5px solid var(--sd-line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--teal);
+}
+.sd-check.on > span {
+  border-color: rgba(86, 200, 181, 0.5);
+  background: rgba(86, 200, 181, 0.16);
+}
+.sd-check.next > span { border-color: var(--amber); }
+
+/* Folded "E01–E12 · all watched" row: a .sd-ep laid out as a full-width button. */
+.sd-foldrow {
+  width: 100%;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sd-foldrow:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+
+/* ------------------------------------------------ cast avatars */
+.sd-avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--sd-text-2);
+  object-fit: cover;
+  flex: none;
+}
+
+/* ------------------------------------------------ bottom sheet */
+.sd-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(5, 7, 10, 0.66);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: sd-fade 0.16s ease-out;
+}
+.sd-sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border-top: 1px solid var(--line);
+  border-radius: 20px 20px 0 0;
+  padding: 10px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  animation: sd-rise 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  outline: none;
+}
+.sd-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--sd-line-strong);
+  margin: 0 auto 10px;
+  flex: none;
+}
+.sd-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  flex: none;
+}
+.sd-sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.sd-opt-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.sd-opt {
+  height: 48px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-raise);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sd-opt.on {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+@keyframes sd-rise {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes sd-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sd-scrim, .sd-sheet { animation: none; }
+}
+
+/* Bigger tap-through cast grid inside the sheet. */
+.sd-cast-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.sd-cast-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-raise);
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  min-width: 0;
+}

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore.js';
 import {
-  epKey,
   markEpisode,
   markSeason,
   logEpisodeRewatch,
@@ -16,20 +15,33 @@ import {
   hoursLeft,
   paceFinish,
 } from '../store/db.js';
-import { seasonDetails, resolveShow, searchShows, showDetails, hasKey, img, watchProviders, tvVideos, pickTrailer } from '../api/tmdb.js';
-import Stars from '../components/Stars.jsx';
-import PlatformPicker from '../components/PlatformPicker.jsx';
+import {
+  seasonDetails,
+  resolveShow,
+  searchShows,
+  showDetails,
+  hasKey,
+  img,
+  watchProviders,
+  tvVideos,
+  pickTrailer,
+} from '../api/tmdb.js';
+import { PLATFORMS, platformById } from '../components/PlatformPicker.jsx';
 import CastCrew from '../components/CastCrew.jsx';
+import { Bar, Chevron, Sheet } from '../components/ui.jsx';
+import {
+  epKey,
+  seasonInfo,
+  nextToMark,
+  leadingDoneCount,
+  currentSeasonN,
+  leadingWatchedFold,
+} from '../components/showLogic.js';
 
-function Check({ on, onClick, label }) {
-  return (
-    <button className={'check' + (on ? ' on' : '')} onClick={onClick} aria-label={label} aria-pressed={on}>
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="3">
-        <path d="M5 13l4 4 10-10" />
-      </svg>
-    </button>
-  );
-}
+// Show page — "v2 C" from the Claude Design round: a compact hero with the
+// one primary action, then grouped list-row cards (rating / where you watch /
+// streaming → seasons → cast & crew), with the heavy pickers moved into
+// bottom sheets instead of sitting on the page.
 
 // "2026-12-25" -> "25 Dec 2026", with no timezone drift.
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -39,11 +51,30 @@ function fmtDate(s) {
   if (!y || !m || !d) return s;
   return `${d} ${MONTHS[m - 1]} ${y}`;
 }
+const pad2 = (n) => String(n).padStart(2, '0');
+const isoToday = () => new Date().toISOString().slice(0, 10);
 
-function Season({ id, show, season }) {
+// ---------------------------------------------------------------- icons
+const CheckIcon = ({ size = 16, w = 2.4 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </svg>
+);
+const StarIcon = ({ on }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinejoin="round"
+    fill={on ? 'var(--amber)' : 'none'} stroke={on ? 'var(--amber)' : 'var(--sd-line-strong)'}
+    aria-hidden="true">
+    <path d="M12 17.3l-6.2 3.7 1.6-7.1L2 9.2l7.2-.6L12 2l2.8 6.6 7.2.6-5.4 4.7 1.6 7.1z" />
+  </svg>
+);
+
+// ---------------------------------------------------------------- seasons
+function Season({ id, show, season, info, isCurrent, next }) {
   const [eps, setEps] = useState(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(isCurrent);
   const [err, setErr] = useState(null);
+  const [expandDone, setExpandDone] = useState(false);
 
   async function load() {
     if (eps || !show.tmdbId) return;
@@ -55,103 +86,134 @@ function Season({ id, show, season }) {
     }
   }
 
-  const seenInSeason = Object.keys(show.watched || {}).filter(
-    (k) => k.startsWith(season.n + 'x')
-  ).length;
-  const allSeen = season.count > 0 && seenInSeason >= season.count;
+  // The current season opens by itself, so its episodes load straight away.
+  useEffect(() => {
+    if (isCurrent) load();
+  }, []);
 
-  // A season hasn't been released if its air date is still in the future, or
-  // (when TMDB hasn't dated it) it has no episodes and nothing watched. The
-  // per-season air date comes from a sync; the show's nextAir covers the
-  // upcoming season even on data synced before that field existed.
-  const today = new Date().toISOString().slice(0, 10);
-  const airDate =
-    season.air ||
-    (show.nextAir && show.nextAir.season === season.n ? show.nextAir.date : null);
-  const isFuture = airDate && airDate > today;
-  const upcoming = isFuture || (!airDate && season.count === 0 && seenInSeason === 0);
+  const { seen, count, pct, done, upcoming, airDate } = info;
+  const barColor = done ? 'var(--teal)' : 'var(--amber)';
+  const watched = show.watched || {};
+  const today = isoToday();
+  const fold = eps ? leadingWatchedFold(eps.map((e) => e.episode_number), watched, season.n) : 0;
 
   return (
-    <div className={'season-block' + (upcoming ? ' upcoming' : '')}>
-      <div className="season-head">
-        <h3>
-          Season {season.n}{' '}
-          {upcoming ? (
-            <>
-              <span className="badge-soon">Upcoming</span>{' '}
-              <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-                {airDate ? `Premieres ${fmtDate(airDate)}` : 'Not released yet'}
-              </span>
-            </>
-          ) : (
-            <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
-              {seenInSeason}/{season.count}
+    <div className="sd-sep" style={{ background: open ? 'var(--bg-card)' : 'transparent' }}>
+      <button
+        className="sd-season-head"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen(!open);
+          if (!open) load();
+        }}
+      >
+        <span className="sd-mono" style={{ width: 30, fontSize: 12, color: isCurrent ? 'var(--amber)' : 'var(--sd-text-2)' }}>
+          S{pad2(season.n)}
+        </span>
+        {upcoming ? (
+          <>
+            <span className="sd-ell" style={{ flexGrow: 1, fontSize: 12, color: 'var(--amber)' }}>
+              {airDate ? `Premieres ${fmtDate(airDate)}` : 'Not released yet'}
             </span>
-          )}
-        </h3>
-        <div className="row">
-          {eps && !upcoming && (
-            <button
-              className="btn"
-              onClick={() => markSeason(id, season.n, eps, !allSeen)}
+          </>
+        ) : (
+          <>
+            <span style={{ flexGrow: 1, display: 'flex' }}>
+              <Bar value={pct} color={barColor} height={4} />
+            </span>
+            <span
+              className="sd-mono"
+              style={{ width: 44, textAlign: 'right', fontSize: 12, color: done ? 'var(--teal)' : 'var(--text-dim)' }}
             >
-              {allSeen ? 'Unmark season' : 'Mark season watched'}
-            </button>
-          )}
+              {seen}/{count}
+            </span>
+          </>
+        )}
+        <Chevron dir="down" size={18} style={{ transform: open ? 'rotate(180deg)' : 'none' }} />
+      </button>
+
+      {open && err && <p className="muted" style={{ padding: '0 16px 12px', margin: 0 }}>{err}</p>}
+      {open && !show.tmdbId && (
+        <p className="muted" style={{ padding: '0 16px 12px', margin: 0, fontSize: 13 }}>
+          Link this show to TMDB (⋯ → Fix TMDB match) to load its episodes.
+        </p>
+      )}
+      {open && show.tmdbId && !eps && !err && (
+        <p className="muted" style={{ padding: '0 16px 12px', margin: 0, fontSize: 13 }}>Loading episodes…</p>
+      )}
+
+      {open && eps && !upcoming && eps.length > 0 && (
+        <div className="sd-ep" style={{ minHeight: 44 }}>
           <button
-            className="btn"
-            onClick={() => {
-              setOpen(!open);
-              if (!open) load();
-            }}
+            className="sd-linkbtn"
+            onClick={() => markSeason(id, season.n, eps, !done)}
           >
-            {open ? 'Hide' : 'Episodes'}
+            {done ? 'Unmark season' : 'Mark season watched'}
           </button>
         </div>
-      </div>
-      {open && err && <p className="muted">{err}</p>}
-      {open && !eps && !err && <p className="muted">Loading episodes…</p>}
+      )}
+
+      {open && eps && fold > 0 && (
+        <button
+          className="sd-ep sd-foldrow"
+          aria-expanded={expandDone}
+          onClick={() => setExpandDone(!expandDone)}
+        >
+          <span style={{ flexGrow: 1, fontSize: 13, color: 'var(--text-dim)', textAlign: 'left' }}>
+            E01–E{pad2(eps[fold - 1].episode_number)} · all watched
+          </span>
+          <span className="sd-mono" style={{ fontSize: 11, color: 'var(--amber)', paddingRight: 8 }}>
+            {expandDone ? 'HIDE' : 'SHOW'}
+          </span>
+        </button>
+      )}
+
       {open &&
         eps &&
-        eps.map((ep) => {
+        eps.slice(expandDone ? 0 : fold).map((ep) => {
           const k = epKey(season.n, ep.episode_number);
-          const w = (show.watched || {})[k];
+          const w = watched[k];
           const on = !!w;
           const n = w && w.n ? w.n : 0;
+          const isNext = !!next && next.season === season.n && next.episode === ep.episode_number;
+          const code = `S${season.n}E${ep.episode_number}`;
+          let sub = null;
+          if (on && w.at) {
+            sub = { text: `Watched ${fmtDate(w.at.slice(0, 10))}${n > 1 ? ` · ${n}×` : ''}`, color: 'var(--text-dim)' };
+          } else if (!on && ep.air_date && ep.air_date > today) {
+            sub = { text: `Airs ${fmtDate(ep.air_date)}`, color: 'var(--amber)' };
+          }
           return (
-            <div className="ep-row" key={ep.id}>
-              <Check
-                on={on}
-                label={`Mark S${season.n}E${ep.episode_number} ${on ? 'unwatched' : 'watched'}`}
-                onClick={() =>
-                  markEpisode(id, season.n, ep.episode_number, ep.runtime, !on)
-                }
-              />
-              <span className="epcode">
-                S{String(season.n).padStart(2, '0')}·E
-                {String(ep.episode_number).padStart(2, '0')}
+            <div className="sd-ep" key={ep.id}>
+              <span className="sd-mono" style={{ width: 30, fontSize: 12, color: isNext ? 'var(--amber)' : 'var(--text-dim)' }}>
+                E{pad2(ep.episode_number)}
               </span>
-              <div className="ep-name">
-                {ep.name}
-                {on && w.at ? (
-                  <div className="airdate" style={{ color: 'var(--amber)' }}>
-                    Watched {fmtDate(w.at.slice(0, 10))}
-                    {n > 1 ? ` (${n}×)` : ''}
-                  </div>
-                ) : ep.air_date ? (
-                  <div className="airdate">Aired {ep.air_date}</div>
-                ) : null}
+              <div style={{ flexGrow: 1, minWidth: 0, padding: '8px 0' }}>
+                <div style={{ fontSize: 14 }}>{ep.name || `Episode ${ep.episode_number}`}</div>
+                {sub && <div style={{ fontSize: 12, color: sub.color, marginTop: 2 }}>{sub.text}</div>}
               </div>
               {on && (
                 <button
-                  className="btn"
+                  className="sd-check"
+                  style={{ width: 36 }}
                   title="Log another watch of this episode"
-                  style={{ padding: '4px 9px', fontSize: 11.5, flex: 'none' }}
+                  aria-label={`Log another watch of ${code}`}
                   onClick={() => logEpisodeRewatch(id, season.n, ep.episode_number, ep.runtime)}
                 >
-                  + Rewatch
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5" />
+                  </svg>
                 </button>
               )}
+              <button
+                className={'sd-check' + (on ? ' on' : isNext ? ' next' : '')}
+                aria-pressed={on}
+                aria-label={`Mark ${code} ${on ? 'unwatched' : 'watched'}`}
+                onClick={() => markEpisode(id, season.n, ep.episode_number, ep.runtime, !on)}
+              >
+                <span>{on && <CheckIcon size={16} w={3} />}</span>
+              </button>
             </div>
           );
         })}
@@ -159,15 +221,17 @@ function Season({ id, show, season }) {
   );
 }
 
+// ---------------------------------------------------------------- page
 export default function ShowDetail({ id, onBack }) {
   const state = useStore();
   const show = state.shows[id];
   const [syncing, setSyncing] = useState(false);
-  const [fixing, setFixing] = useState(false);
+  const [sheet, setSheet] = useState(null); // 'platform' | 'streaming' | 'menu' | 'fix'
   const [fixQuery, setFixQuery] = useState('');
   const [fixResults, setFixResults] = useState(null);
   const [streamLoading, setStreamLoading] = useState(false);
   const [trailerLoading, setTrailerLoading] = useState(false);
+  const [showDone, setShowDone] = useState(false);
 
   // Opens a blank tab synchronously (within the click handler, before any
   // await) so browsers treat it as a direct result of the user's click and
@@ -237,7 +301,7 @@ export default function ShowDetail({ id, onBack }) {
     try {
       const details = await showDetails(result.id);
       applyTmdbDetails(id, details);
-      setFixing(false);
+      setSheet(null);
       setFixResults(null);
       setFixQuery('');
     } catch (err) {
@@ -258,240 +322,449 @@ export default function ShowDetail({ id, onBack }) {
 
   if (!show) {
     return (
-      <div>
-        <button className="back" onClick={onBack}>← Back</button>
+      <div className="sd-page">
+        <button className="sd-back" onClick={onBack}><Chevron dir="left" />Back</button>
         <p className="muted">Show not found.</p>
       </div>
     );
   }
 
-  // TMDB ids the user already tracks, so the cast panel can flag "in library".
-  const trackedTv = new Set(
-    Object.values(state.shows).map((s) => s.tmdbId).filter(Boolean)
-  );
-  const trackedMovie = new Set(
-    (state.movies || []).map((m) => m.tmdbId).filter(Boolean)
-  );
-
+  // ---- derived state
+  const today = isoToday();
   const seen = watchedCount(show);
   const left = episodesLeft(show);
   const hrs = hoursLeft(show);
   const finish = paceFinish(show);
+  const total = show.totalEpisodes || 0;
+  const pct = total ? Math.min(100, Math.round((seen / total) * 100)) : 0;
+  const finished = total > 0 && seen >= total;
+  const next = nextToMark(show, today);
+  const platform = platformById(show.platform);
+  const providers = show.providers || [];
+
+  // TMDB ids the user already tracks, so the cast panel can flag "in library".
+  const trackedTv = new Set(Object.values(state.shows).map((s) => s.tmdbId).filter(Boolean));
+  const trackedMovie = new Set((state.movies || []).map((m) => m.tmdbId).filter(Boolean));
+
+  const seasons = show.seasons || [];
+  const infos = seasons.map((se) => ({ season: se.n, se, info: seasonInfo(show, se, today) }));
+  const lead = leadingDoneCount(infos.map((x) => x.info));
+  const foldedLead = lead > 0 && !showDone ? infos.slice(0, lead) : [];
+  const visible = infos.slice(foldedLead.length);
+  const currentN = currentSeasonN(infos, next);
+
+  const titleSize = show.name.length <= 18 ? 42 : show.name.length <= 28 ? 34 : 28;
+  const kind = `TV${show.status ? ' · ' + show.status : ''}`;
+
+  let streamSub;
+  if (!show.tmdbId) streamSub = 'Link to TMDB to check availability';
+  else if (!hasKey()) streamSub = 'Add a TMDB API key in Settings';
+  else if (providers.length) streamSub = providers.map((p) => p.name).join(' · ');
+  else if (show.providersSynced) streamSub = 'Not streaming in Australia';
+  else streamSub = 'Tap to check availability';
+
+  const rating = show.rating || 0;
 
   return (
-    <div>
-      <button className="back" onClick={onBack}>← Back</button>
-      <div className="detail-hero">
-        {show.poster ? (
-          <img src={img(show.poster)} alt="" />
-        ) : (
-          <div className="noposter" style={{ width: 128, aspectRatio: '2/3' }}>
-            {show.name}
-          </div>
-        )}
-        <div>
-          <h2>{show.name}</h2>
-          <div className="stat-inline">
-            <span>{seen} watched</span>
-            {show.totalEpisodes ? <span>{show.totalEpisodes} total</span> : null}
-            {show.status ? <span>{show.status}</span> : null}
-            {show.nextAir ? <span>next: {show.nextAir.date}</span> : null}
-          </div>
-          {left > 0 && (
-            <div className="stat-inline" style={{ marginTop: -6 }}>
-              <span style={{ color: 'var(--amber)' }}>
-                {left} episode{left === 1 ? '' : 's'} left
-                {hrs > 0 ? ` · ~${hrs} hr${hrs === 1 ? '' : 's'}` : ''}
-              </span>
-              {finish && <span>≈ finish by {fmtDate(finish.date)} at your recent pace</span>}
-            </div>
-          )}
-          <div className="row">
-            <button className="btn" onClick={() => toggleFollow(id)}>
-              {show.followed ? 'Unfollow' : 'Follow'}
-            </button>
-            {hasKey() && show.tmdbId && (
-              <button className="btn" onClick={openTrailer} disabled={trailerLoading}>
-                {trailerLoading ? 'Loading trailer…' : '▶ Trailer'}
-              </button>
-            )}
-            {hasKey() && (
-              <button
-                className="btn"
-                onClick={() => {
-                  setFixing(!fixing);
-                  setFixQuery(show.name);
-                  setFixResults(null);
-                }}
-              >
-                Fix match
-              </button>
-            )}
-            <button
-              className="btn danger"
-              onClick={() => {
-                if (
-                  confirm(
-                    `Delete "${show.name}" and its watch history? This removes it ` +
-                      `from your library and every signed-in device, and can't be undone.`
-                  )
-                ) {
-                  deleteShow(id);
-                  onBack();
-                }
+    <div className="sd-page">
+      <button className="sd-back" onClick={onBack}><Chevron dir="left" />Back</button>
+
+      {/* ---------------- hero */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4 }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
+          <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span className="sd-lbl">{kind}</span>
+            <h1
+              style={{
+                margin: 0,
+                fontFamily: 'var(--font-display)',
+                fontSize: titleSize,
+                lineHeight: 0.95,
+                fontWeight: 800,
+                overflowWrap: 'break-word',
               }}
             >
-              Delete
-            </button>
-            {syncing && <span className="muted">Syncing with TMDB…</span>}
+              {show.name}
+            </h1>
           </div>
-          <div className="rate-row">
-            <span className="muted" style={{ fontSize: 12 }}>Your rating</span>
-            <Stars value={show.rating || 0} onChange={(n) => setShowRating(id, n)} />
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-              Where you watch it
-            </div>
-            <PlatformPicker
-              value={show.platform || ''}
-              onChange={(p) => setShowPlatform(id, p)}
+          {show.poster ? (
+            <img
+              src={img(show.poster, 'w185')}
+              alt=""
+              style={{ width: 72, height: 108, flexShrink: 0, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--line)' }}
             />
-          </div>
+          ) : (
+            <div
+              style={{
+                width: 72, height: 108, flexShrink: 0, borderRadius: 10,
+                background: 'linear-gradient(165deg, #3a3f4d, #171d28)', border: '1px solid var(--line)',
+              }}
+            />
+          )}
+        </div>
 
-          <div style={{ marginTop: 14 }}>
-            <div className="row" style={{ marginBottom: 7 }}>
-              <div className="muted" style={{ fontSize: 12 }}>Streaming in Australia</div>
-              <div className="spacer" />
-              {hasKey() && show.tmdbId && (
-                <button
-                  className="btn"
-                  onClick={refreshStreaming}
-                  disabled={streamLoading}
-                  style={{ padding: '3px 10px', fontSize: 11.5 }}
-                >
-                  {streamLoading ? 'Checking…' : show.providersSynced ? 'Refresh' : 'Check'}
-                </button>
-              )}
-            </div>
-
-            {show.providers && show.providers.length > 0 ? (
-              <>
-                <div className="chips">
-                  {show.providers.map((p) => (
-                    <span
-                      key={p.name}
-                      className="chip"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        cursor: 'default',
-                        paddingLeft: p.logo ? 4 : 12,
-                      }}
-                    >
-                      {p.logo && (
-                        <img
-                          src={img(p.logo, 'w45')}
-                          alt=""
-                          style={{ width: 18, height: 18, borderRadius: 4, display: 'block' }}
-                        />
-                      )}
-                      {p.name}
-                    </span>
-                  ))}
-                </div>
-                {show.providersLink && (
-                  <a
-                    href={show.providersLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="muted"
-                    style={{ fontSize: 11.5, display: 'inline-block', marginTop: 8 }}
-                  >
-                    Streaming data by JustWatch →
-                  </a>
-                )}
-              </>
-            ) : show.providersSynced ? (
-              <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
-                Not currently streaming anywhere in Australia, per TMDB/JustWatch.
-              </p>
-            ) : show.tmdbId ? (
-              <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
-                {hasKey()
-                  ? 'Not checked yet — tap "Check" to see where this is streaming.'
-                  : 'Add a TMDB API key in Settings to check streaming availability.'}
-              </p>
-            ) : (
-              <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
-                Link this show to TMDB (Fix match) to check streaming availability.
-              </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <Bar value={pct} color={finished ? 'var(--teal)' : 'var(--amber)'} height={8} />
+          <div className="sd-mono" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: 'var(--text-dim)' }}>
+            <span>
+              <span style={{ color: 'var(--text)' }}>{seen}</span>
+              {total ? ` of ${total} watched` : ' watched'}
+            </span>
+            {left > 0 && (
+              <span style={{ color: 'var(--amber)' }}>
+                {left} left{hrs > 0 ? ` · ~${hrs} hrs` : ''}
+              </span>
             )}
           </div>
+          {finish && (
+            <div className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              ≈ finish by {fmtDate(finish.date)} at your recent pace
+            </div>
+          )}
         </div>
+
+        {next && (
+          <button
+            className="sd-btn primary"
+            style={{ width: '100%', height: 52, fontSize: 15 }}
+            onClick={() => markEpisode(id, next.season, next.episode, null, true)}
+          >
+            <CheckIcon size={18} />
+            <span>
+              Mark{' '}
+              <span className="sd-mono" style={{ fontWeight: 600 }}>
+                S{pad2(next.season)}·E{pad2(next.episode)}
+              </span>{' '}
+              watched
+            </span>
+          </button>
+        )}
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className={'sd-btn' + (show.followed ? ' teal' : '')}
+            style={{ flex: 1 }}
+            aria-pressed={!!show.followed}
+            onClick={() => toggleFollow(id)}
+          >
+            {show.followed ? <CheckIcon /> : <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>+</span>}
+            {show.followed ? 'Following' : 'Follow'}
+          </button>
+          {hasKey() && show.tmdbId && (
+            <button className="sd-btn" onClick={openTrailer} disabled={trailerLoading}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M7 5l12 7-12 7z" />
+              </svg>
+              {trailerLoading ? 'Loading…' : 'Trailer'}
+            </button>
+          )}
+          <button
+            className="sd-btn"
+            style={{ width: 44, padding: 0 }}
+            aria-label="More actions"
+            aria-haspopup="dialog"
+            onClick={() => setSheet('menu')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+            </svg>
+          </button>
+        </div>
+        {syncing && <span className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>Syncing with TMDB…</span>}
       </div>
 
+      {/* ---------------- rating / where you watch / streaming */}
+      <section className="sd-card" style={{ margin: '20px 0 0' }}>
+        <div className="sd-row" style={{ justifyContent: 'space-between', paddingRight: 8, cursor: 'default' }}>
+          <span>Your rating</span>
+          <span role="radiogroup" aria-label="Your rating" style={{ display: 'flex' }}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                className="sd-star"
+                role="radio"
+                aria-checked={n === rating}
+                aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                onClick={() => setShowRating(id, n === rating ? 0 : n)}
+              >
+                <StarIcon on={n <= rating} />
+              </button>
+            ))}
+          </span>
+        </div>
+
+        <button className="sd-row sd-sep" aria-haspopup="dialog" onClick={() => setSheet('platform')}>
+          <span style={{ flexGrow: 1 }}>Where you watch</span>
+          {platform ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--sd-text-2)' }}>
+              <span style={{ width: 8, height: 8, borderRadius: 4, background: platform.color, display: 'block' }} />
+              {platform.label}
+            </span>
+          ) : (
+            <span style={{ color: 'var(--text-dim)' }}>Not set</span>
+          )}
+          <span className="sd-mono" style={{ fontSize: 11, color: 'var(--amber)' }}>
+            {platform ? 'CHANGE' : 'SET'}
+          </span>
+          <Chevron />
+        </button>
+
+        <button
+          className="sd-row sd-sep"
+          aria-haspopup="dialog"
+          disabled={!show.tmdbId || !hasKey()}
+          onClick={() => setSheet('streaming')}
+        >
+          <span style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span>Streaming in Australia</span>
+            <span className="sd-ell" style={{ fontSize: 12, color: 'var(--text-dim)' }}>{streamSub}</span>
+          </span>
+          {providers.length > 0 && (
+            <span style={{ display: 'flex' }}>
+              {providers.slice(0, 3).map((p, i) => (
+                <span
+                  key={p.name}
+                  style={{
+                    width: 24, height: 24, borderRadius: 6, display: 'block', overflow: 'hidden',
+                    background: 'var(--line)', marginLeft: i === 0 ? 0 : -6, border: '2px solid var(--bg-raise)',
+                    boxSizing: 'content-box',
+                  }}
+                >
+                  {p.logo && (
+                    <img src={img(p.logo, 'w45')} alt="" style={{ width: 24, height: 24, display: 'block' }} />
+                  )}
+                </span>
+              ))}
+            </span>
+          )}
+          <Chevron />
+        </button>
+      </section>
+
+      {/* ---------------- seasons */}
+      <section className="sd-card" style={{ margin: '16px 0 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '14px 16px 10px' }}>
+          <h2 className="sd-h2">Seasons</h2>
+          <span className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+            {seasons.length} season{seasons.length === 1 ? '' : 's'}
+          </span>
+        </div>
+
+        {seasons.length === 0 && !syncing && (
+          <p className="muted" style={{ margin: 0, padding: '4px 16px 16px', fontSize: 13 }}>
+            {hasKey()
+              ? 'No episode data loaded yet. Use “Sync with TMDB” on the Shows tab, or reopen this page.'
+              : 'Add a TMDB API key in Settings to load seasons and episodes.'}
+          </p>
+        )}
+
+        {foldedLead.length > 0 && (() => {
+          const first = foldedLead[0].season;
+          const last = foldedLead[foldedLead.length - 1].season;
+          const seenSum = foldedLead.reduce((n, x) => n + Math.min(x.info.seen, x.info.count), 0);
+          const countSum = foldedLead.reduce((n, x) => n + x.info.count, 0);
+          return (
+            <button
+              className="sd-season-head sd-sep"
+              aria-expanded="false"
+              onClick={() => setShowDone(true)}
+            >
+              <span
+                style={{
+                  width: 28, height: 28, borderRadius: 14, flex: 'none', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', color: 'var(--teal)',
+                  background: 'rgba(86, 200, 181, 0.16)',
+                }}
+              >
+                <CheckIcon size={15} w={3} />
+              </span>
+              <span style={{ flexGrow: 1, fontSize: 14 }}>Seasons {first}–{last}</span>
+              <span className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                {seenSum} / {countSum}
+              </span>
+              <Chevron dir="down" size={18} />
+            </button>
+          );
+        })()}
+
+        {visible.map(({ se, info }) => (
+          <Season
+            key={`${show.tmdbId || 'x'}:${se.n}`}
+            id={id}
+            show={show}
+            season={se}
+            info={info}
+            isCurrent={se.n === currentN}
+            next={next}
+          />
+        ))}
+      </section>
+
+      {/* ---------------- cast & crew */}
       {hasKey() && show.tmdbId && (
-        <CastCrew
-          tmdbId={show.tmdbId}
-          trackedTv={trackedTv}
-          trackedMovie={trackedMovie}
-        />
+        <CastCrew tmdbId={show.tmdbId} trackedTv={trackedTv} trackedMovie={trackedMovie} />
       )}
 
-      {fixing && (
-        <div className="notice accent">
-          <p style={{ marginTop: 0 }}>
-            Search TMDB and pick the correct show. Your watch history stays;
-            only the poster, episode data and air dates get relinked.
+      {/* ================= sheets ================= */}
+
+      <Sheet
+        open={sheet === 'platform'}
+        title="Where you watch"
+        subtitle="Used in Stats › Where you watch"
+        onClose={() => setSheet(null)}
+      >
+        <div className="sd-opt-grid">
+          {PLATFORMS.map((p) => {
+            const on = show.platform === p.id;
+            return (
+              <button
+                key={p.id}
+                className={'sd-opt' + (on ? ' on' : '')}
+                aria-pressed={on}
+                onClick={() => setShowPlatform(id, on ? '' : p.id)}
+              >
+                {on ? '✓ ' : ''}
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={sheet === 'streaming'}
+        title="Streaming in Australia"
+        subtitle={show.providersSynced ? 'Subscription services' : 'Not checked yet'}
+        onClose={() => setSheet(null)}
+      >
+        {providers.length > 0 ? (
+          <div className="sd-card">
+            {providers.map((p, i) => (
+              <div key={p.name} className={'sd-row' + (i > 0 ? ' sd-sep' : '')} style={{ cursor: 'default' }}>
+                <span
+                  style={{
+                    width: 32, height: 32, borderRadius: 8, overflow: 'hidden', flex: 'none',
+                    background: 'var(--line)', display: 'block',
+                  }}
+                >
+                  {p.logo && <img src={img(p.logo, 'w92')} alt="" style={{ width: 32, height: 32, display: 'block' }} />}
+                </span>
+                <span style={{ flexGrow: 1 }}>{p.name}</span>
+                <span className="sd-mono" style={{ fontSize: 11, color: 'var(--teal)' }}>STREAM</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="muted" style={{ margin: 0, fontSize: 14 }}>
+            {show.providersSynced
+              ? 'Not currently streaming anywhere in Australia, per TMDB/JustWatch.'
+              : 'Tap “Check” to see where this is streaming.'}
           </p>
-          <form onSubmit={runFixSearch} className="row">
-            <input
-              type="search"
-              value={fixQuery}
-              onChange={(e) => setFixQuery(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <button className="btn" type="submit">Search</button>
-          </form>
-          {fixResults &&
-            (fixResults.length === 0 ? (
-              <p className="muted">No results — try a different name (e.g. the English title).</p>
-            ) : (
-              fixResults.slice(0, 6).map((r) => (
-                <div key={r.id} className="next-row" style={{ cursor: 'default', marginTop: 10 }}>
+        )}
+        <button
+          className="sd-btn"
+          style={{ width: '100%', marginTop: 12 }}
+          onClick={refreshStreaming}
+          disabled={streamLoading}
+        >
+          {streamLoading ? 'Checking…' : show.providersSynced ? 'Refresh' : 'Check'}
+        </button>
+        {show.providersLink && (
+          <a
+            href={show.providersLink}
+            target="_blank"
+            rel="noreferrer"
+            className="muted"
+            style={{ fontSize: 12, display: 'inline-block', marginTop: 12 }}
+          >
+            Streaming data by JustWatch →
+          </a>
+        )}
+      </Sheet>
+
+      <Sheet open={sheet === 'menu'} title={show.name} subtitle="More actions" onClose={() => setSheet(null)}>
+        <div className="sd-card">
+          {hasKey() && (
+            <button
+              className="sd-row"
+              onClick={() => {
+                setFixQuery(show.name);
+                setFixResults(null);
+                setSheet('fix');
+              }}
+            >
+              <span style={{ flexGrow: 1, color: 'var(--sd-text-2)' }}>Fix TMDB match</span>
+              <Chevron />
+            </button>
+          )}
+          <button
+            className={'sd-row' + (hasKey() ? ' sd-sep' : '')}
+            style={{ color: 'var(--red)' }}
+            onClick={() => {
+              if (
+                confirm(
+                  `Delete "${show.name}" and its watch history? This removes it ` +
+                    `from your library and every signed-in device, and can't be undone.`
+                )
+              ) {
+                setSheet(null);
+                deleteShow(id);
+                onBack();
+              }
+            }}
+          >
+            Delete from library
+          </button>
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet === 'fix'} title="Fix TMDB match" onClose={() => setSheet(null)}>
+        <p className="muted" style={{ margin: '0 0 12px', fontSize: 13 }}>
+          Search TMDB and pick the correct show. Your watch history stays; only the poster,
+          episode data and air dates get relinked.
+        </p>
+        <form onSubmit={runFixSearch} style={{ display: 'flex', gap: 8 }}>
+          <input
+            type="search"
+            value={fixQuery}
+            onChange={(e) => setFixQuery(e.target.value)}
+            aria-label="Search TMDB"
+            style={{
+              flex: 1, minWidth: 0, height: 44, borderRadius: 12, border: '1px solid var(--line)',
+              background: 'var(--bg-raise)', color: 'var(--text)', font: 'inherit', fontSize: 14,
+              padding: '0 12px',
+            }}
+          />
+          <button className="sd-btn" type="submit">Search</button>
+        </form>
+        {fixResults &&
+          (fixResults.length === 0 ? (
+            <p className="muted" style={{ marginTop: 12 }}>
+              No results — try a different name (e.g. the English title).
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+              {fixResults.slice(0, 6).map((r) => (
+                <div key={r.id} className="sd-card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8 }}>
                   {r.poster_path ? (
-                    <img src={img(r.poster_path, 'w154')} alt="" />
+                    <img src={img(r.poster_path, 'w154')} alt="" style={{ width: 34, aspectRatio: '2/3', borderRadius: 5, objectFit: 'cover', flex: 'none' }} />
                   ) : (
-                    <div className="thumb" />
+                    <div style={{ width: 34, aspectRatio: '2/3', borderRadius: 5, background: 'var(--bg-card)', flex: 'none' }} />
                   )}
-                  <div className="info">
-                    <div className="name">{r.name}</div>
-                    <div className="detail">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="sd-ell" style={{ fontSize: 14 }}>{r.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                       {(r.first_air_date || '').slice(0, 4) || 'unknown year'}
                     </div>
                   </div>
-                  <button className="btn primary" onClick={() => linkTo(r)}>
+                  <button className="sd-btn primary" style={{ height: 36, padding: '0 12px', fontSize: 13 }} onClick={() => linkTo(r)}>
                     Link this
                   </button>
                 </div>
-              ))
-            ))}
-        </div>
-      )}
-
-      {!show.seasons?.length && !syncing && (
-        <div className="notice">
-          {hasKey()
-            ? 'No episode data loaded yet. Use "Sync with TMDB" on the Shows tab, or reopen this page.'
-            : 'Add a TMDB API key in Settings to load seasons and episodes.'}
-        </div>
-      )}
-
-      {(show.seasons || []).map((season) => (
-        <Season key={season.n} id={id} show={show} season={season} />
-      ))}
+              ))}
+            </div>
+          ))}
+      </Sheet>
     </div>
   );
 }
