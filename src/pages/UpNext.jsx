@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore.js';
-import { watchedCount, lastWatched, lastWatchDate, setShowUpcoming, epKey, markEpisode } from '../store/db.js';
+import { watchedCount, lastWatched, lastWatchDate, setShowUpcoming, epKey, markEpisode, episodesLeft, hoursLeft, paceFinish } from '../store/db.js';
 import { img, hasKey, fetchUpcomingEpisodes } from '../api/tmdb.js';
 import CalendarGrid from '../components/CalendarGrid.jsx';
 
@@ -16,6 +16,7 @@ function fmtAgenda(dateStr) {
 }
 
 // A short relative hint, only when the date is near.
+// A short relative hint, only when the date is near.
 function relHint(dateStr) {
   const [y, m, d] = (dateStr || '').split('-').map(Number);
   if (!y) return null;
@@ -27,6 +28,13 @@ function relHint(dateStr) {
   if (days === 1) return 'tomorrow';
   if (days <= 14) return `in ${days} days`;
   return null;
+}
+
+// "2026-11-15" -> "15 Nov 2026" (no weekday), for the finish estimate.
+function fmtFinish(dateStr) {
+  const [y, m, d] = (dateStr || '').split('-').map(Number);
+  if (!y || !m || !d) return dateStr || '';
+  return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 
 // Earliest unwatched episode from stored season data (fills gaps), or null if
@@ -51,6 +59,9 @@ function NextRow({ id, show, onOpen }) {
   const last = lastWatched(show);
   const total = show.totalEpisodes;
   const next = nextUnwatched(show);
+  const left = episodesLeft(show);
+  const hrs = hoursLeft(show);
+  const finish = paceFinish(show);
   return (
     <div className="next-row" style={{ cursor: 'default' }}>
       <button
@@ -82,12 +93,17 @@ function NextRow({ id, show, onOpen }) {
             {last ? (
               <>
                 last watched <span className="epcode">S{String(last[0]).padStart(2, '0')}·E{String(last[1]).padStart(2, '0')}</span>
-                {total ? ` — ${total - seen} to go` : ''}
+                {left > 0 ? ` — ${left} to go${hrs > 0 ? ` · ~${hrs} hr${hrs === 1 ? '' : 's'} left` : ''}` : ''}
               </>
             ) : (
               'not started yet'
             )}
           </div>
+          {finish && (
+            <div className="detail" style={{ color: 'var(--amber)' }}>
+              ≈ finish by {fmtFinish(finish.date)} at your recent pace
+            </div>
+          )}
         </div>
       </button>
       {next && (

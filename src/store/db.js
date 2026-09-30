@@ -161,6 +161,79 @@ export function lastWatchDate(show) {
   return latest;
 }
 
+// --- "time left to finish" helpers (pure functions of a show record) ---
+const PACE_BATCH_MIN = 15;    // a minute with >= this many watches is a bulk import
+const PACE_WINDOW_DAYS = 120; // recent-pace lookback
+
+// Episodes remaining. 0 when the show is complete or has no episode count yet.
+export function episodesLeft(show) {
+  const total = show.totalEpisodes || 0;
+  if (!total) return 0;
+  return Math.max(0, total - watchedCount(show));
+}
+
+// Rough hours remaining = episodes left x per-episode runtime (40m fallback).
+export function hoursLeft(show) {
+  const mins = episodesLeft(show) * (show.runtimeMin || 40);
+  return mins > 0 ? Math.round(mins / 60) : 0;
+}
+
+// Finish-date estimate from THIS show's own recent watch pace. Returns
+// { days, date } (date = "YYYY-MM-DD") or null when there isn't enough recent
+// signal to be meaningful — so it never guesses off one binge or a stale show.
+// Bulk-import minutes are de-skewed (counted once) so a backlog dump can't fake
+// a blistering pace.
+export function paceFinish(show) {
+  const left = episodesLeft(show);
+  if (left <= 0) return null;
+
+  const entries = Object.values(show.watched || {}).filter((w) => w && w.at);
+  if (entries.length < 3) return null;
+
+  const dayNumOf = (iso) => {
+    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+    return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+  };
+  const todayNum = Math.floor(Date.now() / 86400000);
+  const windowStart = todayNum - PACE_WINDOW_DAYS;
+
+  const minuteCount = {};
+  for (const w of entries) {
+    const min = w.at.slice(0, 16);
+    minuteCount[min] = (minuteCount[min] || 0) + 1;
+  }
+
+  const seenBatch = new Set();
+  const activeDays = new Set();
+  let watchedInWindow = 0;
+  let earliest = null;
+  for (const w of entries) {
+    const dn = dayNumOf(w.at);
+    if (dn < windowStart) continue;
+    const min = w.at.slice(0, 16);
+    if (minuteCount[min] >= PACE_BATCH_MIN) {
+      if (seenBatch.has(min)) continue; // collapse a bulk-import minute to 1
+      seenBatch.add(min);
+    }
+    watchedInWindow += 1;
+    activeDays.add(w.at.slice(0, 10));
+    if (earliest === null || dn < earliest) earliest = dn;
+  }
+
+  // Trust a rate only with a few episodes across at least two separate days.
+  if (activeDays.size < 2 || watchedInWindow < 3) return null;
+
+  const spanDays = Math.max(1, todayNum - earliest);
+  const perDay = watchedInWindow / spanDays;
+  if (perDay <= 0) return null;
+
+  const days = Math.ceil(left / perDay);
+  if (days > 3650) return null; // slower than ~10 years out: not worth showing
+
+  const date = new Date((todayNum + days) * 86400000).toISOString().slice(0, 10);
+  return { days, date };
+}
+
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------

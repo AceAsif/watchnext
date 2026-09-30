@@ -12,6 +12,9 @@ import {
   deleteShow,
   applyTmdbDetails,
   watchedCount,
+  episodesLeft,
+  hoursLeft,
+  paceFinish,
 } from '../store/db.js';
 import { seasonDetails, resolveShow, searchShows, showDetails, hasKey, img, watchProviders, tvVideos, pickTrailer } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
@@ -262,6 +265,9 @@ export default function ShowDetail({ id, onBack }) {
   }
 
   const seen = watchedCount(show);
+  const left = episodesLeft(show);
+  const hrs = hoursLeft(show);
+  const finish = paceFinish(show);
 
   return (
     <div>
@@ -282,6 +288,15 @@ export default function ShowDetail({ id, onBack }) {
             {show.status ? <span>{show.status}</span> : null}
             {show.nextAir ? <span>next: {show.nextAir.date}</span> : null}
           </div>
+          {left > 0 && (
+            <div className="stat-inline" style={{ marginTop: -6 }}>
+              <span style={{ color: 'var(--amber)' }}>
+                {left} episode{left === 1 ? '' : 's'} left
+                {hrs > 0 ? ` · ~${hrs} hr${hrs === 1 ? '' : 's'}` : ''}
+              </span>
+              {finish && <span>≈ finish by {fmtDate(finish.date)} at your recent pace</span>}
+            </div>
+          )}
           <div className="row">
             <button className="btn" onClick={() => toggleFollow(id)}>
               {show.followed ? 'Unfollow' : 'Follow'}
