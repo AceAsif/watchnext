@@ -19,6 +19,7 @@ import {
 import { seasonDetails, resolveShow, searchShows, showDetails, hasKey, img, watchProviders, tvVideos, pickTrailer } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
 import PlatformPicker from '../components/PlatformPicker.jsx';
+import CastCrew from '../components/CastCrew.jsx';
 
 function Check({ on, onClick, label }) {
   return (
@@ -264,6 +265,14 @@ export default function ShowDetail({ id, onBack }) {
     );
   }
 
+  // TMDB ids the user already tracks, so the cast panel can flag "in library".
+  const trackedTv = new Set(
+    Object.values(state.shows).map((s) => s.tmdbId).filter(Boolean)
+  );
+  const trackedMovie = new Set(
+    (state.movies || []).map((m) => m.tmdbId).filter(Boolean)
+  );
+
   const seen = watchedCount(show);
   const left = episodesLeft(show);
   const hrs = hoursLeft(show);
@@ -422,6 +431,14 @@ export default function ShowDetail({ id, onBack }) {
           </div>
         </div>
       </div>
+
+      {hasKey() && show.tmdbId && (
+        <CastCrew
+          tmdbId={show.tmdbId}
+          trackedTv={trackedTv}
+          trackedMovie={trackedMovie}
+        />
+      )}
 
       {fixing && (
         <div className="notice accent">

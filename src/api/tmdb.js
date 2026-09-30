@@ -112,6 +112,22 @@ export function movieSimilar(tmdbId, page = 1) {
   return get(`/movie/${tmdbId}/similar`, { page });
 }
 
+// Cast & crew for a show. aggregate_credits (not plain credits) rolls a
+// person's work up across every season, so recurring cast aren't duplicated
+// and each carries a total_episode_count. Cast entries have roles:[{character,
+// episode_count}]; crew entries have jobs:[{job, episode_count}] + department.
+export function tvAggregateCredits(tmdbId) {
+  return get(`/tv/${tmdbId}/aggregate_credits`);
+}
+
+// Everything a person is credited in (TV + film), for the "what else are they
+// in" panel. Returns { cast:[...], crew:[...] }; each entry has media_type,
+// id, title|name, poster_path, character|job, first_air_date|release_date,
+// vote_count, popularity.
+export function personCombinedCredits(personId) {
+  return get(`/person/${personId}/combined_credits`);
+}
+
 export function tvVideos(tmdbId) {
   return get(`/tv/${tmdbId}/videos`);
 }
