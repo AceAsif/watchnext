@@ -12,6 +12,8 @@ import {
 import { searchMovies, movieDetails, hasKey, img, movieVideos, pickTrailer } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
 import PlatformPicker, { PlatformChip } from '../components/PlatformPicker.jsx';
+import { Sheet } from '../components/ui.jsx';
+import { PageHead, SearchField, PosterTile, MediaRow, Poster, Empty } from '../components/LibraryUI.jsx';
 
 export default function Movies() {
   const state = useStore();
@@ -23,15 +25,13 @@ export default function Movies() {
   const [fixResults, setFixResults] = useState(null);
   const [openIndex, setOpenIndex] = useState(null); // movie index showing details
   const [details, setDetails] = useState({}); // tmdbId -> TMDB movie details
+  const [libQuery, setLibQuery] = useState(''); // filters the watched grid
+  const [sortBy, setSortBy] = useState('recent'); // 'recent' | 'title' | 'rating'
 
   // Overviews are fetched on demand rather than stored: they're always
   // re-queryable from TMDB, and keeping 395 of them in local storage would
   // bloat the saved state for no real gain.
-  async function toggleDetails(m) {
-    if (openIndex === m.index) {
-      setOpenIndex(null);
-      return;
-    }
+  async function openMovie(m) {
     setOpenIndex(m.index);
     if (!m.tmdbId || details[m.tmdbId]) return;
     try {
@@ -199,288 +199,238 @@ export default function Movies() {
     }
   }
 
+  const shown = useMemo(() => {
+    const q = libQuery.trim().toLowerCase();
+    let list = q ? movies.filter((m) => (m.name || '').toLowerCase().includes(q)) : movies.slice();
+    if (sortBy === 'title') list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    else if (sortBy === 'rating')
+      list.sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.watchedAt || '').localeCompare(a.watchedAt || ''));
+    return list;
+  }, [movies, libQuery, sortBy]);
+
+  const sel = openIndex != null ? movies.find((m) => m.index === openIndex) : null;
+  const d = sel && sel.tmdbId ? details[sel.tmdbId] : null;
+  const fixing = sel && fixIndex === sel.index;
+  const closeSheet = () => {
+    setOpenIndex(null);
+    setFixIndex(null);
+    setFixResults(null);
+  };
+
   return (
-    <div>
-      <form onSubmit={runSearch} className="row" style={{ marginTop: 4 }}>
-        <input
-          type="search"
-          placeholder="Search TMDB for a movie you watched"
-          value={query}
-          onChange={(e) => {
-            const v = e.target.value;
-            setQuery(v);
-            if (!v.trim()) setResults(null); // emptying the box clears the list
-          }}
-          style={{ flex: 1 }}
-        />
-        <button className="btn" type="submit" disabled={busy || !hasKey()}>
-          Search
-        </button>
-      </form>
+    <div className="sd-page sd-page--wide">
+      <PageHead title="Movies" count={movies.length} />
+
+      <SearchField
+        value={query}
+        onChange={(v) => {
+          setQuery(v);
+          if (!v.trim()) setResults(null); // emptying the box clears the list
+        }}
+        placeholder="Search TMDB to log a movie"
+        onSubmit={runSearch}
+        busy={busy}
+        disabled={!hasKey()}
+      />
       {!hasKey() && (
-        <p className="muted" style={{ fontSize: 13 }}>
-          Search needs a TMDB API key — add one in Settings.
-        </p>
+        <p className="sd-sub" style={{ marginTop: 8 }}>Search needs a TMDB API key — add one in Settings.</p>
       )}
 
       {results && (
-        <>
-          <h2 className="section">Search results</h2>
-          {results.length === 0 && <p className="muted">No movies found for that search.</p>}
-          {results.slice(0, 10).map((r) => {
-            const seen = watchedByTmdb.get(r.id);
-            return (
-              <div key={r.id} className="movie-row">
-                {r.poster_path ? (
-                  <img src={img(r.poster_path, 'w154')} alt="" />
-                ) : (
-                  <div className="thumb" />
-                )}
-                <div className="info">
-                  <div className="name">{r.title}</div>
-                  <div className="detail">
-                    {(r.release_date || '').slice(0, 4) || 'unknown year'}
-                    {seen && (
-                      <>
-                        {' · '}
-                        <span style={{ color: 'var(--teal)' }}>
-                          ✓ already logged {(seen.last || '').slice(0, 10)}
+        <section className="sd-sec2" style={{ marginTop: 22 }}>
+          <div className="sd-sec2-head has-ctl">
+            <span className="sd-lbl">Search results</span>
+            <button className="sd-linkbtn" onClick={() => setResults(null)}>Clear</button>
+          </div>
+          {results.length === 0 ? (
+            <Empty>No movies found for that search.</Empty>
+          ) : (
+            <div className="sd-card">
+              {results.slice(0, 10).map((r, i) => {
+                const seen = watchedByTmdb.get(r.id);
+                return (
+                  <MediaRow key={r.id} sep={i > 0} path={r.poster_path} name={r.title}>
+                    <span className="sd-mrow-name">{r.title}</span>
+                    <span className="sd-mrow-meta">
+                      {(r.release_date || '').slice(0, 4) || 'unknown year'}
+                      {seen && (
+                        <span className="ok">
+                          {' · '}✓ logged {(seen.last || '').slice(0, 10)}
                           {seen.count > 1 ? ` (${seen.count}×)` : ''}
                         </span>
-                      </>
-                    )}
-                  </div>
-                  {r.overview ? (
-                    <p className="movie-overview">
-                      {r.overview.length > 220
-                        ? r.overview.slice(0, 220).trimEnd() + '…'
-                        : r.overview}
-                    </p>
-                  ) : null}
-                  <div className="actions">
-                    {seen ? (
-                      <>
-                        <button
-                          className="btn"
-                          onClick={() => addFromSearch(r, true)}
-                          disabled={busy}
-                          title="Add another watch with today's date"
-                        >
-                          Log rewatch
-                        </button>
-                        <button
-                          className="btn danger"
-                          onClick={() => removeLoggedMovie(r)}
-                          disabled={busy}
-                          title="Delete this logged watch"
-                        >
-                          {seen.count > 1 ? 'Remove latest' : 'Remove'}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        className="btn primary"
-                        onClick={() => addFromSearch(r)}
-                        disabled={busy}
-                      >
-                        Watched it
-                      </button>
-                    )}
-                    {!seen &&
-                      (plannedTmdbIds.has(r.id) ? (
-                        <button className="btn" disabled>
-                          On watchlist
-                        </button>
+                      )}
+                    </span>
+                    {r.overview ? (
+                      <span className="sd-mrow-over">{r.overview}</span>
+                    ) : null}
+                    <span className="sd-mrow-actions" style={{ justifyContent: 'flex-start', marginTop: 6 }}>
+                      {seen ? (
+                        <>
+                          <button className="sd-btn sm" onClick={() => addFromSearch(r, true)} disabled={busy} title="Add another watch with today's date">
+                            Log rewatch
+                          </button>
+                          <button className="sd-btn sm danger" onClick={() => removeLoggedMovie(r)} disabled={busy} title="Delete this logged watch">
+                            {seen.count > 1 ? 'Remove latest' : 'Remove'}
+                          </button>
+                        </>
                       ) : (
-                        <button
-                          className="btn"
-                          onClick={() => addToWatchlistFromSearch(r)}
-                          disabled={busy}
-                        >
-                          ＋ Watchlist
+                        <button className="sd-btn sm primary" onClick={() => addFromSearch(r)} disabled={busy}>
+                          Watched it
                         </button>
-                      ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          <button className="btn" onClick={() => setResults(null)}>
-            Clear results
-          </button>
-        </>
+                      )}
+                      {!seen &&
+                        (plannedTmdbIds.has(r.id) ? (
+                          <button className="sd-btn sm" disabled>On watchlist</button>
+                        ) : (
+                          <button className="sd-btn sm" onClick={() => addToWatchlistFromSearch(r)} disabled={busy}>
+                            ＋ Watchlist
+                          </button>
+                        ))}
+                    </span>
+                  </MediaRow>
+                );
+              })}
+            </div>
+          )}
+        </section>
       )}
 
-      <div className="row" style={{ marginTop: 22 }}>
-        <h2 className="section" style={{ margin: 0 }}>
-          Watched <span className="muted">({movies.length})</span>
-        </h2>
-      </div>
+      <section className="sd-sec2" style={{ marginTop: 24 }}>
+        <div className="sd-sec2-head has-ctl">
+          <span className="sd-lbl">Watched · {shown.length}</span>
+          <div className="sd-seg" role="group" aria-label="Sort movies">
+            {[['recent', 'Recent'], ['title', 'A–Z'], ['rating', 'Rating']].map(([id, label]) => (
+              <button key={id} aria-pressed={sortBy === id} onClick={() => setSortBy(id)}>{label}</button>
+            ))}
+          </div>
+        </div>
 
-      {movies.length === 0 && (
-        <p className="muted">
-          No movies yet. Search above to log one, or import your TV Time
-          history in Settings.
-        </p>
-      )}
+        {movies.length > 0 && (
+          <SearchField value={libQuery} onChange={setLibQuery} placeholder="Filter your movies" />
+        )}
 
-      {movies.map((m) => {
-        const d = m.tmdbId ? details[m.tmdbId] : null;
-        const isOpen = openIndex === m.index;
-        return (
-          <React.Fragment key={`${m.name}|${m.watchedAt}|${m.index}`}>
-            <div className="movie-row">
-              {m.poster ? (
-                <img src={img(m.poster, 'w154')} alt="" loading="lazy" />
-              ) : (
-                <div className="thumb" />
-              )}
-              <div className="info">
-                <div className="name">{m.name}</div>
-                <div className="detail">
-                  {m.year ? `${m.year} · ` : ''}
-                  watched {(m.watchedAt || '').slice(0, 10) || 'sometime'}
-                </div>
-                {m.platform ? (
-                  <div style={{ margin: '6px 0 2px' }}>
-                    <PlatformChip id={m.platform} />
+        {movies.length === 0 ? (
+          <Empty>No movies yet. Search above to log one, or import your TV Time history in Settings.</Empty>
+        ) : shown.length === 0 ? (
+          <Empty>No watched movie matches “{libQuery}”.</Empty>
+        ) : (
+          <div className="sd-pgrid" style={{ marginTop: 6 }}>
+            {shown.map((m) => (
+              <PosterTile
+                key={`${m.name}|${m.watchedAt}|${m.index}`}
+                path={m.poster}
+                name={m.name}
+                badge={m.rating ? `★ ${m.rating}` : null}
+                meta={(m.watchedAt || '').slice(0, 10) || m.year || ''}
+                onClick={() => openMovie(m)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <Sheet
+        open={!!sel}
+        title={sel ? sel.name : ''}
+        subtitle={sel ? [sel.year, `watched ${(sel.watchedAt || '').slice(0, 10) || 'sometime'}`].filter(Boolean).join(' · ') : ''}
+        onClose={closeSheet}
+      >
+        {sel && (
+          <>
+            <div className="sd-mdet-head">
+              <Poster path={sel.poster} name={sel.name} width={84} height={126} radius={10} />
+              <div className="sd-gap10" style={{ minWidth: 0, flex: 1 }}>
+                <Stars value={sel.rating || 0} size={24} onChange={(n) => setMovieRating(sel.index, n)} />
+                {sel.platform ? <div><PlatformChip id={sel.platform} /></div> : null}
+                {d && !d.error && (
+                  <div className="sd-mdet-facts">
+                    {d.runtime ? <span>{d.runtime} min</span> : null}
+                    {d.vote_average ? <span>★ {d.vote_average.toFixed(1)}</span> : null}
+                    {(d.genres || []).length ? <span>{d.genres.map((g) => g.name).join(', ')}</span> : null}
                   </div>
-                ) : null}
-
-                <div style={{ margin: '4px 0 2px' }}>
-                  <Stars
-                    value={m.rating || 0}
-                    size={18}
-                    onChange={(n) => setMovieRating(m.index, n)}
-                  />
-                </div>
-
-                {isOpen && (
-                  <>
-                    {!m.tmdbId ? (
-                      <p className="movie-overview">
-                        Not linked to TMDB yet — use Fix to match it, then
-                        details will load here.
-                      </p>
-                    ) : !d ? (
-                      <p className="movie-overview">Loading details…</p>
-                    ) : d.error ? (
-                      <p className="movie-overview">Couldn't load details: {d.error}</p>
-                    ) : (
-                      <>
-                        <div className="movie-facts">
-                          {d.runtime ? <span>{d.runtime} min</span> : null}
-                          {d.vote_average ? (
-                            <span>★ {d.vote_average.toFixed(1)}</span>
-                          ) : null}
-                          {(d.genres || []).length ? (
-                            <span>{d.genres.map((g) => g.name).join(', ')}</span>
-                          ) : null}
-                          {d.release_date ? <span>{d.release_date}</span> : null}
-                        </div>
-                        {d.tagline ? (
-                          <p className="movie-overview" style={{ fontStyle: 'italic' }}>
-                            {d.tagline}
-                          </p>
-                        ) : null}
-                        <p className="movie-overview">
-                          {d.overview || 'No description available on TMDB.'}
-                        </p>
-                      </>
-                    )}
-                    <div style={{ marginTop: 10 }}>
-                      <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                        Where you watched it
-                      </div>
-                      <PlatformPicker
-                        value={m.platform || ''}
-                        onChange={(p) => setMoviePlatform(m.index, p)}
-                      />
-                    </div>
-                  </>
                 )}
-
-                <div className="actions">
-                  <button className="btn" onClick={() => toggleDetails(m)}>
-                    {isOpen ? 'Hide' : 'Details'}
-                  </button>
-                  {m.tmdbId && (
-                    <button
-                      className="btn"
-                      onClick={() => openTrailer(m)}
-                      disabled={trailerBusy === m.index}
-                    >
-                      {trailerBusy === m.index ? 'Loading…' : '▶ Trailer'}
-                    </button>
-                  )}
-                  <button
-                    className="btn"
-                    onClick={() => {
-                      setFixIndex(fixIndex === m.index ? null : m.index);
-                      setFixQuery(m.name);
-                      setFixResults(null);
-                    }}
-                  >
-                    Fix
-                  </button>
-                  <button
-                    className="btn danger"
-                    onClick={() => {
-                      if (confirm(`Remove "${m.name}" from your watched movies?`)) {
-                        removeMovie(m.index);
-                      }
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
               </div>
             </div>
-            {fixIndex === m.index && (
-              <div className="notice accent">
-                <p style={{ marginTop: 0 }}>
-                  Search TMDB and pick the correct movie — try the English title
-                  (e.g. "Tiger Zinda Hai"). Your watch date stays.
-                </p>
-                <form onSubmit={runFixSearch} className="row">
-                  <input
-                    type="search"
-                    value={fixQuery}
-                    onChange={(e) => setFixQuery(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <button className="btn" type="submit">Search</button>
-                </form>
+
+            <div className="sd-mdet-sec">
+              <span className="sd-lbl">About</span>
+              {!sel.tmdbId ? (
+                <p className="sd-mdet-over">Not linked to TMDB yet — use Fix match to link it, then details will load here.</p>
+              ) : !d ? (
+                <p className="sd-mdet-over">Loading details…</p>
+              ) : d.error ? (
+                <p className="sd-mdet-over">Couldn't load details: {d.error}</p>
+              ) : (
+                <>
+                  {d.tagline ? <p className="sd-mdet-over" style={{ fontStyle: 'italic' }}>{d.tagline}</p> : null}
+                  <p className="sd-mdet-over">{d.overview || 'No description available on TMDB.'}</p>
+                </>
+              )}
+            </div>
+
+            <div className="sd-mdet-sec">
+              <span className="sd-lbl">Where you watched it</span>
+              <PlatformPicker value={sel.platform || ''} onChange={(pl) => setMoviePlatform(sel.index, pl)} />
+            </div>
+
+            {fixing && (
+              <div className="sd-mdet-sec">
+                <span className="sd-lbl">Fix match</span>
+                <p className="sd-sub">Search TMDB and pick the correct movie — try the English title. Your watch date stays.</p>
+                <SearchField value={fixQuery} onChange={setFixQuery} placeholder="Movie title" onSubmit={runFixSearch} />
                 {fixResults &&
                   (fixResults.length === 0 ? (
-                    <p className="muted">No results — try another spelling or the English title.</p>
+                    <p className="sd-sub">No results — try another spelling or the English title.</p>
                   ) : (
-                    fixResults.slice(0, 6).map((r) => (
-                      <div key={r.id} className="movie-row" style={{ marginTop: 10 }}>
-                        {r.poster_path ? (
-                          <img src={img(r.poster_path, 'w154')} alt="" />
-                        ) : (
-                          <div className="thumb" />
-                        )}
-                        <div className="info">
-                          <div className="name">{r.title}</div>
-                          <div className="detail">
-                            {(r.release_date || '').slice(0, 4) || 'unknown year'}
-                          </div>
-                          <div className="actions">
-                            <button className="btn primary" onClick={() => linkMovie(r)}>
-                              Link this
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
+                    <div className="sd-card">
+                      {fixResults.slice(0, 6).map((r, i) => (
+                        <MediaRow
+                          key={r.id}
+                          sep={i > 0}
+                          path={r.poster_path}
+                          name={r.title}
+                          actions={<button className="sd-btn sm primary" onClick={() => linkMovie(r)}>Link</button>}
+                        >
+                          <span className="sd-mrow-name">{r.title}</span>
+                          <span className="sd-mrow-meta">{(r.release_date || '').slice(0, 4) || 'unknown year'}</span>
+                        </MediaRow>
+                      ))}
+                    </div>
                   ))}
               </div>
             )}
-          </React.Fragment>
-        );
-      })}
+
+            <div className="sd-mdet-actions">
+              {sel.tmdbId ? (
+                <button className="sd-btn" onClick={() => openTrailer(sel)} disabled={trailerBusy === sel.index}>
+                  {trailerBusy === sel.index ? 'Loading…' : '▶ Trailer'}
+                </button>
+              ) : <span />}
+              <button
+                className="sd-btn"
+                onClick={() => {
+                  setFixIndex(fixing ? null : sel.index);
+                  setFixQuery(sel.name);
+                  setFixResults(null);
+                }}
+              >
+                Fix match
+              </button>
+              <button
+                className="sd-btn danger"
+                onClick={() => {
+                  if (confirm(`Remove "${sel.name}" from your watched movies?`)) {
+                    removeMovie(sel.index);
+                    closeSheet();
+                  }
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          </>
+        )}
+      </Sheet>
     </div>
   );
 }

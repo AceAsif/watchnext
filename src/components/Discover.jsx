@@ -11,6 +11,7 @@ import {
   tvSimilar,
   movieSimilar,
 } from '../api/tmdb.js';
+import { Empty } from './LibraryUI.jsx';
 
 const MAX_SEEDS = 6; // per type, highest-rated first
 const MAX_RESULTS = 18;
@@ -153,156 +154,75 @@ export default function Discover() {
   }
 
   if (!hasKey()) {
-    return (
-      <p className="muted" style={{ fontSize: 13.5, marginTop: 10 }}>
-        Add a TMDB API key in Settings to get recommendations.
-      </p>
-    );
+    return <Empty>Add a TMDB API key in Settings to get recommendations.</Empty>;
   }
 
   if (noSeeds) {
     return (
-      <p className="muted" style={{ fontSize: 13.5, marginTop: 10 }}>
-        Rate a few shows or movies you enjoyed (on their detail page, or on the
-        Movies tab), and Discover will use them to find what to watch next.
-      </p>
+      <Empty>
+        Rate a few shows or movies you enjoyed (on their detail page, or on the Movies tab), and
+        Discover will use them to find what to watch next.
+      </Empty>
     );
   }
 
   return (
-    <div style={{ marginTop: 8 }}>
+    <div className="sd-gap10">
       {items === null ? (
-        <div className="notice accent">
-          <strong>Find something new.</strong>
-          <br />
-          Built from your top-rated shows and movies — nothing already in your
-          library will show up here.
-          <div style={{ marginTop: 10 }}>
-            <button className="btn primary" onClick={generate} disabled={loading}>
-              {loading ? 'Finding picks…' : 'Show me picks'}
-            </button>
-          </div>
+        <div className="sd-card sd-pad sd-discover-intro">
+          <strong>Find something new</strong>
+          <p className="sd-sub">
+            Built from your top-rated shows and movies — nothing already in your library will show up here.
+          </p>
+          <button className="sd-btn primary" onClick={generate} disabled={loading}>
+            {loading ? 'Finding picks…' : 'Show me picks'}
+          </button>
         </div>
       ) : (
         <>
-          <div className="row" style={{ marginBottom: 12 }}>
-            <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-              Based on {[...showSeeds, ...movieSeeds].length} of your top-rated titles.
-            </p>
-            <div className="spacer" />
-            <button className="btn" onClick={generate} disabled={loading}>
+          <div className="sd-sec2-head has-ctl">
+            <span className="sd-sub">Based on {[...showSeeds, ...movieSeeds].length} of your top-rated titles.</span>
+            <button className="sd-btn sm" onClick={generate} disabled={loading}>
               {loading ? 'Refreshing…' : 'Refresh picks'}
             </button>
           </div>
 
-          {error && <p className="muted" style={{ fontSize: 13 }}>{error}</p>}
+          {error && <p className="sd-sub">{error}</p>}
 
           {items.length === 0 && !loading && !error && (
-            <p className="muted" style={{ fontSize: 13.5 }}>
-              No new recommendations turned up — you may already have most of
-              what TMDB suggests for your top-rated titles. Try refreshing.
-            </p>
+            <Empty>
+              No new recommendations turned up — you may already have most of what TMDB suggests for
+              your top-rated titles. Try refreshing.
+            </Empty>
           )}
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-              gap: 14,
-            }}
-          >
+          <div className="sd-pgrid">
             {items.map((it) => (
-              <div
-                key={it.key}
-                style={{
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--radius)',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}
-              >
-                <div style={{ position: 'relative' }}>
-                  <button
-                    onClick={() => dismiss(it.key)}
-                    title="Not interested"
-                    aria-label="Dismiss"
-                    style={{
-                      position: 'absolute', top: 6, right: 6, zIndex: 1,
-                      width: 24, height: 24, borderRadius: 999,
-                      background: 'rgba(13,16,21,0.75)', border: '1px solid var(--line)',
-                      color: '#fff', cursor: 'pointer', fontSize: 13, lineHeight: 1,
-                    }}
-                  >
+              <div className="sd-pick" key={it.key}>
+                <span className="sd-tilebtn-art">
+                  <button className="sd-pick-x" onClick={() => dismiss(it.key)} title="Not interested" aria-label={`Dismiss ${it.name}`}>
                     ×
                   </button>
                   {it.poster ? (
-                    <img
-                      src={img(it.poster)}
-                      alt=""
-                      loading="lazy"
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        aspectRatio: '2 / 3',
-                        objectFit: 'cover',
-                        background: 'var(--bg-raise)',
-                      }}
-                    />
+                    <img src={img(it.poster, 'w342')} alt="" loading="lazy" />
                   ) : (
-                    <div
-                      style={{
-                        aspectRatio: '2 / 3',
-                        background: 'var(--bg-raise)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: 10,
-                        textAlign: 'center',
-                        fontFamily: 'var(--font-display)',
-                        fontWeight: 600,
-                        fontSize: 13,
-                        color: 'var(--text-dim)',
-                      }}
-                    >
-                      {it.name}
-                    </div>
+                    <span className="sd-poster-ph sd-tilebtn-ph">{it.name}</span>
                   )}
-                </div>
-
-                <div style={{ padding: '9px 10px 10px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: 12.5, fontWeight: 600, lineHeight: 1.3,
-                      overflow: 'hidden', textOverflow: 'ellipsis',
-                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                    }}
-                    title={it.name}
-                  >
-                    {it.name}
-                  </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--text-dim)' }}>
-                    {it.year || ''}{it.year ? ' · ' : ''}{it.type === 'show' ? 'Show' : 'Movie'}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10.5, color: 'var(--amber)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}
-                    title={`Because you rated ${it.because.join(', ')}`}
-                  >
-                    Because you liked {it.because[0]}
-                  </div>
-                  <button
-                    className="btn"
-                    style={{ width: '100%', marginTop: 'auto', padding: '6px 0', fontSize: 12 }}
-                    onClick={() => addItem(it)}
-                    disabled={adding === it.key || added[it.key]}
-                  >
-                    {added[it.key] ? 'Added ✓' : adding === it.key ? 'Adding…' : '+ Watchlist'}
-                  </button>
-                </div>
+                </span>
+                <span className="sd-tilebtn-name" title={it.name}>{it.name}</span>
+                <span className="sd-tilebtn-meta">
+                  {it.year || ''}{it.year ? ' · ' : ''}{it.type === 'show' ? 'Show' : 'Movie'}
+                </span>
+                <span className="sd-pick-why" title={`Because you rated ${it.because.join(', ')}`}>
+                  Because you liked {it.because[0]}
+                </span>
+                <button
+                  className="sd-btn sm block"
+                  onClick={() => addItem(it)}
+                  disabled={adding === it.key || added[it.key]}
+                >
+                  {added[it.key] ? 'Added ✓' : adding === it.key ? 'Adding…' : '+ Watchlist'}
+                </button>
               </div>
             ))}
           </div>
