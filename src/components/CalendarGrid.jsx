@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { img } from '../api/tmdb.js';
+import { EpisodeRow } from './AgendaEpisode.jsx';
+import { localISODate } from './showLogic.js';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -8,30 +9,8 @@ function ymd(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-// A dated agenda row, matching the .next-row look used elsewhere.
-function EpRow({ it, onOpen }) {
-  return (
-    <button className="next-row" onClick={() => onOpen(it.id)}>
-      {it.show.poster ? (
-        <img src={img(it.show.poster, 'w154')} alt="" loading="lazy" />
-      ) : (
-        <div className="thumb" />
-      )}
-      <div className="info">
-        <div className="name">{it.show.name}</div>
-        <div className="detail">
-          <span className="epcode">
-            S{String(it.s).padStart(2, '0')}·E{String(it.e).padStart(2, '0')}
-          </span>
-          {it.name ? ` — ${it.name}` : ''}
-        </div>
-      </div>
-    </button>
-  );
-}
-
 export default function CalendarGrid({ items, onOpen }) {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localISODate(); // local day, not UTC
 
   const byDate = useMemo(() => {
     const m = new Map();
@@ -106,8 +85,8 @@ export default function CalendarGrid({ items, onOpen }) {
     border: '1px solid var(--line)',
     color: 'var(--text)',
     borderRadius: 8,
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     cursor: 'pointer',
     fontSize: 16,
     lineHeight: 1,
@@ -188,9 +167,11 @@ export default function CalendarGrid({ items, onOpen }) {
         <>
           <div className="agenda-date" style={{ marginTop: 16 }}>{selectedLabel}</div>
           {selectedItems.length ? (
-            selectedItems.map((it) => (
-              <EpRow key={`${it.id}:${it.s}x${it.e}`} it={it} onOpen={onOpen} />
-            ))
+            <div className="sd-card">
+              {selectedItems.map((it, i) => (
+                <EpisodeRow key={`${it.id}:${it.s}x${it.e}`} it={it} onOpen={onOpen} divider={i > 0} />
+              ))}
+            </div>
           ) : (
             <p className="muted" style={{ fontSize: 13 }}>Nothing scheduled this day.</p>
           )}

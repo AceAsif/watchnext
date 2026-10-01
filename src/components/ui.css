@@ -336,3 +336,116 @@
   cursor: pointer;
   min-width: 0;
 }
+
+/* ------------------------------------------------ Up Next (Claude Design) */
+.sd-ib {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-raise);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.sd-ib:disabled { opacity: 0.5; cursor: default; }
+
+/* List | Calendar segmented control */
+.sd-seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+}
+.sd-seg button {
+  height: 36px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sd-seg button[aria-pressed='true'] {
+  background: var(--line);
+  color: var(--text);
+  font-weight: 600;
+}
+.sd-seg button:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+
+/* A tappable "open this show" area next to a separate action button. */
+.sd-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sd-open:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; border-radius: 6px; }
+
+.sd-poster {
+  display: block;
+  flex: none;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: linear-gradient(165deg, #3a3f4d, #171d28);
+}
+
+/* The amber "mark next episode watched" circle. */
+.sd-markbtn {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--amber);
+  background: transparent;
+  color: var(--amber);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.sd-markbtn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+@keyframes sd-spin { to { transform: rotate(360deg); } }
+.sd-spin { animation: sd-spin 0.9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .sd-spin { animation: none; } }
+
+/* "Marked … · Undo" snackbar. Sits above the tab bar, below sheets (z 60). */
+.sd-toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  max-width: 528px;
+  margin: 0 auto;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 16px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+  animation: sd-rise 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) { .sd-toast { animation: none; } }

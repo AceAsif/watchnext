@@ -38,6 +38,7 @@ import {
   leadingDoneCount,
   currentSeasonN,
   leadingWatchedFold,
+  localISODate,
 } from '../components/showLogic.js';
 
 // Show page — "v2 C" from the Claude Design round: a compact hero with the
@@ -54,7 +55,7 @@ function fmtDate(s) {
   return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 const pad2 = (n) => String(n).padStart(2, '0');
-const isoToday = () => new Date().toISOString().slice(0, 10);
+const isoToday = () => localISODate();
 
 // ---------------------------------------------------------------- icons
 const CheckIcon = ({ size = 16, w = 2.4 }) => (

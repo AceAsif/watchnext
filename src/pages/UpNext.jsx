@@ -1,191 +1,185 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/useStore.js';
-import { watchedCount, lastWatched, lastWatchDate, setShowUpcoming, epKey, markEpisode, episodesLeft, hoursLeft, paceFinish } from '../store/db.js';
-import { img, hasKey, fetchUpcomingEpisodes } from '../api/tmdb.js';
+import {
+  watchedCount,
+  lastWatched,
+  lastWatchDate,
+  setShowUpcoming,
+  markEpisode,
+  episodesLeft,
+  hoursLeft,
+  paceFinish,
+} from '../store/db.js';
+import { hasKey, fetchUpcomingEpisodes } from '../api/tmdb.js';
 import CalendarGrid from '../components/CalendarGrid.jsx';
+import { Poster, EpisodeRow } from '../components/AgendaEpisode.jsx';
+import { localISODate } from '../components/showLogic.js';
+import {
+  buildUpNext,
+  groupAgenda,
+  headerDate,
+  codeOf,
+  shortDate,
+  isRepeatTap,
+} from '../components/upnextLogic.js';
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// Up Next — the "v2" layout from the Claude Design round: today's date, a
+// compact "Continue watching" card (one tap marks the next episode), then
+// "On the way" as a dated agenda (or the calendar). The next-episode logic is
+// the same nextToMark the show page uses, so the two screens never disagree —
+// and never offer an episode that hasn't aired yet.
 
-// "2026-12-24" -> "Thu 24 Dec 2026", built from local date parts (no TZ drift).
-function fmtAgenda(dateStr) {
-  const [y, m, d] = (dateStr || '').split('-').map(Number);
-  if (!y || !m || !d) return dateStr || '';
-  const dt = new Date(y, m - 1, d);
-  return `${WEEKDAYS[dt.getDay()]} ${d} ${MONTHS[m - 1]} ${y}`;
+const CONTINUE_PREVIEW = 4; // rows shown before "See all"
+const CONTINUE_MAX = 30;
+const TOAST_MS = 6000;
+
+const CheckIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </svg>
+);
+const RefreshIcon = ({ spinning }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+    className={spinning ? 'sd-spin' : undefined}>
+    <path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3" />
+    <path d="M18 3v4h-4M6 21v-4h4" />
+  </svg>
+);
+
+function Notice({ children, accent }) {
+  return (
+    <div
+      className="sd-card"
+      style={{
+        padding: '14px 16px',
+        marginTop: 16,
+        fontSize: 13.5,
+        lineHeight: 1.5,
+        color: 'var(--text-dim)',
+        borderColor: accent ? 'var(--amber)' : undefined,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
-// A short relative hint, only when the date is near.
-// A short relative hint, only when the date is near.
-function relHint(dateStr) {
-  const [y, m, d] = (dateStr || '').split('-').map(Number);
-  if (!y) return null;
-  const target = new Date(y, m - 1, d);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const days = Math.round((target - now) / 86400000);
-  if (days <= 0) return 'today';
-  if (days === 1) return 'tomorrow';
-  if (days <= 14) return `in ${days} days`;
-  return null;
-}
-
-// "2026-11-15" -> "15 Nov 2026" (no weekday), for the finish estimate.
-function fmtFinish(dateStr) {
-  const [y, m, d] = (dateStr || '').split('-').map(Number);
-  if (!y || !m || !d) return dateStr || '';
-  return `${d} ${MONTHS[m - 1]} ${y}`;
-}
-
-// Earliest unwatched episode from stored season data (fills gaps), or null if
-// the show is fully watched or has no season data yet. Season 0 (specials) is
-// skipped. No network call — reads the per-season counts already synced from
-// TMDB, so this works entirely from local state.
-function nextUnwatched(show) {
-  const watched = show.watched || {};
-  const seasons = (show.seasons || [])
-    .filter((se) => se.n >= 1)
-    .sort((a, b) => a.n - b.n);
-  for (const se of seasons) {
-    for (let e = 1; e <= (se.count || 0); e++) {
-      if (!watched[epKey(se.n, e)]) return { season: se.n, episode: e };
-    }
-  }
-  return null;
-}
-
-function NextRow({ id, show, onOpen }) {
-  const seen = watchedCount(show);
-  const last = lastWatched(show);
-  const total = show.totalEpisodes;
-  const next = nextUnwatched(show);
+// ---------------------------------------------------------------- continue row
+function ContinueRow({ id, show, next, today, first, onOpen, onMark }) {
   const left = episodesLeft(show);
   const hrs = hoursLeft(show);
   const finish = paceFinish(show);
+  const lastEp = lastWatched(show);
+  const lastCode = lastEp ? codeOf(lastEp[0], lastEp[1]) : null;
+
+  // Line 2: what's next and how much is left. If there's nothing to mark (the
+  // show hasn't been synced with TMDB yet) say where you last got to instead.
+  let line2;
+  if (next) {
+    line2 = (
+      <>
+        <span className="sd-mono" style={{ color: 'var(--amber)' }}>{codeOf(next.season, next.episode)}</span>
+        {left > 0 ? ` · ${left} to go` : ''}
+        {left > 0 && hrs > 0 ? ` · ~${hrs} h` : ''}
+      </>
+    );
+  } else {
+    line2 = lastCode ? (
+      <>
+        Last watched <span className="sd-mono" style={{ color: 'var(--amber)' }}>{lastCode}</span>
+      </>
+    ) : (
+      'In progress'
+    );
+  }
+  // Line 3: the pace-based finish estimate, else the last episode watched.
+  const line3 = finish
+    ? `≈ done by ${shortDate(finish.date, today)} at your pace`
+    : next && lastCode
+      ? `Last watched ${lastCode}`
+      : null;
+
   return (
-    <div className="next-row" style={{ cursor: 'default' }}>
-      <button
-        onClick={onOpen}
-        style={{
-          display: 'flex',
-          gap: 14,
-          alignItems: 'center',
-          flex: 1,
-          minWidth: 0,
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          margin: 0,
-          cursor: 'pointer',
-          color: 'var(--text)',
-          textAlign: 'left',
-          font: 'inherit',
-        }}
-      >
-        {show.poster ? (
-          <img src={img(show.poster, 'w154')} alt="" loading="lazy" />
-        ) : (
-          <div className="thumb" />
-        )}
-        <div className="info">
-          <div className="name">{show.name}</div>
-          <div className="detail">
-            {last ? (
-              <>
-                last watched <span className="epcode">S{String(last[0]).padStart(2, '0')}·E{String(last[1]).padStart(2, '0')}</span>
-                {left > 0 ? ` — ${left} to go${hrs > 0 ? ` · ~${hrs} hr${hrs === 1 ? '' : 's'} left` : ''}` : ''}
-              </>
-            ) : (
-              'not started yet'
-            )}
-          </div>
-          {finish && (
-            <div className="detail" style={{ color: 'var(--amber)' }}>
-              ≈ finish by {fmtFinish(finish.date)} at your recent pace
-            </div>
-          )}
-        </div>
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px 10px 12px',
+        borderTop: first ? 'none' : '1px solid var(--sd-line-soft)',
+      }}
+    >
+      <button className="sd-open" onClick={onOpen}>
+        <Poster path={show.poster} w={40} h={60} r={6} />
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>{show.name}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{line2}</span>
+          {line3 && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{line3}</span>}
+        </span>
       </button>
       {next && (
         <button
-          className="btn"
-          style={{ flex: 'none' }}
-          title={`Mark Season ${next.season}, Episode ${next.episode} watched`}
-          onClick={() => markEpisode(id, next.season, next.episode, show.runtimeMin, true)}
+          className="sd-markbtn"
+          aria-label={`Mark ${show.name} ${codeOf(next.season, next.episode)} watched`}
+          onClick={() => onMark(id, show, next)}
         >
-          ✓ S{String(next.season).padStart(2, '0')}·E{String(next.episode).padStart(2, '0')}
+          <CheckIcon />
         </button>
       )}
     </div>
   );
 }
 
+// ---------------------------------------------------------------- page
 export default function UpNext({ openShow }) {
   const state = useStore();
-  const shows = Object.entries(state.shows);
   const [refresh, setRefresh] = useState(null); // {done, total} while refreshing
   const [view, setView] = useState('list'); // 'list' | 'calendar'
+  const [showAll, setShowAll] = useState(false);
+  const [toast, setToast] = useState(null); // last mark, for Undo
 
-  const { inProgress, agenda, upcomingCount, syncTargets, items } = useMemo(() => {
-    const inProgress = [];
-    const today = new Date().toISOString().slice(0, 10);
+  const today = localISODate();
+  const alive = useRef(true);
+  const lastTap = useRef({}); // show id -> ms of the last mark tap
+  const toastTimer = useRef(null);
+  useEffect(
+    () => () => {
+      alive.current = false;
+      clearTimeout(toastTimer.current);
+    },
+    []
+  );
 
-    // Every still-to-air episode across the library. Prefer the cached
-    // `upcoming` list (all episodes of the airing season); fall back to the
-    // single `nextAir` so the agenda still works before the first refresh.
-    const items = [];
-    const syncTargets = []; // shows we can pull upcoming episodes for
-    for (const [id, show] of shows) {
-      if (!show.followed) continue;
+  const { cont, items, syncTargets } = useMemo(
+    () => buildUpNext(Object.entries(state.shows), today, { watchedCount, lastWatchDate }),
+    [state.shows, today]
+  );
+  const agenda = useMemo(() => groupAgenda(items, today), [items, today]);
 
-      const seen = watchedCount(show);
-      const total = show.totalEpisodes;
-      if (seen > 0 && (!total || seen < total)) inProgress.push([id, show]);
+  const empty = Object.keys(state.shows).length === 0;
+  const upcomingCount = items.length;
 
-      if (show.tmdbId && show.nextAir) syncTargets.push([id, show]);
+  function markNext(id, show, next) {
+    // The same button points at the following episode the instant this one is
+    // marked, so ignore a fast double-tap rather than mark two episodes.
+    const now = Date.now();
+    if (isRepeatTap(lastTap.current[id], now)) return;
+    lastTap.current[id] = now;
 
-      const cached = Array.isArray(show.upcoming)
-        ? show.upcoming.filter((ep) => ep.air >= today)
-        : [];
-      if (cached.length) {
-        for (const ep of cached) {
-          items.push({ id, show, s: ep.s, e: ep.e, name: ep.name, date: ep.air });
-        }
-      } else if (show.nextAir && show.nextAir.date >= today) {
-        items.push({
-          id,
-          show,
-          s: show.nextAir.season,
-          e: show.nextAir.episode,
-          name: show.nextAir.name,
-          date: show.nextAir.date,
-        });
-      }
-    }
+    markEpisode(id, next.season, next.episode, show.runtimeMin, true);
+    setToast({ id, name: show.name, season: next.season, episode: next.episode, runtimeMin: show.runtimeMin });
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => alive.current && setToast(null), TOAST_MS);
+  }
 
-    inProgress.sort(
-      (a, b) => (lastWatchDate(b[1]) || '').localeCompare(lastWatchDate(a[1]) || '')
-    );
-    items.sort(
-      (a, b) =>
-        a.date.localeCompare(b.date) ||
-        a.show.name.localeCompare(b.show.name) ||
-        a.s - b.s ||
-        a.e - b.e
-    );
-
-    // Group by air date so it reads like a dated agenda.
-    const byDate = new Map();
-    for (const it of items) {
-      if (!byDate.has(it.date)) byDate.set(it.date, []);
-      byDate.get(it.date).push(it);
-    }
-    const agenda = [...byDate.entries()]; // already date-ascending
-
-    return { inProgress, agenda, upcomingCount: items.length, syncTargets, items };
-  }, [state.shows]);
-
-  const empty = shows.length === 0;
+  function undo() {
+    if (!toast) return;
+    markEpisode(toast.id, toast.season, toast.episode, toast.runtimeMin, false);
+    // Re-marking right after an undo is deliberate, so don't let the
+    // double-tap guard swallow it.
+    delete lastTap.current[toast.id];
+    clearTimeout(toastTimer.current);
+    setToast(null);
+  }
 
   async function refreshUpcoming() {
     if (!syncTargets.length) return;
@@ -199,61 +193,88 @@ export default function UpNext({ openShow }) {
         console.warn('upcoming fetch failed for', show.name, err);
       }
       done++;
-      setRefresh({ done, total: syncTargets.length });
+      if (alive.current) setRefresh({ done, total: syncTargets.length });
     }
-    setRefresh(null);
+    if (alive.current) setRefresh(null);
   }
 
+  const contShown = showAll ? cont.slice(0, CONTINUE_MAX) : cont.slice(0, CONTINUE_PREVIEW);
+  const hasOnTheWay = !empty && (syncTargets.length > 0 || upcomingCount > 0);
+
   return (
-    <div>
+    <div className="sd-page">
+      {/* ---------------- title */}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', paddingTop: 8 }}>
+        <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800 }}>Up Next</h1>
+        <span className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>{headerDate(today)}</span>
+      </div>
+
       {empty && (
-        <div className="notice accent">
-          <strong>Welcome to WatchNext.</strong>
+        <Notice accent>
+          <strong style={{ color: 'var(--text)' }}>Welcome to WatchNext.</strong>
           <br />
-          Import your TV Time history from the Settings tab, or search for a show
-          in the Shows tab to start tracking.
-        </div>
+          Import your TV Time history from the Settings tab, or search for a show in the Shows tab to
+          start tracking.
+        </Notice>
       )}
 
       {!hasKey() && !empty && (
-        <div className="notice">
-          Add a free TMDB API key in Settings, then run a sync to load posters,
-          episode counts and air dates.
-        </div>
+        <Notice>
+          Add a free TMDB API key in Settings, then run a sync to load posters, episode counts and air
+          dates.
+        </Notice>
       )}
 
-      {!empty && (syncTargets.length > 0 || upcomingCount > 0) && (
-        <>
-          <div className="row" style={{ marginTop: 4 }}>
-            <h2 className="section" style={{ margin: 0 }}>
-              On the way{' '}
-              {upcomingCount > 0 && (
-                <span className="muted">({upcomingCount} episode{upcomingCount === 1 ? '' : 's'})</span>
-              )}
-            </h2>
-            <div className="spacer" />
-            <div className="row" style={{ gap: 6 }}>
-              <button
-                className="btn"
-                style={view === 'list' ? { borderColor: 'var(--amber)', color: 'var(--amber)' } : {}}
-                onClick={() => setView('list')}
-              >
-                List
+      {/* ---------------- continue watching */}
+      {cont.length > 0 && (
+        <section style={{ paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span className="sd-lbl">Continue watching · {cont.length}</span>
+            {cont.length > CONTINUE_PREVIEW && (
+              <button className="sd-linkbtn" style={{ fontWeight: 400, minHeight: 44, padding: '0 0 0 12px' }}
+                onClick={() => setShowAll(!showAll)}>
+                {showAll ? 'Show less' : 'See all'}
               </button>
+            )}
+          </div>
+          <div className="sd-card">
+            {contShown.map(({ id, show, next }, i) => (
+              <ContinueRow
+                key={id}
+                id={id}
+                show={show}
+                next={next}
+                today={today}
+                first={i === 0}
+                onOpen={() => openShow(id)}
+                onMark={markNext}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ---------------- on the way */}
+      {hasOnTheWay && (
+        <section style={{ paddingTop: 28, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <span className="sd-lbl" aria-live="polite">
+              {refresh ? `Refreshing ${refresh.done}/${refresh.total}` : `On the way · ${upcomingCount}`}
+            </span>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <div className="sd-seg" role="group" aria-label="View">
+                <button aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button>
+                <button aria-pressed={view === 'calendar'} onClick={() => setView('calendar')}>Calendar</button>
+              </div>
               <button
-                className="btn"
-                style={view === 'calendar' ? { borderColor: 'var(--amber)', color: 'var(--amber)' } : {}}
-                onClick={() => setView('calendar')}
-              >
-                Calendar
-              </button>
-              <button
-                className="btn"
+                className="sd-ib"
+                aria-label="Refresh upcoming"
+                title="Pull every scheduled episode for your airing shows from TMDB"
+                aria-busy={!!refresh}
                 onClick={refreshUpcoming}
                 disabled={!hasKey() || !!refresh || syncTargets.length === 0}
-                title="Pull every scheduled episode for your airing shows from TMDB"
               >
-                {refresh ? `Refreshing ${refresh.done}/${refresh.total}` : 'Refresh upcoming'}
+                <RefreshIcon spinning={!!refresh} />
               </button>
             </div>
           </div>
@@ -261,62 +282,63 @@ export default function UpNext({ openShow }) {
           {view === 'calendar' ? (
             <CalendarGrid items={items} onOpen={openShow} />
           ) : agenda.length === 0 ? (
-            <p className="muted" style={{ fontSize: 13.5 }}>
-              No upcoming episodes scheduled. Tap "Refresh upcoming" to check TMDB
-              for newly-dated episodes (sync your library in the Shows tab first if
-              you haven't).
+            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: 'var(--text-dim)' }}>
+              No upcoming episodes scheduled. Tap the refresh button to check TMDB for newly-dated
+              episodes (sync your library in the Shows tab first if you haven't).
             </p>
           ) : (
-            agenda.map(([date, rows]) => {
-              const rel = relHint(date);
-              return (
-                <div key={date}>
-                  <div className="agenda-date">
-                    {fmtAgenda(date)}
-                    {rel && <span className="rel"> · {rel}</span>}
+            agenda.map((g) => (
+              <React.Fragment key={g.date}>
+                {g.monthLabel && (
+                  <div className="sd-lbl" style={{ paddingTop: 6, color: 'var(--sd-text-2)' }}>{g.monthLabel}</div>
+                )}
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div
+                    style={{
+                      width: 48, flexShrink: 0, display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', paddingTop: 10, gap: 2,
+                    }}
+                  >
+                    <span className="sd-mono" style={{ fontSize: 10, letterSpacing: '0.08em', color: g.isToday ? 'var(--amber)' : 'var(--text-dim)' }}>
+                      {g.wd}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, lineHeight: 1, color: g.isToday ? 'var(--amber)' : 'var(--text)' }}>
+                      {g.d}
+                    </span>
+                    <span className="sd-mono" style={{ fontSize: 10, color: 'var(--text-dim)' }}>{g.rel}</span>
                   </div>
-                  {rows.map((it) => (
-                    <button
-                      key={`${it.id}:${it.s}x${it.e}`}
-                      className="next-row"
-                      onClick={() => openShow(it.id)}
-                    >
-                      {it.show.poster ? (
-                        <img src={img(it.show.poster, 'w154')} alt="" loading="lazy" />
-                      ) : (
-                        <div className="thumb" />
-                      )}
-                      <div className="info">
-                        <div className="name">{it.show.name}</div>
-                        <div className="detail">
-                          <span className="epcode">
-                            S{String(it.s).padStart(2, '0')}·E{String(it.e).padStart(2, '0')}
-                          </span>
-                          {it.name ? ` — ${it.name}` : ''}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                  <div
+                    className="sd-card"
+                    style={{ flexGrow: 1, minWidth: 0, borderColor: g.isToday ? 'rgba(242, 163, 60, 0.4)' : undefined }}
+                  >
+                    {g.items.map((it, i) => (
+                      <EpisodeRow key={`${it.id}:${it.s}x${it.e}`} it={it} onOpen={openShow} divider={i > 0} />
+                    ))}
+                  </div>
                 </div>
-              );
-            })
+              </React.Fragment>
+            ))
           )}
-        </>
+        </section>
       )}
 
-      {inProgress.length > 0 && (
-        <>
-          <h2 className="section">Continue watching</h2>
-          {inProgress.slice(0, 30).map(([id, show]) => (
-            <NextRow key={id} id={id} show={show} onOpen={() => openShow(id)} />
-          ))}
-        </>
+      {!empty && cont.length === 0 && upcomingCount === 0 && syncTargets.length === 0 && (
+        <Notice>
+          Nothing in progress. Sync with TMDB in the Shows tab to load episode counts, or open a show to
+          mark where you're up to.
+        </Notice>
       )}
 
-      {!empty && inProgress.length === 0 && upcomingCount === 0 && syncTargets.length === 0 && (
-        <div className="notice">
-          Nothing in progress. Sync with TMDB in the Shows tab to load episode
-          counts, or open a show to mark where you're up to.
+      {/* ---------------- undo */}
+      {toast && (
+        <div className="sd-toast" role="status">
+          <span className="sd-ell" style={{ flex: 1 }}>
+            <span className="sd-mono" style={{ color: 'var(--amber)' }}>{codeOf(toast.season, toast.episode)}</span>{' '}
+            marked watched · {toast.name}
+          </span>
+          <button className="sd-linkbtn" style={{ height: 44, padding: '0 14px', fontSize: 14 }} onClick={undo}>
+            Undo
+          </button>
         </div>
       )}
     </div>
