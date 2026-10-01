@@ -199,7 +199,7 @@ export function cellAtFraction(columns, fx, fy) {
 // short labels (Mon) don't waste room and long ones (Prime Video) don't clip.
 export function labelWidthFor(labels, min = 30, max = 128) {
   const longest = labels.reduce((m, l) => Math.max(m, String(l).length), 0);
-  return Math.min(max, Math.max(min, Math.round(longest * 6.6 + 6)));
+  return Math.min(max, Math.max(min, Math.round(longest * 7.2 + 8)));
 }
 export function valueWidthFor(values, unit = '', min = 32) {
   const longest = values.reduce((m, v) => Math.max(m, (v.toLocaleString() + unit).length), 0);
