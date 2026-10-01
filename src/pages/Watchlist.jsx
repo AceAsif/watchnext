@@ -7,8 +7,8 @@ import {
   removeMovie,
   movieStatus,
 } from '../store/db.js';
-import { img } from '../api/tmdb.js';
 import Discover from '../components/Discover.jsx';
+import { PageHead, MediaRow, Empty, CheckIcon } from '../components/LibraryUI.jsx';
 
 export default function Watchlist({ openShow }) {
   const state = useStore();
@@ -35,114 +35,107 @@ export default function Watchlist({ openShow }) {
 
   const empty = shows.length === 0 && movies.length === 0;
 
+  const count = shows.length + movies.length;
+  const TABS = [['queue', count ? `Queue · ${count}` : 'Queue'], ['discover', 'Discover']];
+
   return (
-    <div>
-      <div className="row" style={{ gap: 6, marginBottom: 4 }}>
-        <button
-          className="btn"
-          style={tab === 'queue' ? { borderColor: 'var(--amber)', color: 'var(--amber)' } : {}}
-          onClick={() => setTab('queue')}
-        >
-          Queue{!empty ? ` (${shows.length + movies.length})` : ''}
-        </button>
-        <button
-          className="btn"
-          style={tab === 'discover' ? { borderColor: 'var(--amber)', color: 'var(--amber)' } : {}}
-          onClick={() => setTab('discover')}
-        >
-          Discover
-        </button>
+    <div className="sd-page">
+      <PageHead title="Watchlist" count={empty ? null : count} />
+
+      <div className="sd-tabs2" role="tablist" aria-label="Watchlist sections">
+        {TABS.map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>
+        ))}
       </div>
 
-      {tab === 'discover' ? (
-        <Discover />
-      ) : (
-        <>
-      {empty && (
-        <div className="notice accent">
-          <strong>Nothing queued up yet.</strong>
-          <br />
-          Search for a show or movie on the Shows or Movies tab and use
-          "＋ Watchlist" to plan it for later without marking it watched.
-        </div>
-      )}
-
-      {shows.length > 0 && (
-        <>
-          <h2 className="section" style={{ marginTop: 6 }}>
-            Shows to watch <span className="muted">({shows.length})</span>
-          </h2>
-          {shows.map(([id, show]) => (
-            <div key={id} className="movie-row">
-              {show.poster ? (
-                <img src={img(show.poster, 'w154')} alt="" loading="lazy" />
-              ) : (
-                <div className="thumb" />
-              )}
-              <div className="info">
-                <div className="name">{show.name}</div>
-                {show.genres && show.genres.length ? (
-                  <div className="detail">{show.genres.slice(0, 3).join(', ')}</div>
-                ) : null}
-                <div className="actions">
-                  <button className="btn primary" onClick={() => startWatchingShow(id)}>
-                    Start watching
-                  </button>
-                  {openShow && (
-                    <button className="btn" onClick={() => openShow(id)}>
-                      Details
-                    </button>
-                  )}
-                  <button className="btn danger" onClick={() => toggleWatchlist(id)}>
-                    Remove
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </>
-      )}
-
-      {movies.length > 0 && (
-        <>
-          <h2 className="section">
-            Movies to watch <span className="muted">({movies.length})</span>
-          </h2>
-          {movies.map((m) => (
-            <div key={`${m.tmdbId || m.name}|${m.index}`} className="movie-row">
-              {m.poster ? (
-                <img src={img(m.poster, 'w154')} alt="" loading="lazy" />
-              ) : (
-                <div className="thumb" />
-              )}
-              <div className="info">
-                <div className="name">{m.name}</div>
-                {m.year ? <div className="detail">{m.year}</div> : null}
-                <div className="actions">
-                  <button
-                    className="btn primary"
-                    onClick={() => markPlannedMovieWatched(m.index)}
-                  >
-                    Mark watched
-                  </button>
-                  <button
-                    className="btn danger"
-                    onClick={() => {
-                      if (confirm(`Remove "${m.name}" from your watchlist?`)) {
-                        removeMovie(m.index);
+      <div style={{ marginTop: 18 }}>
+        {tab === 'discover' ? (
+          <Discover />
+        ) : empty ? (
+          <Empty title="Nothing queued up yet.">
+            Search for a show or movie on the Shows or Movies tab and use “＋ Watchlist” to plan it for
+            later without marking it watched.
+          </Empty>
+        ) : (
+          <div className="sd-cols-2 sd-stackv">
+            {shows.length > 0 && (
+              <section className="sd-sec2">
+                <div className="sd-sec2-head"><span className="sd-lbl">Shows to watch · {shows.length}</span></div>
+                <div className="sd-card">
+                  {shows.map(([id, show], i) => (
+                    <MediaRow
+                      key={id}
+                      sep={i > 0}
+                      path={show.poster}
+                      name={show.name}
+                      onClick={openShow ? () => openShow(id) : undefined}
+                      actions={
+                        <>
+                          <button className="sd-btn sm primary" onClick={() => startWatchingShow(id)}>Start</button>
+                          <button
+                            className="sd-ib sd-ib--sm"
+                            onClick={() => toggleWatchlist(id)}
+                            aria-label={`Remove ${show.name} from watchlist`}
+                            title="Remove"
+                          >
+                            ✕
+                          </button>
+                        </>
                       }
-                    }}
-                  >
-                    Remove
-                  </button>
+                    >
+                      <span className="sd-mrow-name">{show.name}</span>
+                      {show.genres && show.genres.length ? (
+                        <span className="sd-mrow-meta">{show.genres.slice(0, 3).join(' · ')}</span>
+                      ) : null}
+                    </MediaRow>
+                  ))}
                 </div>
-              </div>
-            </div>
-          ))}
-        </>
-      )}
-        </>
-      )}
+              </section>
+            )}
+
+            {movies.length > 0 && (
+              <section className="sd-sec2">
+                <div className="sd-sec2-head"><span className="sd-lbl">Movies to watch · {movies.length}</span></div>
+                <div className="sd-card">
+                  {movies.map((m, i) => (
+                    <MediaRow
+                      key={`${m.tmdbId || m.name}|${m.index}`}
+                      sep={i > 0}
+                      path={m.poster}
+                      name={m.name}
+                      actions={
+                        <>
+                          <button
+                            className="sd-markbtn"
+                            onClick={() => markPlannedMovieWatched(m.index)}
+                            aria-label={`Mark ${m.name} watched`}
+                            title="Mark watched"
+                          >
+                            <CheckIcon />
+                          </button>
+                          <button
+                            className="sd-ib sd-ib--sm"
+                            onClick={() => {
+                              if (confirm(`Remove "${m.name}" from your watchlist?`)) removeMovie(m.index);
+                            }}
+                            aria-label={`Remove ${m.name} from watchlist`}
+                            title="Remove"
+                          >
+                            ✕
+                          </button>
+                        </>
+                      }
+                    >
+                      <span className="sd-mrow-name">{m.name}</span>
+                      {m.year ? <span className="sd-mrow-meta">{m.year}</span> : null}
+                    </MediaRow>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
