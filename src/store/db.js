@@ -305,6 +305,19 @@ export function setShowProviders(id, providers, link) {
   markShowDirty(id);
 }
 
+export function setShowAnime(id, anime) {
+  // anime: the AniList snapshot from animeLogic.normalizeMedia(), or null to
+  //   unlink. Display-only — never touches watched/seasons/episode counts.
+  //   Rides the per-show sync doc. Unlinking stores an explicit null rather
+  //   than deleting the key: the cloud merge is { ...remote, ...local }, so a
+  //   missing key would let the remote copy bring the link back.
+  update((s) => {
+    const show = s.shows[id];
+    if (show) s.shows[id] = { ...show, anime: anime || null };
+  });
+  markShowDirty(id);
+}
+
 export function deleteShow(id) {
   // True delete: remove the record from local state now, and from Firestore on
   // the next sync flush (see cloud.js). Unlike unfollow, which only hides a

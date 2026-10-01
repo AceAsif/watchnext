@@ -28,6 +28,8 @@ import {
 } from '../api/tmdb.js';
 import { PLATFORMS, platformById } from '../components/PlatformPicker.jsx';
 import CastCrew from '../components/CastCrew.jsx';
+import AnimeSheet from '../components/AnimeSheet.jsx';
+import { looksLikeAnime, altTitles, summaryLine } from '../components/animeLogic.js';
 import { Bar, Chevron, Sheet } from '../components/ui.jsx';
 import {
   epKey,
@@ -226,7 +228,7 @@ export default function ShowDetail({ id, onBack }) {
   const state = useStore();
   const show = state.shows[id];
   const [syncing, setSyncing] = useState(false);
-  const [sheet, setSheet] = useState(null); // 'platform' | 'streaming' | 'menu' | 'fix'
+  const [sheet, setSheet] = useState(null); // 'platform' | 'streaming' | 'menu' | 'fix' | 'anime'
   const [fixQuery, setFixQuery] = useState('');
   const [fixResults, setFixResults] = useState(null);
   const [streamLoading, setStreamLoading] = useState(false);
@@ -341,6 +343,11 @@ export default function ShowDetail({ id, onBack }) {
   const next = nextToMark(show, today);
   const platform = platformById(show.platform);
   const providers = show.providers || [];
+  const anime = show.anime || null;
+  // The "Anime details" row appears up front for animation shows (and any
+  // already linked); everything else can still link it from the ⋯ menu.
+  const animeRow = looksLikeAnime(show) || !!anime;
+  const alts = altTitles(show, anime);
 
   // TMDB ids the user already tracks, so the cast panel can flag "in library".
   const trackedTv = new Set(Object.values(state.shows).map((s) => s.tmdbId).filter(Boolean));
@@ -386,6 +393,11 @@ export default function ShowDetail({ id, onBack }) {
             >
               {show.name}
             </h1>
+            {alts.length > 0 && (
+              <span className="sd-ell" style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                {alts.join(' · ')}
+              </span>
+            )}
           </div>
           {show.poster ? (
             <img
@@ -539,6 +551,21 @@ export default function ShowDetail({ id, onBack }) {
           )}
           <Chevron />
         </button>
+
+        {animeRow && (
+          <button className="sd-row sd-sep" aria-haspopup="dialog" onClick={() => setSheet('anime')}>
+            <span style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span>Anime details</span>
+              <span className="sd-ell" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                {anime ? `AniList · ${summaryLine(anime)}` : 'Link to AniList for titles and episode info'}
+              </span>
+            </span>
+            {!anime && (
+              <span className="sd-mono" style={{ fontSize: 11, color: 'var(--amber)' }}>LINK</span>
+            )}
+            <Chevron />
+          </button>
+        )}
       </section>
 
       {/* ---------------- seasons */}
@@ -684,9 +711,15 @@ export default function ShowDetail({ id, onBack }) {
 
       <Sheet open={sheet === 'menu'} title={show.name} subtitle="More actions" onClose={() => setSheet(null)}>
         <div className="sd-card">
+          {!animeRow && (
+            <button className="sd-row" onClick={() => setSheet('anime')}>
+              <span style={{ flexGrow: 1, color: 'var(--sd-text-2)' }}>Anime details (AniList)</span>
+              <Chevron />
+            </button>
+          )}
           {hasKey() && (
             <button
-              className="sd-row"
+              className={'sd-row' + (!animeRow ? ' sd-sep' : '')}
               onClick={() => {
                 setFixQuery(show.name);
                 setFixResults(null);
@@ -698,7 +731,7 @@ export default function ShowDetail({ id, onBack }) {
             </button>
           )}
           <button
-            className={'sd-row' + (hasKey() ? ' sd-sep' : '')}
+            className={'sd-row' + (hasKey() || !animeRow ? ' sd-sep' : '')}
             style={{ color: 'var(--red)' }}
             onClick={() => {
               if (
@@ -765,6 +798,8 @@ export default function ShowDetail({ id, onBack }) {
             </div>
           ))}
       </Sheet>
+
+      {sheet === 'anime' && <AnimeSheet id={id} show={show} onClose={() => setSheet(null)} />}
     </div>
   );
 }
