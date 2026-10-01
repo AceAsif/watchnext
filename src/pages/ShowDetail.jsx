@@ -377,6 +377,11 @@ export default function ShowDetail({ id, onBack }) {
     <div className="sd-page">
       <button className="sd-back" onClick={onBack}><Chevron dir="left" />Back</button>
 
+      {/* On a phone these two wrappers just stack (hero, settings, seasons,
+          cast — exactly as before). On desktop they become a sticky sidebar
+          and a wide main column (see "Desktop layout" in ui.css). */}
+      <div className="sd-cols">
+      <aside className="sd-side">
       {/* ---------------- hero */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4 }}>
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
@@ -402,14 +407,16 @@ export default function ShowDetail({ id, onBack }) {
           </div>
           {show.poster ? (
             <img
+              className="sd-hero-poster"
               src={img(show.poster, 'w185')}
               alt=""
-              style={{ width: 72, height: 108, flexShrink: 0, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--line)' }}
+              style={{ flexShrink: 0, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--line)' }}
             />
           ) : (
             <div
+              className="sd-hero-poster"
               style={{
-                width: 72, height: 108, flexShrink: 0, borderRadius: 10,
+                flexShrink: 0, borderRadius: 10,
                 background: 'linear-gradient(165deg, #3a3f4d, #171d28)', border: '1px solid var(--line)',
               }}
             />
@@ -487,7 +494,7 @@ export default function ShowDetail({ id, onBack }) {
       </div>
 
       {/* ---------------- rating / where you watch / streaming */}
-      <section className="sd-card" style={{ margin: '20px 0 0' }}>
+      <section className="sd-card">
         <div className="sd-row" style={{ justifyContent: 'space-between', paddingRight: 8, cursor: 'default' }}>
           <span>Your rating</span>
           <span role="radiogroup" aria-label="Your rating" style={{ display: 'flex' }}>
@@ -569,8 +576,11 @@ export default function ShowDetail({ id, onBack }) {
         )}
       </section>
 
+      </aside>
+
+      <div className="sd-main">
       {/* ---------------- seasons */}
-      <section className="sd-card" style={{ margin: '16px 0 0' }}>
+      <section className="sd-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '14px 16px 10px' }}>
           <h2 className="sd-h2">Seasons</h2>
           <span className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
@@ -632,6 +642,8 @@ export default function ShowDetail({ id, onBack }) {
       {hasKey() && show.tmdbId && (
         <CastCrew tmdbId={show.tmdbId} trackedTv={trackedTv} trackedMovie={trackedMovie} />
       )}
+      </div>
+      </div>
 
       {/* ================= sheets ================= */}
 

@@ -105,7 +105,7 @@ export default function CastCrew({ tmdbId, trackedTv, trackedMovie }) {
   // ---- loading / error: keep the card's footprint so the page doesn't jump
   if (err || !data) {
     return (
-      <section className="sd-card" style={{ margin: '16px 0 0' }}>
+      <section className="sd-card">
         <div className="sd-row" style={{ minHeight: 72, cursor: 'default' }}>
           <span className="sd-h2" style={{ fontSize: 16 }}>Cast</span>
           <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
@@ -131,7 +131,7 @@ export default function CastCrew({ tmdbId, trackedTv, trackedMovie }) {
 
   return (
     <>
-      <section className="sd-card" style={{ margin: '16px 0 0' }}>
+      <section className="sd-card">
         {cast.length > 0 && (
           <button
             className="sd-row"

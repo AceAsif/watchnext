@@ -200,6 +200,9 @@ export default function UpNext({ openShow }) {
 
   const contShown = showAll ? cont.slice(0, CONTINUE_MAX) : cont.slice(0, CONTINUE_PREVIEW);
   const hasOnTheWay = !empty && (syncTargets.length > 0 || upcomingCount > 0);
+  // Two columns on desktop only when there's something for both; a lone section
+  // gets a comfortable single column instead of sitting in a narrow side one.
+  const solo = !(cont.length > 0 && hasOnTheWay);
 
   return (
     <div className="sd-page">
@@ -225,10 +228,14 @@ export default function UpNext({ openShow }) {
         </Notice>
       )}
 
+      {/* Phone: the two sections stack. Desktop: side by side (ui.css). */}
+      <div className={'sd-cols sd-cols-un' + (solo ? ' sd-cols-solo' : '')}>
       {/* ---------------- continue watching */}
       {cont.length > 0 && (
-        <section style={{ paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <section className="sd-sec sd-un-left">
+          {/* Same 44px header height as "On the way" (which holds the controls),
+              so the two desktop columns' cards start level. */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
             <span className="sd-lbl">Continue watching · {cont.length}</span>
             {cont.length > CONTINUE_PREVIEW && (
               <button className="sd-linkbtn" style={{ fontWeight: 400, minHeight: 44, padding: '0 0 0 12px' }}
@@ -256,7 +263,7 @@ export default function UpNext({ openShow }) {
 
       {/* ---------------- on the way */}
       {hasOnTheWay && (
-        <section style={{ paddingTop: 28, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <section className="sd-sec sd-sec--2">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <span className="sd-lbl" aria-live="polite">
               {refresh ? `Refreshing ${refresh.done}/${refresh.total}` : `On the way · ${upcomingCount}`}
@@ -321,6 +328,8 @@ export default function UpNext({ openShow }) {
           )}
         </section>
       )}
+
+      </div>
 
       {!empty && cont.length === 0 && upcomingCount === 0 && syncTargets.length === 0 && (
         <Notice>
