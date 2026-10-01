@@ -1,138 +1,124 @@
-import React, { useMemo, useState } from 'react';
-
-const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-// Faint empty cell, then four amber intensities.
-const LEVELS = ['#1b2029', 'rgba(242,163,60,0.30)', 'rgba(242,163,60,0.55)', 'rgba(242,163,60,0.80)', '#f2a33c'];
-const CELL = 12;
-const GAP = 3;
-const LABELW = 30;
-
-function levelOf(c) {
-  if (!c) return 0;
-  if (c <= 2) return 1;
-  if (c <= 4) return 2;
-  if (c <= 7) return 3;
-  return 4;
-}
-function ymd(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function pretty(ds) {
-  const [y, m, d] = ds.split('-').map(Number);
-  const dt = new Date(y, m - 1, d);
-  return `${WEEK[dt.getDay()]} ${d} ${MON[m - 1]} ${y}`;
-}
+import React, { useMemo, useRef, useState } from 'react';
+import { YearSelect, Section } from './StatsUI.jsx';
+import { buildYearGrid, cellAtFraction, heatLevel, MONTHS, DOW } from './statsLogic.js';
 
 // GitHub-style contribution grid of de-skewed watches per day, one calendar
-// year at a time (Sun-first columns of weeks). countsByDay is a { day: count }
-// map already de-skewed upstream; years is newest-first.
-export default function Heatmap({ countsByDay, years }) {
+// year at a time (Sunday-first columns of weeks). countsByDay is a { day: count }
+// map already de-skewed upstream; years is newest-first; today (YYYY-MM-DD)
+// dims the rest of the current year.
+//
+// Claude Design layout: the grid fills the card's width with square cells (no
+// horizontal scrolling), so on a phone the cells are small — a tap is resolved
+// from the pointer position (cellAtFraction) rather than needing to land on a
+// 5px square. On desktop the cells are comfortably large and hover shows a tip.
+
+const LEVELS = ['#1e2530', '#4a3a22', '#7d5a2a', '#b87d33', '#f2a33c'];
+const FUTURE = '#161b24';
+
+function pretty(ds) {
+  const [y, m, d] = ds.split('-').map(Number);
+  return `${DOW[new Date(y, m - 1, d).getDay()]} ${d} ${MONTHS[m - 1]} ${y}`;
+}
+const plural = (n, w) => `${n.toLocaleString()} ${w}${n === 1 ? '' : 'es'}`;
+
+export default function Heatmap({ countsByDay, years, today }) {
   const [year, setYear] = useState(() => Number(years[0]) || new Date().getFullYear());
   const [sel, setSel] = useState(null);
+  const gridRef = useRef(null);
 
-  const { columns, months, total, activeDays } = useMemo(() => {
-    const start = new Date(year, 0, 1);
-    const gridStart = new Date(year, 0, 1 - start.getDay());
-    const end = new Date(year, 11, 31);
-    const gridEnd = new Date(year, 11, 31 + (6 - end.getDay()));
-    const days = [];
-    let total = 0;
-    let activeDays = 0;
-    for (let t = gridStart.getTime(); t <= gridEnd.getTime(); t += 86400000) {
-      const dt = new Date(t);
-      const ds = ymd(dt);
-      const inYear = dt.getFullYear() === year;
-      const count = inYear ? (countsByDay[ds] || 0) : 0;
-      if (inYear && count > 0) { total += count; activeDays++; }
-      days.push({ ds, day: dt.getDate(), month: dt.getMonth(), inYear, count });
-    }
-    const columns = [];
-    for (let i = 0; i < days.length; i += 7) columns.push(days.slice(i, i + 7));
-    // label a column when it contains the 1st of a month
-    const months = columns.map((col) => {
-      const d1 = col.find((c) => c.inYear && c.day === 1);
-      return d1 ? MON[d1.month] : '';
-    });
-    return { columns, months, total, activeDays };
-  }, [countsByDay, year]);
+  const { columns, months, total, activeDays } = useMemo(
+    () => buildYearGrid(year, countsByDay, today),
+    [countsByDay, year, today]
+  );
+  const cols = columns.length;
+
+  const summary = `${plural(total, 'watch')} across ${activeDays.toLocaleString()} day${activeDays === 1 ? '' : 's'} in ${year}`;
+
+  function onPick(e) {
+    const el = gridRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const cell = cellAtFraction(columns, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+    setSel(cell);
+  }
 
   return (
-    <div>
-      <div className="lib-controls" style={{ marginTop: 4, marginBottom: 10 }}>
-        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-          {total.toLocaleString()} watch{total === 1 ? '' : 'es'} across {activeDays.toLocaleString()} day
-          {activeDays === 1 ? '' : 's'} in {year}
-        </p>
-        <div className="sort-field">
-          <label htmlFor="heat-year" className="muted" style={{ fontSize: 13 }}>Year</label>
-          <select id="heat-year" className="select" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+    <Section
+      title="Watch activity"
+      className="a-activity"
+      right={
+        <YearSelect
+          id="heat-year"
+          label="Year"
+          value={String(year)}
+          onChange={(v) => { setYear(Number(v)); setSel(null); }}
+          options={years.map((y) => ({ value: y, label: y }))}
+        />
+      }
+    >
+      <div className="sd-card sd-heat">
+        {/* The summary line doubles as the tapped-day readout, so there's no
+            reserved empty caption line and the card never changes height. */}
+        <div className={'sd-heat-sum' + (sel ? ' picked' : '')} aria-live="polite">
+          {sel ? (
+            sel.count ? (
+              <><b>{plural(sel.count, 'watch')}</b> on {pretty(sel.ds)}</>
+            ) : (
+              <>Nothing watched on {pretty(sel.ds)}</>
+            )
+          ) : (
+            <><b>{plural(total, 'watch')}</b> across {activeDays.toLocaleString()} day{activeDays === 1 ? '' : 's'}</>
+          )}
         </div>
-      </div>
 
-      <div style={{ overflowX: 'auto', paddingBottom: 6 }}>
-        <div style={{ display: 'inline-block', minWidth: 'min-content' }}>
-          {/* month labels */}
-          <div style={{ display: 'flex', marginLeft: LABELW, marginBottom: 4 }}>
-            {months.map((m, i) => (
-              <div key={i} style={{ width: CELL, marginRight: GAP, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'visible' }}>
-                {m}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex' }}>
-            {/* weekday labels */}
-            <div style={{ width: LABELW, display: 'flex', flexDirection: 'column', gap: GAP }}>
-              {WEEK.map((w, i) => (
-                <div key={w} style={{ height: CELL, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', lineHeight: `${CELL}px` }}>
-                  {i % 2 === 1 ? w : ''}
-                </div>
-              ))}
-            </div>
-
-            {/* week columns */}
-            {columns.map((col, ci) => (
-              <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: GAP, marginRight: GAP }}>
-                {col.map((c) => (
-                  <div
-                    key={c.ds}
-                    title={c.inYear ? `${c.count} watch${c.count === 1 ? '' : 'es'} · ${pretty(c.ds)}` : ''}
-                    onClick={c.inYear && c.count ? () => setSel({ ds: c.ds, count: c.count }) : undefined}
-                    style={{
-                      width: CELL,
-                      height: CELL,
-                      borderRadius: 2,
-                      background: c.inYear ? LEVELS[levelOf(c.count)] : 'transparent',
-                      cursor: c.inYear && c.count ? 'pointer' : 'default',
-                    }}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
+        {/* month letters (J F M…), each placed on the week column holding the 1st */}
+        <div className="sd-heat-months" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }} aria-hidden="true">
+          {months.map((m) => (
+            <span key={m.month} style={{ gridColumn: m.col + 1 }}>
+              <i className="s">{MONTHS[m.month][0]}</i>
+              <i className="l">{MONTHS[m.month]}</i>
+            </span>
+          ))}
         </div>
-      </div>
 
-      {/* legend */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-        <span className="muted" style={{ fontSize: 11 }}>Less</span>
-        {LEVELS.map((c, i) => (
-          <div key={i} style={{ width: CELL, height: CELL, borderRadius: 2, background: c }} />
-        ))}
-        <span className="muted" style={{ fontSize: 11 }}>More</span>
-      </div>
+        <div
+          ref={gridRef}
+          className="sd-heat-grid"
+          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+          role="img"
+          aria-label={summary}
+          onClick={onPick}
+        >
+          {columns.map((col) =>
+            col.map((c) => (
+              <div
+                key={c.ds}
+                className={'sd-heat-cell' + (sel && sel.ds === c.ds ? ' sel' : '')}
+                title={c.inYear ? `${plural(c.count, 'watch')} · ${pretty(c.ds)}` : undefined}
+                style={{
+                  background: !c.inYear
+                    ? 'transparent'
+                    : c.count
+                      ? LEVELS[heatLevel(c.count)]
+                      : c.future
+                        ? FUTURE
+                        : LEVELS[0],
+                }}
+              />
+            ))
+          )}
+        </div>
 
-      {sel && (
-        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          {sel.count} watch{sel.count === 1 ? '' : 'es'} on {pretty(sel.ds)}.
-        </p>
-      )}
-    </div>
+        <div className="sd-heat-legend" aria-hidden="true">
+          Less
+          {LEVELS.map((c) => (
+            <i key={c} style={{ background: c }} />
+          ))}
+          More
+        </div>
+
+      </div>
+    </Section>
   );
 }

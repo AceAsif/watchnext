@@ -5,139 +5,27 @@ import Stars from '../components/Stars.jsx';
 import YearInReview from '../components/YearInReview.jsx';
 import { platformById } from '../components/PlatformPicker.jsx';
 import Heatmap from '../components/Heatmap.jsx';
+import { StatTile, TabBar, YearSelect, BarList, Section, Note } from '../components/StatsUI.jsx';
+import {
+  BATCH_MIN,
+  fmtDay,
+  weekdayOf,
+  dayNum,
+  computeHabits,
+  busiestMonthOf,
+  activeDaysOf,
+  streakRangeLabel,
+} from '../components/statsLogic.js';
+import { localISODate } from '../components/showLogic.js';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+// Stats — the Claude Design layout: a title, a four-way tab bar, and cards. On
+// a phone each tab is a single column; on desktop (>= 900px) the tabs lay their
+// cards out side by side (see "Stats" in components/ui.css). All the numbers
+// come from the `base` computation below, unchanged; the pure de-skew helpers
+// (bulk-import smoothing, busiest day, heatmap grid) live in statsLogic.js.
+
 const TABS = ['Overview', 'Habits', 'Rankings', 'Breakdown'];
-
-// A "minute" holding this many watches or more is treated as one bulk/import
-// batch (marking a backlog on a single date), not real viewing. Real binges
-// carry their own per-episode timestamps and stay untouched. See the Habits
-// de-skew below. Chosen from the data: real days top out around a few watches
-// per minute, while import batches pack hundreds into one timestamp.
-const BATCH_MIN = 15;
-
-function fmtDay(ds) {
-  if (!ds) return '';
-  const [y, m, d] = ds.split('-').map(Number);
-  if (!y || !m || !d) return ds;
-  return `${d} ${MONTHS[m - 1]} ${y}`;
-}
-function weekdayOf(ds) {
-  const [y, m, d] = ds.split('-').map(Number);
-  return new Date(y, m - 1, d).getDay();
-}
-// whole-day number, for consecutive-day math (UTC-based so no DST drift)
-function dayNum(ds) {
-  const [y, m, d] = ds.split('-').map(Number);
-  return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
-}
-
-// De-skewed timing stats for a scope (all years or one year).
-// - By day of week: each bulk batch (a minute with >= BATCH_MIN watches)
-//   contributes ONE event instead of its full size, so a 1,000-watch backlog
-//   dump doesn't bury the real weekly rhythm.
-// - Most in one day: the busiest day measured by DISTINCT timestamps, i.e. the
-//   biggest genuine sitting — 200 episodes stamped the same second count as 1.
-function computeHabits(events, year) {
-  const evs = year === 'all' ? events : events.filter((e) => e.year === year);
-
-  const minuteCount = {};
-  for (const e of evs) minuteCount[e.minute] = (minuteCount[e.minute] || 0) + 1;
-
-  const dow = [0, 0, 0, 0, 0, 0, 0]; // Sun..Sat
-  const distinctTsPerDay = {}; // day -> Set of timestamps
-  const days = new Set();
-  const seenBatchMinute = new Set();
-  let batchMinutes = 0; // how many batches we collapsed
-  let batchWatches = 0; // how many raw watches those batches represented
-
-  for (const e of evs) {
-    days.add(e.day);
-    (distinctTsPerDay[e.day] || (distinctTsPerDay[e.day] = new Set())).add(e.ts);
-
-    if (minuteCount[e.minute] >= BATCH_MIN) {
-      batchWatches++;
-      if (!seenBatchMinute.has(e.minute)) {
-        seenBatchMinute.add(e.minute);
-        batchMinutes++;
-        dow[e.wd] += 1; // whole batch = a single event
-      }
-    } else {
-      dow[e.wd] += 1;
-    }
-  }
-
-  let busiest = null;
-  for (const [d, set] of Object.entries(distinctTsPerDay)) {
-    if (!busiest || set.size > busiest.count) busiest = { date: d, count: set.size };
-  }
-
-  // Display Mon-first; DOW/dow are indexed Sun..Sat.
-  const dowRows = [1, 2, 3, 4, 5, 6, 0].map((i) => ({ label: DOW[i], value: dow[i] }));
-
-  return { dowRows, busiest, activeDays: days.size, batchMinutes, batchWatches };
-}
-
-// Busiest month for a single year, de-skewed the same way (a bulk batch counts
-// once). Returns { name, count } or null.
-function busiestMonthOf(events, year) {
-  const evs = events.filter((e) => e.year === year);
-  if (!evs.length) return null;
-  const minuteCount = {};
-  for (const e of evs) minuteCount[e.minute] = (minuteCount[e.minute] || 0) + 1;
-  const months = new Array(12).fill(0);
-  const seen = new Set();
-  for (const e of evs) {
-    const mi = Number(e.day.slice(5, 7)) - 1;
-    if (minuteCount[e.minute] >= BATCH_MIN) {
-      if (!seen.has(e.minute)) { seen.add(e.minute); months[mi]++; }
-    } else {
-      months[mi]++;
-    }
-  }
-  let best = 0;
-  for (let i = 1; i < 12; i++) if (months[i] > months[best]) best = i;
-  return { name: MONTHS[best], count: months[best] };
-}
-
-function activeDaysOf(events, year) {
-  const days = new Set();
-  for (const e of events) if (e.year === year) days.add(e.day);
-  return days.size;
-}
-
-function RatedList({ rows }) {
-  return (
-    <div className="rated-list">
-      {rows.map((r) => (
-        <div className="rated-row" key={r.name}>
-          <span className="rated-name" title={r.name}>{r.name}</span>
-          <Stars value={r.rating} size={15} readOnly />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Bars({ rows, unit }) {
-  const max = Math.max(...rows.map((r) => r.value), 1);
-  return (
-    <div>
-      {rows.map((r) => (
-        <div className="bar-row" key={r.label}>
-          <div className="bar-label" title={r.label}>{r.label}</div>
-          <div className="bar-track">
-            <div className="bar-fill" style={{ width: (r.value / max) * 100 + '%', background: r.color }} />
-          </div>
-          <div className="bar-val">
-            {r.value.toLocaleString()}{unit || ''}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+const plural = (n, one, many) => (n === 1 ? one : many || one + 's');
 
 export default function Stats() {
   const state = useStore();
@@ -425,228 +313,200 @@ export default function Stats() {
 
   if (base.episodes === 0 && base.movieCount === 0) {
     return (
-      <div className="notice">
-        No watch history yet. Import your TV Time data in Settings, or start
-        marking episodes watched.
+      <div className="sd-page">
+        <h1 className="sd-title">Stats</h1>
+        <div className="sd-card sd-pad sd-empty">
+          No watch history yet. Import your TV Time data in Settings, or start marking episodes watched.
+        </div>
       </div>
     );
   }
 
   const scopeLabel = year === 'all' ? 'all years' : year;
+  const today = localISODate();
+  const yearOptions = [{ value: 'all', label: 'All years' }, ...base.years.map((y) => ({ value: y, label: y }))];
 
-  return (
-    <div>
-      <div className="row" style={{ gap: 6, marginTop: 4, marginBottom: 4, flexWrap: 'wrap' }}>
-        {TABS.map((t) => (
-          <button
-            key={t}
-            className="btn"
-            style={tab === t ? { borderColor: 'var(--amber)', color: 'var(--amber)' } : {}}
-            onClick={() => setTab(t)}
-          >
-            {t}
-          </button>
-        ))}
+  // ------------------------------------------------------------- Overview
+  const overview = (
+    <div className="sd-cols-stats">
+      <div className="sd-stack">
+        <Section title="All time">
+          <StatTile
+            size="hero"
+            statKey="days"
+            value={base.days}
+            unit=" days"
+            plain
+            label={`of TV — ${base.hours.toLocaleString()} hours across ${base.showCount.toLocaleString()} ${plural(base.showCount, 'show')}`}
+          />
+          <div className="sd-tiles">
+            <StatTile statKey="episodes" value={base.episodes.toLocaleString()} label="Episodes" />
+            <StatTile statKey="shows" value={base.showCount.toLocaleString()} label="Shows started" />
+            <StatTile statKey="movies" value={base.movieCount.toLocaleString()} label="Movies" />
+            <StatTile statKey="movie-hours" value={`${base.movieHours.toLocaleString()} h`} label="Of movies" />
+          </div>
+          {(base.watchlistShows > 0 || base.watchlistMovies > 0) && (
+            <Note>
+              On your watchlist: {base.watchlistShows} {plural(base.watchlistShows, 'show')},{' '}
+              {base.watchlistMovies} {plural(base.watchlistMovies, 'movie')}.
+            </Note>
+          )}
+        </Section>
+      </div>
+      <div className="sd-stack">
+        {review && <YearInReview data={review} years={base.years} onYear={setReviewYear} />}
+      </div>
+    </div>
+  );
+
+  // --------------------------------------------------------------- Habits
+  const longestLabel = base.longestRange
+    ? `Longest · ${streakRangeLabel(base.longestRange.from, base.longestRange.to)}`
+    : 'Longest streak';
+  const busiestLabel = habits.busiest ? `Most in a day · ${fmtDay(habits.busiest.date).toUpperCase()}` : 'Most in a day';
+  const habitsTab = base.hasHabits ? (
+    <div className="sd-habits">
+      <div className="sd-tiles a-streak">
+        <StatTile size="lg" accent statKey="streak-current" value={base.currentStreak} unit={plural(base.currentStreak, ' day', ' days')} label="Current streak" />
+        <StatTile size="lg" statKey="streak-longest" value={base.longestStreak} unit={plural(base.longestStreak, ' day', ' days')} label={longestLabel} />
       </div>
 
-      {tab === 'Overview' && (
-        <>
-      <h2 className="section">All time</h2>
-      <div className="stat-cards">
-        <div className="stat-card">
-          <div className="big">{base.episodes.toLocaleString()}</div>
-          <div className="label">Episodes watched</div>
+      <Heatmap countsByDay={base.dailyCounts} years={base.years} today={today} />
+
+      <Section
+        title="By day of week"
+        className="a-dow"
+        right={<YearSelect id="habit-year" label="Year" value={year} onChange={setYear} options={yearOptions} />}
+      >
+        <BarList rows={habits.dowRows} ariaLabel={`Watches by day of week, ${scopeLabel}`} />
+        {habits.batchMinutes > 0 && (
+          <Note>
+            {habits.batchMinutes} bulk-marked {plural(habits.batchMinutes, 'batch', 'batches')} (
+            {habits.batchWatches.toLocaleString()} watches) {habits.batchMinutes === 1 ? 'is' : 'are'} smoothed out so a
+            backlog import doesn’t skew the pattern.
+          </Note>
+        )}
+      </Section>
+
+      <div className="a-tiles">
+        <div className="sd-tiles">
+          <StatTile statKey="busiest" value={(habits.busiest ? habits.busiest.count : 0).toLocaleString()} label={busiestLabel} />
+          <StatTile statKey="active-days" value={habits.activeDays.toLocaleString()} label="Days with a watch" />
         </div>
-        <div className="stat-card">
-          <div className="big">{base.hours.toLocaleString()}</div>
-          <div className="label">Hours of TV</div>
-        </div>
-        <div className="stat-card">
-          <div className="big">{base.days}</div>
-          <div className="label">Days of TV</div>
-        </div>
-        <div className="stat-card">
-          <div className="big">{base.showCount}</div>
-          <div className="label">Shows started</div>
-        </div>
-        <div className="stat-card">
-          <div className="big">{base.movieCount}</div>
-          <div className="label">Movies watched</div>
-        </div>
-        <div className="stat-card">
-          <div className="big">{base.movieHours.toLocaleString()}</div>
-          <div className="label">Movie hours</div>
-        </div>
+        <Note>Most in a day counts separately-timed watches only ({scopeLabel}).</Note>
       </div>
+    </div>
+  ) : (
+    <div className="sd-card sd-pad sd-empty">No dated watches yet — your viewing habits will appear here once you have some.</div>
+  );
 
-      {(base.watchlistShows > 0 || base.watchlistMovies > 0) && (
-        <p className="muted" style={{ fontSize: 13, marginTop: -6 }}>
-          On your watchlist: {base.watchlistShows} show{base.watchlistShows === 1 ? '' : 's'},{' '}
-          {base.watchlistMovies} movie{base.watchlistMovies === 1 ? '' : 's'}.
-        </p>
-      )}
-
-      {review && (
-        <YearInReview data={review} years={base.years} onYear={setReviewYear} />
-      )}
-        </>
-      )}
-
-      {tab === 'Habits' && base.hasHabits && (
-        <>
-          <h2 className="section">Habits</h2>
-          <div className="stat-cards">
-            <div className="stat-card">
-              <div className="big">{base.currentStreak}</div>
-              <div className="label">Current streak (days)</div>
-            </div>
-            <div className="stat-card">
-              <div className="big">{base.longestStreak}</div>
-              <div className="label">Longest streak (days)</div>
-            </div>
-          </div>
-          {base.longestRange && (
-            <p className="muted" style={{ fontSize: 13, marginTop: -6 }}>
-              Longest streak ran {fmtDay(base.longestRange.from)} – {fmtDay(base.longestRange.to)}.
-            </p>
-          )}
-
-          <div className="lib-controls" style={{ marginTop: 18 }}>
-            <h3 className="subsection" style={{ margin: 0 }}>Viewing pattern</h3>
-            <div className="sort-field">
-              <label htmlFor="habit-year" className="muted" style={{ fontSize: 13 }}>Year</label>
-              <select
-                id="habit-year"
-                className="select"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-              >
-                <option value="all">All years</option>
-                {base.years.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="stat-cards">
-            <div className="stat-card">
-              <div className="big">{habits.busiest ? habits.busiest.count : 0}</div>
-              <div className="label">Most in one day</div>
-            </div>
-            <div className="stat-card">
-              <div className="big">{habits.activeDays.toLocaleString()}</div>
-              <div className="label">Days with a watch</div>
-            </div>
-          </div>
-          {habits.busiest && (
-            <p className="muted" style={{ fontSize: 13, marginTop: -6 }}>
-              Busiest day: {habits.busiest.count} watched on {fmtDay(habits.busiest.date)}{' '}
-              (counting only separately-timed watches, {scopeLabel}).
-            </p>
-          )}
-
-          <h3 className="subsection">By day of week</h3>
-          <Bars rows={habits.dowRows} />
-          {habits.batchMinutes > 0 && (
-            <p className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
-              Smoothed {habits.batchMinutes} bulk-marked batch{habits.batchMinutes === 1 ? '' : 'es'}{' '}
-              ({habits.batchWatches.toLocaleString()} watches marked together on a single date) out of
-              this view, so a one-off backlog import doesn't drown out your real day-to-day pattern.
-            </p>
-          )}
-
-          <h3 className="subsection" style={{ marginTop: 22 }}>Watch activity</h3>
-          <Heatmap countsByDay={base.dailyCounts} years={base.years} />
-        </>
-      )}
-
-      {tab === 'Rankings' && (base.topRatedShows.length > 0 || base.topRatedMovies.length > 0) && (
-        <>
-          <h2 className="section">Recently rated</h2>
+  // ------------------------------------------------------------- Rankings
+  const hasRated = base.topRatedShows.length > 0 || base.topRatedMovies.length > 0;
+  const RatedCard = ({ rows, label }) => (
+    <div className="sd-card" role="group" aria-label={label}>
+      {rows.map((r, i) => (
+        <div className={'sd-rated' + (i > 0 ? ' sd-sep' : '')} key={r.name}>
+          <span className="sd-rated-name" title={r.name}>{r.name}</span>
+          <Stars value={r.rating} size={15} readOnly />
+        </div>
+      ))}
+    </div>
+  );
+  const rankings =
+    hasRated || base.topShows.length > 0 ? (
+      <div className="sd-cols-even">
+        <div className="sd-stack">
           {base.topRatedShows.length > 0 && (
-            <>
-              <h3 className="subsection">Shows</h3>
-              <RatedList rows={base.topRatedShows} />
-            </>
+            <Section title="Recently rated · Shows"><RatedCard rows={base.topRatedShows} label="Recently rated shows" /></Section>
           )}
           {base.topRatedMovies.length > 0 && (
-            <>
-              <h3 className="subsection">Movies</h3>
-              <RatedList rows={base.topRatedMovies} />
-            </>
+            <Section title="Recently rated · Movies"><RatedCard rows={base.topRatedMovies} label="Recently rated movies" /></Section>
           )}
-        </>
-      )}
-
-      {tab === 'Rankings' && base.topShows.length > 0 && (
-        <>
-          <h2 className="section">Most watched shows</h2>
-          <Bars rows={base.topShows} />
-        </>
-      )}
-
-      {tab === 'Breakdown' && base.yearBars.length > 0 && (
-        <>
-          <h2 className="section">Episodes per year</h2>
-          <Bars rows={base.yearBars} />
-        </>
-      )}
-
-      {tab === 'Breakdown' && base.movieYears.length > 0 && (
-        <>
-          <h2 className="section">Movies per year</h2>
-          <Bars rows={base.movieYears} />
-        </>
-      )}
-
-      {tab === 'Breakdown' && (base.platformRows.length > 0 || base.untaggedTitles > 0) && (
-        <>
-          <h2 className="section">Where you watch</h2>
-          {base.platformRows.length > 0 ? (
-            <>
-              <Bars rows={base.platformRows} unit=" hrs" />
-              {base.untaggedHours > 0 && (
-                <p className="muted" style={{ fontSize: 13 }}>
-                  {base.untaggedHours.toLocaleString()} hrs across {base.untaggedTitles} title
-                  {base.untaggedTitles === 1 ? '' : 's'} have no platform set — run "Detect
-                  platforms" on the Shows tab to fill them in.
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="muted" style={{ fontSize: 13.5 }}>
-              No platforms tagged yet. Run "Detect platforms" on the Shows tab (or set one on a
-              show's page), and your viewing-by-platform breakdown will appear here.
-            </p>
+        </div>
+        <div className="sd-stack">
+          {base.topShows.length > 0 && (
+            <Section title="Most watched shows">
+              <BarList rows={base.topShows} unit=" eps" ariaLabel="Most watched shows" />
+            </Section>
           )}
-        </>
-      )}
+        </div>
+      </div>
+    ) : (
+      <div className="sd-card sd-pad sd-empty">Rate a show or movie, or watch something, and your rankings will appear here.</div>
+    );
 
-      {tab === 'Breakdown' && (
-        <>
-          <h2 className="section">Library completion</h2>
-          <Bars rows={base.completion} />
-
-          <h2 className="section">Genres</h2>
+  // ------------------------------------------------------------ Breakdown
+  const completion = base.completion.map((r) => ({
+    ...r,
+    color: r.label === 'Finished' ? 'var(--teal)' : r.label === 'Watching' ? 'var(--amber)' : '#4a5365',
+  }));
+  const breakdown = (
+    <div className="sd-cols-even">
+      <div className="sd-stack">
+        {base.yearBars.length > 0 && (
+          <Section title="Episodes per year"><BarList rows={base.yearBars} ariaLabel="Episodes per year" /></Section>
+        )}
+        {base.movieYears.length > 0 && (
+          <Section title="Movies per year"><BarList rows={base.movieYears} ariaLabel="Movies per year" /></Section>
+        )}
+        <Section title="Library completion">
+          <BarList rows={completion} highlightTop={false} ariaLabel="Library completion" />
+        </Section>
+      </div>
+      <div className="sd-stack">
+        {(base.platformRows.length > 0 || base.untaggedTitles > 0) && (
+          <Section title="Where you watch">
+            {base.platformRows.length > 0 ? (
+              <>
+                <BarList rows={base.platformRows} unit=" hrs" highlightTop={false} ariaLabel="Hours by platform" />
+                {base.untaggedHours > 0 && (
+                  <Note>
+                    {base.untaggedHours.toLocaleString()} hrs across {base.untaggedTitles}{' '}
+                    {plural(base.untaggedTitles, 'title')} have no platform set — run “Detect platforms” on the
+                    Shows tab to fill them in.
+                  </Note>
+                )}
+              </>
+            ) : (
+              <div className="sd-card sd-pad sd-empty">
+                No platforms tagged yet. Run “Detect platforms” on the Shows tab (or set one on a show’s page),
+                and your viewing-by-platform breakdown will appear here.
+              </div>
+            )}
+          </Section>
+        )}
+        <Section title="Genres">
           {base.genres.length > 0 ? (
             <>
-              <Bars rows={base.genres} unit=" eps" />
+              <BarList rows={base.genres} unit=" eps" ariaLabel="Episodes by genre" />
               {base.genreDataMissing > 0 && (
-                <p className="muted" style={{ fontSize: 13 }}>
-                  {base.genreDataMissing} shows have no genre data yet — run "Refresh
-                  all from TMDB" on the Shows tab to fill them in.
-                </p>
+                <Note>
+                  {base.genreDataMissing} {plural(base.genreDataMissing, 'show')} {base.genreDataMissing === 1 ? 'has' : 'have'} no
+                  genre data yet — run “Refresh all from TMDB” on the Shows tab to fill them in.
+                </Note>
               )}
             </>
           ) : (
-            <p className="muted" style={{ fontSize: 13.5 }}>
-              No genre data yet. Run "Refresh all from TMDB" on the Shows tab
-              once, and genres will appear here.
-            </p>
+            <div className="sd-card sd-pad sd-empty">
+              No genre data yet. Run “Refresh all from TMDB” on the Shows tab once, and genres will appear here.
+            </div>
           )}
-        </>
-      )}
+        </Section>
+      </div>
+    </div>
+  );
+
+  const panels = { Overview: overview, Habits: habitsTab, Rankings: rankings, Breakdown: breakdown };
+
+  return (
+    <div className="sd-page">
+      <div className="sd-stats-head">
+        <h1 className="sd-title">Stats</h1>
+        <TabBar tabs={TABS} value={tab} onChange={setTab} label="Stats sections" />
+      </div>
+      <div className="sd-stats-body" role="tabpanel" id="stats-panel" aria-labelledby={`stats-tab-${tab}`}>
+        {panels[tab]}
+      </div>
     </div>
   );
 }

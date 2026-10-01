@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { img } from '../api/tmdb.js';
+import { Section, YearSelect } from './StatsUI.jsx';
 
 // Public app URL — included in the share text so a screenshot/link points people
 // back to WatchNext.
@@ -18,48 +19,6 @@ function loadImg(url) {
     im.onerror = () => resolve(null);
     im.src = url + (url.includes('?') ? '&' : '?') + 'cors=1';
   });
-}
-
-// The card is styled inline (rather than in styles.css) on purpose: it's a
-// self-contained shareable artifact meant to look right when screenshotted,
-// with no hover/interactive state to need a stylesheet. It reuses the app's
-// design tokens via var(--...) so it still matches the theme.
-const cardStyle = {
-  maxWidth: 430,
-  margin: '10px auto 0',
-  borderRadius: 18,
-  border: '1px solid var(--line)',
-  background:
-    'radial-gradient(120% 80% at 0% 0%, rgba(242,163,60,0.16), transparent 55%), ' +
-    'radial-gradient(120% 80% at 100% 100%, rgba(86,200,181,0.14), transparent 55%), ' +
-    'var(--bg-card)',
-  padding: '22px 20px 18px',
-  overflow: 'hidden',
-};
-const kicker = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 10,
-  textTransform: 'uppercase',
-  letterSpacing: '0.1em',
-  color: 'var(--text-dim)',
-};
-
-function StatBox({ big, label }) {
-  return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px' }}>
-      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 26, letterSpacing: '-0.02em' }}>{big}</div>
-      <div style={{ ...kicker, marginTop: 2 }}>{label}</div>
-    </div>
-  );
-}
-
-function Fact({ label, value }) {
-  return (
-    <div>
-      <div style={kicker}>{label}</div>
-      <div style={{ fontWeight: 700, fontSize: 15, marginTop: 2 }}>{value}</div>
-    </div>
-  );
 }
 
 export default function YearInReview({ data, years, onYear }) {
@@ -297,81 +256,83 @@ export default function YearInReview({ data, years, onYear }) {
   };
 
   return (
-    <>
-      <div className="lib-controls" style={{ marginTop: 4 }}>
-        <h2 className="section" style={{ margin: 0 }}>Year in review</h2>
-        <div className="row" style={{ gap: 8 }}>
-          <div className="sort-field">
-            <label htmlFor="yir-year" className="muted" style={{ fontSize: 13 }}>Year</label>
-            <select id="yir-year" className="select" value={data.year} onChange={(e) => onYear(e.target.value)}>
-              {years.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
-          <button className="btn primary" type="button" onClick={share}>
-            {copied ? 'Copied!' : 'Share'}
-          </button>
-          <button className="btn" type="button" onClick={downloadImage} disabled={saving}>
-            {saving ? 'Rendering…' : 'Download image'}
-          </button>
-        </div>
-      </div>
-
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18 }}>
-            Watch<span style={{ color: 'var(--amber)' }}>Next</span>
-          </span>
-          <span style={{ ...kicker, letterSpacing: '0.14em' }}>Year in review</span>
+    <Section
+      title="Year in review"
+      className="a-yir"
+      right={
+        <YearSelect
+          id="yir-year"
+          label="Year"
+          value={String(data.year)}
+          onChange={onYear}
+          options={years.map((y) => ({ value: y, label: y }))}
+        />
+      }
+    >
+      {/* On-screen card (Claude Design layout). The saved image is drawn
+          separately by downloadImage() above and keeps its own layout. */}
+      <div className="sd-card sd-yir">
+        <div className="sd-yir-top">
+          <span className="sd-yir-year">{data.year}</span>
+          {data.epDelta != null && (
+            <span className="sd-yir-delta" style={{ color: data.epDelta >= 0 ? 'var(--teal)' : 'var(--text-dim)' }}>
+              {data.epDelta >= 0 ? '▲' : '▼'} {Math.abs(data.epDelta)}% {data.epDelta >= 0 ? 'more' : 'fewer'} episodes than {data.prevYear}
+            </span>
+          )}
         </div>
 
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(52px, 16vw, 72px)', lineHeight: 1, letterSpacing: '-0.03em', margin: '8px 0 2px' }}>
-          {data.year}
-        </div>
-        {data.epDelta != null && (
-          <div className="muted" style={{ fontSize: 13, marginBottom: 6 }}>
-            {data.epDelta >= 0 ? '▲' : '▼'} {Math.abs(data.epDelta)}% {data.epDelta >= 0 ? 'more' : 'fewer'} episodes than {data.prevYear}
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '14px 0 16px' }}>
-          <StatBox big={data.episodes.toLocaleString()} label="Episodes" />
-          <StatBox big={data.hours.toLocaleString()} label="Hours" />
-          <StatBox big={data.movies.toLocaleString()} label="Movies" />
-          <StatBox big={data.activeDays.toLocaleString()} label="Days watched" />
+        <div className="sd-yir-stats">
+          {[
+            [data.episodes, 'Episodes'],
+            [data.hours, 'Hours'],
+            [data.movies, 'Movies'],
+            [data.activeDays, 'Days'],
+          ].map(([v, l]) => (
+            <div key={l} data-stat={'yir-' + l.toLowerCase()}>
+              <span className="sd-yir-v">{v.toLocaleString()}</span>
+              <span className="sd-tile-l sd-tile-l--s">{l}</span>
+            </div>
+          ))}
         </div>
 
         {data.topShows.length > 0 && (
-          <>
-            <div style={{ ...kicker, marginBottom: 8 }}>Top shows</div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-              {data.topShows.map((sh) => (
-                <div key={sh.name} style={{ width: '33.33%', minWidth: 0 }}>
-                  {img(sh.poster) ? (
-                    <img src={img(sh.poster)} alt="" style={{ width: '100%', aspectRatio: '2 / 3', objectFit: 'cover', borderRadius: 10, border: '1px solid var(--line)', display: 'block' }} />
-                  ) : (
-                    <div style={{ width: '100%', aspectRatio: '2 / 3', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg-raise)' }} />
-                  )}
-                  <div style={{ fontSize: 12, fontWeight: 600, marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={sh.name}>{sh.name}</div>
-                  <div className="muted" style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}>{sh.count} eps</div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {(data.busiestMonth || data.topGenre) && (
-          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-            {data.busiestMonth && <Fact label="Busiest month" value={data.busiestMonth.name} />}
-            {data.topGenre && <Fact label="Top genre" value={data.topGenre} />}
+          <div className="sd-yir-top3">
+            <span className="sd-tile-l sd-tile-l--s">Top shows</span>
+            {data.topShows.map((sh, i) => (
+              <div className="sd-yir-show" key={sh.name}>
+                <span className="sd-mono sd-yir-rank">{i + 1}</span>
+                {sh.poster ? (
+                  <img className="sd-poster" src={img(sh.poster, 'w92')} alt="" loading="lazy" style={{ width: 28, height: 42, borderRadius: 5 }} />
+                ) : (
+                  <span className="sd-poster" aria-hidden="true" style={{ width: 28, height: 42, borderRadius: 5 }} />
+                )}
+                <span className="sd-yir-name" title={sh.name}>{sh.name}</span>
+                <span className="sd-mono sd-yir-eps">{sh.count} eps</span>
+              </div>
+            ))}
           </div>
         )}
 
-        <div className="muted" style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', marginTop: 14, textAlign: 'right' }}>
-          aceasif.github.io/watchnext
-        </div>
+        {(data.busiestMonth || data.topGenre) && (
+          <div className="sd-yir-facts">
+            {data.busiestMonth && (
+              <div><span className="sd-tile-l sd-tile-l--s">Busiest month</span><span className="sd-yir-fact">{data.busiestMonth.name}</span></div>
+            )}
+            {data.topGenre && (
+              <div><span className="sd-tile-l sd-tile-l--s">Top genre</span><span className="sd-yir-fact">{data.topGenre}</span></div>
+            )}
+          </div>
+        )}
       </div>
-    </>
+
+      <div className="sd-yir-actions">
+        <button className="sd-btn primary" type="button" onClick={share}>
+          {copied ? 'Copied!' : 'Share'}
+        </button>
+        <button className="sd-btn" type="button" onClick={downloadImage} disabled={saving}>
+          {saving ? 'Rendering…' : 'Save image'}
+        </button>
+      </div>
+    </Section>
   );
 }
