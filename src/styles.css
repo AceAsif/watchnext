@@ -37,9 +37,11 @@ html, body {
 /* ------------------------------------------------ header */
 .masthead {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
-  padding: 22px 0 14px; /* flush with the page content edge */
+  padding: 10px 0 6px; /* flush with the page content edge */
+  min-height: 56px;
+  box-sizing: border-box;
 }
 .masthead h1 {
   font-family: var(--font-display);

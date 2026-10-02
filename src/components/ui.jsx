@@ -84,12 +84,22 @@ export function Avatar({ name, path, size = 40, tint = 0, ring = false, style })
 // top of the cast sheet closes first.
 const openSheets = [];
 
-export function Sheet({ open, title, subtitle, action, onClose, children }) {
+export function Sheet({ open, title, subtitle, action, onClose, children, variant }) {
   const panel = useRef(null);
   const token = useRef({});
+  // Remember what had focus BEFORE the sheet opened. This has to be read during
+  // render: a child that autofocuses itself (the Add dialog's search box) takes
+  // focus before any effect here runs, and we'd then "restore" focus to an
+  // element that is about to be removed instead of back to the trigger button.
+  const returnFocus = useRef(null);
+  if (open && !returnFocus.current) returnFocus.current = document.activeElement;
+  if (!open) returnFocus.current = null;
 
   useEffect(() => {
     if (!open) return undefined;
+    // Capture now: by the time this effect's cleanup runs (when `open` flips to
+    // false) the render above has already reset the ref.
+    const back = returnFocus.current;
     const me = token.current;
     openSheets.push(me);
     const onKey = (e) => {
@@ -100,15 +110,16 @@ export function Sheet({ open, title, subtitle, action, onClose, children }) {
     // Lock background scroll while a sheet is up (restore whatever was there).
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const prevFocus = document.activeElement;
-    if (panel.current) panel.current.focus();
+    // Focus the panel — unless something inside (e.g. an autofocused search
+    // box) has already taken focus, which we must not steal.
+    if (panel.current && !panel.current.contains(document.activeElement)) panel.current.focus();
 
     return () => {
       document.removeEventListener('keydown', onKey);
       const i = openSheets.indexOf(me);
       if (i >= 0) openSheets.splice(i, 1);
       if (openSheets.length === 0) document.body.style.overflow = prevOverflow;
-      if (prevFocus && prevFocus.focus) prevFocus.focus();
+      if (back && back.focus && document.contains(back)) back.focus();
     };
   }, [open]);
 
@@ -116,7 +127,7 @@ export function Sheet({ open, title, subtitle, action, onClose, children }) {
   return (
     <div className="sd-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
-        className="sd-sheet"
+        className={'sd-sheet' + (variant ? ` sd-sheet--${variant}` : '')}
         role="dialog"
         aria-modal="true"
         aria-label={title}

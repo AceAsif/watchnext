@@ -88,28 +88,19 @@ export default function App() {
         <h1>
           Watch<span>Next</span>
         </h1>
-        <span className="sub">personal tracker</span>
         <button
+          className="sd-ib masthead-search"
           onClick={() => {
             setSearching(true);
             setShowOpen(null);
           }}
           aria-label="Search shows and movies"
           title="Search"
-          style={{
-            marginLeft: 'auto',
-            alignSelf: 'center',
-            background: 'none',
-            border: 'none',
-            color: searching ? 'var(--amber)' : 'var(--text-dim)',
-            cursor: 'pointer',
-            padding: 6,
-            lineHeight: 0,
-          }}
+          style={{ marginLeft: 'auto', color: searching ? 'var(--amber)' : 'var(--text)' }}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.35-4.35" />
+            <path d="M20 20l-3.5-3.5" />
           </svg>
         </button>
       </header>

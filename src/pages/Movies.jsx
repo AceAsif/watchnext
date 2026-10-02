@@ -13,13 +13,34 @@ import { searchMovies, movieDetails, hasKey, img, movieVideos, pickTrailer } fro
 import Stars from '../components/Stars.jsx';
 import PlatformPicker, { PlatformChip } from '../components/PlatformPicker.jsx';
 import { Sheet } from '../components/ui.jsx';
-import { PageHead, SearchField, PosterTile, MediaRow, Poster, Empty } from '../components/LibraryUI.jsx';
+import { SearchField, MediaRow, Poster } from '../components/LibraryUI.jsx';
+import {
+  MOVIE_SORTS,
+  shownMovies,
+  movieSortSummary,
+  movieResultState,
+} from '../components/libraryLogic.js';
+import {
+  LibHead,
+  AddButton,
+  FilterField,
+  SegmentedSort,
+  CountLine,
+  ToolbarClear,
+  LibEmpty,
+  MovieTile,
+  AddDialog,
+  ResBtn,
+  PlusIcon,
+  FilmIcon,
+} from '../components/LibraryBar.jsx';
+
+const searchMoviesList = (q) => searchMovies(q).then((d) => d.results || []);
 
 export default function Movies() {
   const state = useStore();
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [addOpen, setAddOpen] = useState(false); // the "Add a movie" dialog
+  const [addQuery, setAddQuery] = useState('');
   const [fixIndex, setFixIndex] = useState(null); // movie index being fixed
   const [fixQuery, setFixQuery] = useState('');
   const [fixResults, setFixResults] = useState(null);
@@ -138,75 +159,55 @@ export default function Movies() {
     return set;
   }, [state.movies]);
 
-  async function runSearch(e) {
-    e && e.preventDefault();
-    if (!query.trim()) return;
-    setBusy(true);
-    try {
-      const data = await searchMovies(query.trim());
-      setResults(data.results || []);
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setBusy(false);
+  // ---- the Add dialog (search lives there, not on the page)
+  const openAdd = (q = '') => {
+    setAddQuery(q);
+    setAddOpen(true);
+  };
+  const addMovie = async (r, force = false) => addMovieWatched(await movieDetails(r.id), force);
+  const addWatch = async (r) => addMovieToWatchlist(await movieDetails(r.id));
+  // Open = the detail sheet of the most recent watch of that film.
+  const openResult = (r) => {
+    const m = movies.find((x) => x.tmdbId === r.id); // `movies` is newest-first
+    if (m) {
+      setAddOpen(false);
+      openMovie(m);
     }
-  }
-
-  function removeLoggedMovie(r) {
-    // Delete the most recent watched entry for this TMDB film (used to clear a
-    // wrongly-matched movie straight from search). Leaves older rewatches, if
-    // any, in place. Reads the current array each call so the index is fresh.
-    const matches = state.movies
-      .map((m, index) => ({ ...m, index }))
-      .filter((m) => m.tmdbId === r.id && movieStatus(m) === 'watched');
-    if (matches.length === 0) return;
-    matches.sort((a, b) => (b.watchedAt || '').localeCompare(a.watchedAt || ''));
-    const target = matches[0];
-    if (
-      confirm(
-        `Remove your logged watch of "${target.name}"` +
-          (target.watchedAt ? ` (${target.watchedAt.slice(0, 10)})` : '') +
-          '? This deletes it from your history.'
-      )
-    ) {
-      removeMovie(target.index);
+  };
+  const renderActions = (r, { busy, act }) => {
+    const st = movieResultState(r, watchedByTmdb, plannedTmdbIds);
+    if (st.kind === 'watched') {
+      return (
+        <>
+          <ResBtn kind="ok" onClick={() => openResult(r)}>Open</ResBtn>
+          <ResBtn disabled={busy} onClick={() => act(r, () => addMovie(r, true), `Logged another watch of “${r.title}”`)}>
+            Log again
+          </ResBtn>
+        </>
+      );
     }
-  }
+    return (
+      <>
+        <ResBtn kind="primary" disabled={busy} onClick={() => act(r, () => addMovie(r), `Logged “${r.title}” as watched`)}>
+          <PlusIcon size={16} /> Watched it
+        </ResBtn>
+        {st.kind === 'planned' ? (
+          <ResBtn kind="wide" disabled>On watchlist</ResBtn>
+        ) : (
+          <ResBtn kind="wide" disabled={busy} onClick={() => act(r, () => addWatch(r), `Added “${r.title}” to your watchlist`)}>
+            Add to watchlist
+          </ResBtn>
+        )}
+      </>
+    );
+  };
+  const badgeFor = (r) => {
+    const st = movieResultState(r, watchedByTmdb, plannedTmdbIds);
+    if (st.kind === 'watched') return st.count > 1 ? `Logged ${st.count}×` : 'In library';
+    return st.kind === 'planned' ? 'On watchlist' : null;
+  };
 
-  async function addToWatchlistFromSearch(r) {
-    setBusy(true);
-    try {
-      const details = await movieDetails(r.id);
-      addMovieToWatchlist(details);
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function addFromSearch(r, force = false) {
-    setBusy(true);
-    try {
-      const details = await movieDetails(r.id);
-      addMovieWatched(details, force);
-      setResults(null);
-      setQuery('');
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const shown = useMemo(() => {
-    const q = libQuery.trim().toLowerCase();
-    let list = q ? movies.filter((m) => (m.name || '').toLowerCase().includes(q)) : movies.slice();
-    if (sortBy === 'title') list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    else if (sortBy === 'rating')
-      list.sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.watchedAt || '').localeCompare(a.watchedAt || ''));
-    return list;
-  }, [movies, libQuery, sortBy]);
+  const shown = useMemo(() => shownMovies(movies, libQuery, sortBy), [movies, libQuery, sortBy]);
 
   const sel = openIndex != null ? movies.find((m) => m.index === openIndex) : null;
   const d = sel && sel.tmdbId ? details[sel.tmdbId] : null;
@@ -219,115 +220,74 @@ export default function Movies() {
 
   return (
     <div className="sd-page sd-page--wide">
-      <PageHead title="Movies" count={movies.length} />
+      <LibHead title="Movies" count={movies.length}>
+        <AddButton label="Add a movie from TMDB" onClick={() => openAdd()} />
+      </LibHead>
 
-      <SearchField
-        value={query}
-        onChange={(v) => {
-          setQuery(v);
-          if (!v.trim()) setResults(null); // emptying the box clears the list
-        }}
-        placeholder="Search TMDB to log a movie"
-        onSubmit={runSearch}
-        busy={busy}
-        disabled={!hasKey()}
-      />
-      {!hasKey() && (
-        <p className="sd-sub" style={{ marginTop: 8 }}>Search needs a TMDB API key — add one in Settings.</p>
-      )}
-
-      {results && (
-        <section className="sd-sec2" style={{ marginTop: 22 }}>
-          <div className="sd-sec2-head has-ctl">
-            <span className="sd-lbl">Search results</span>
-            <button className="sd-linkbtn" onClick={() => setResults(null)}>Clear</button>
-          </div>
-          {results.length === 0 ? (
-            <Empty>No movies found for that search.</Empty>
-          ) : (
-            <div className="sd-card">
-              {results.slice(0, 10).map((r, i) => {
-                const seen = watchedByTmdb.get(r.id);
-                return (
-                  <MediaRow key={r.id} sep={i > 0} path={r.poster_path} name={r.title}>
-                    <span className="sd-mrow-name">{r.title}</span>
-                    <span className="sd-mrow-meta">
-                      {(r.release_date || '').slice(0, 4) || 'unknown year'}
-                      {seen && (
-                        <span className="ok">
-                          {' · '}✓ logged {(seen.last || '').slice(0, 10)}
-                          {seen.count > 1 ? ` (${seen.count}×)` : ''}
-                        </span>
-                      )}
-                    </span>
-                    {r.overview ? (
-                      <span className="sd-mrow-over">{r.overview}</span>
-                    ) : null}
-                    <span className="sd-mrow-actions" style={{ justifyContent: 'flex-start', marginTop: 6 }}>
-                      {seen ? (
-                        <>
-                          <button className="sd-btn sm" onClick={() => addFromSearch(r, true)} disabled={busy} title="Add another watch with today's date">
-                            Log rewatch
-                          </button>
-                          <button className="sd-btn sm danger" onClick={() => removeLoggedMovie(r)} disabled={busy} title="Delete this logged watch">
-                            {seen.count > 1 ? 'Remove latest' : 'Remove'}
-                          </button>
-                        </>
-                      ) : (
-                        <button className="sd-btn sm primary" onClick={() => addFromSearch(r)} disabled={busy}>
-                          Watched it
-                        </button>
-                      )}
-                      {!seen &&
-                        (plannedTmdbIds.has(r.id) ? (
-                          <button className="sd-btn sm" disabled>On watchlist</button>
-                        ) : (
-                          <button className="sd-btn sm" onClick={() => addToWatchlistFromSearch(r)} disabled={busy}>
-                            ＋ Watchlist
-                          </button>
-                        ))}
-                    </span>
-                  </MediaRow>
-                );
-              })}
+      {movies.length > 0 && (
+        <>
+          <div className="sd-lbar">
+            <FilterField
+              value={libQuery}
+              onChange={setLibQuery}
+              placeholder={`Filter ${movies.length.toLocaleString()} movie${movies.length === 1 ? '' : 's'}`}
+            />
+            <div className="sd-lbar-sort">
+              <span className="sd-lbl">Sort</span>
+              <SegmentedSort options={MOVIE_SORTS} value={sortBy} onChange={setSortBy} label="Sort movies" />
             </div>
-          )}
-        </section>
+            {libQuery.trim() && <ToolbarClear onClear={() => setLibQuery('')} />}
+          </div>
+          <CountLine
+            shown={shown.length}
+            total={movies.length}
+            noun="movies"
+            summary={movieSortSummary(sortBy)}
+            filtered={!!libQuery.trim()}
+            onClear={() => setLibQuery('')}
+          />
+        </>
       )}
 
-      <section className="sd-sec2" style={{ marginTop: 24 }}>
-        <div className="sd-sec2-head has-ctl">
-          <span className="sd-lbl">Watched · {shown.length}</span>
-          <div className="sd-seg" role="group" aria-label="Sort movies">
-            {[['recent', 'Recent'], ['title', 'A–Z'], ['rating', 'Rating']].map(([id, label]) => (
-              <button key={id} aria-pressed={sortBy === id} onClick={() => setSortBy(id)}>{label}</button>
-            ))}
-          </div>
+      {shown.length > 0 ? (
+        <div className="sd-lgrid">
+          {shown.map((m) => (
+            <MovieTile key={`${m.name}|${m.watchedAt}|${m.index}`} movie={m} onOpen={() => openMovie(m)} />
+          ))}
         </div>
+      ) : movies.length === 0 ? (
+        <LibEmpty
+          icon={<FilmIcon size={28} />}
+          title="No movies yet"
+          actions={<ResBtn kind="primary" onClick={() => openAdd()}><PlusIcon size={16} /> Add a movie</ResBtn>}
+        >
+          Log the first movie you’ve watched, or import your TV Time history in Settings.
+        </LibEmpty>
+      ) : (
+        <LibEmpty
+          icon={<FilmIcon size={28} />}
+          title={`Nothing called “${libQuery.trim()}” in your library`}
+          actions={
+            <>
+              <ResBtn kind="primary" onClick={() => openAdd(libQuery.trim())}>Search TMDB for “{libQuery.trim()}”</ResBtn>
+              <button type="button" className="sd-lclear" onClick={() => setLibQuery('')}>Clear filter</button>
+            </>
+          }
+        >
+          Check the spelling, or look it up on TMDB to add it.
+        </LibEmpty>
+      )}
 
-        {movies.length > 0 && (
-          <SearchField value={libQuery} onChange={setLibQuery} placeholder="Filter your movies" />
-        )}
-
-        {movies.length === 0 ? (
-          <Empty>No movies yet. Search above to log one, or import your TV Time history in Settings.</Empty>
-        ) : shown.length === 0 ? (
-          <Empty>No watched movie matches “{libQuery}”.</Empty>
-        ) : (
-          <div className="sd-pgrid" style={{ marginTop: 6 }}>
-            {shown.map((m) => (
-              <PosterTile
-                key={`${m.name}|${m.watchedAt}|${m.index}`}
-                path={m.poster}
-                name={m.name}
-                badge={m.rating ? `★ ${m.rating}` : null}
-                meta={(m.watchedAt || '').slice(0, 10) || m.year || ''}
-                onClick={() => openMovie(m)}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      {addOpen && (
+        <AddDialog
+          kind="movie"
+          search={searchMoviesList}
+          initialQuery={addQuery}
+          onClose={() => setAddOpen(false)}
+          badgeFor={badgeFor}
+          renderActions={renderActions}
+        />
+      )}
 
       <Sheet
         open={!!sel}
