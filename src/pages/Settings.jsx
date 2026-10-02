@@ -1,34 +1,72 @@
-import React, { useRef, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useStore } from '../store/useStore.js';
 import { setTmdbKey, importTvTime, getState, resetAll, deleteShow, watchedCount } from '../store/db.js';
+import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud } from '../store/cloud.js';
+import { localISODate } from '../components/showLogic.js';
 import {
-  isCloudAvailable,
-  getCloudUser,
-  subscribeCloudUser,
-  signIn,
-  signOutCloud,
-} from '../store/cloud.js';
+  keyStatus,
+  backupState,
+  backupFileName,
+  importResultText,
+  orphanShows,
+  deleteShowEffects,
+  deleteAllEffects,
+} from '../components/settingsLogic.js';
+import {
+  Banner,
+  SyncCard,
+  KeyCard,
+  ImportCard,
+  CleanupCard,
+  BackupCard,
+  DangerCard,
+  ConfirmDialog,
+  ShowThumb,
+} from '../components/SettingsCards.jsx';
+
+// Settings — Claude Design, Direction A: one column of cards (Sync, TMDB key,
+// Import, Clean up, Backup) and a separate red Danger zone, with real confirm
+// dialogs instead of the browser's popups. Behaviour is the page's own; the
+// agreed changes are: backups leave out the TMDB key, and "Delete all data" is
+// honest that it clears THIS DEVICE only (it does not touch the cloud copy).
+
+const IMPORT_COMMAND = 'python tools/convert_tvtime.py gdpr-data.zip -o tvtime_import.json';
 
 export default function Settings() {
   const state = useStore();
-  const [key, setKey] = useState(state.settings.tmdbKey || '');
-  const [msg, setMsg] = useState('');
-  const fileRef = useRef();
-  const cloudUser = useSyncExternalStore(subscribeCloudUser, getCloudUser);
+  const savedKey = state.settings.tmdbKey || '';
+  const [key, setKey] = useState(savedKey);
+  const [msg, setMsg] = useState(null); // { text, kind: 'ok' | 'err' }
+  const [copied, setCopied] = useState(false);
+  const [confirm, setConfirm] = useState(null); // { type: 'show', id } | { type: 'all' }
   const [cloudBusy, setCloudBusy] = useState(false);
+  const fileRef = useRef();
+  const bannerRef = useRef();
+  const copyTimer = useRef();
+  const cloudUser = useSyncExternalStore(subscribeCloudUser, getCloudUser);
+  const cloudOn = isCloudAvailable();
 
-  // Shows sitting in the data but not in the library or watchlist — leftovers
-  // from unfollowing or old imports (unfollow only hides; it never deletes).
-  const orphans = Object.entries(state.shows)
-    .filter(([, sh]) => !sh.followed && !sh.watchlist)
-    .sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+  const say = (text, kind = 'ok') => setMsg({ text, kind });
+  // The banner sits at the top; bring it into view when a message appears so an
+  // import result or error is never missed on a long phone page.
+  useEffect(() => {
+    if (msg && bannerRef.current && bannerRef.current.scrollIntoView) {
+      bannerRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [msg]);
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
+
+  const orphans = useMemo(
+    () => orphanShows(state.shows).map(([id, sh]) => [id, sh, watchedCount(sh)]),
+    [state.shows]
+  );
 
   async function handleSignIn() {
     setCloudBusy(true);
     try {
       await signIn();
     } catch (err) {
-      alert('Sign-in failed: ' + err.message);
+      say('Sign-in failed: ' + err.message, 'err');
     } finally {
       setCloudBusy(false);
     }
@@ -36,26 +74,32 @@ export default function Settings() {
 
   function saveKey() {
     setTmdbKey(key);
-    setMsg('TMDB key saved. It stays in this browser only.');
+    setKey(key.trim());
+    say(key.trim() ? 'TMDB key saved. It stays in this browser only.' : 'TMDB key removed.');
+  }
+
+  async function copyCommand() {
+    try {
+      await navigator.clipboard.writeText(IMPORT_COMMAND);
+      setCopied(true);
+      clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      say('Couldn’t copy automatically — select the command and copy it by hand.', 'err');
+    }
   }
 
   function onImportFile(e) {
-    const file = e.target.files?.[0];
+    const file = e.target.files && e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const json = JSON.parse(reader.result);
-        if (!json.shows && !json.movies) {
-          throw new Error('That file does not look like a WatchNext import.');
-        }
-        const res = importTvTime(json);
-        setMsg(
-          `Imported ${res.shows} shows and ${res.watches} new episode watches. ` +
-            'Now add a TMDB key (if you have not) and run "Sync with TMDB" on the Shows tab.'
-        );
+        if (!json.shows && !json.movies) throw new Error('That file does not look like a WatchNext import.');
+        say(importResultText(importTvTime(json)));
       } catch (err) {
-        setMsg('Import failed: ' + err.message);
+        say('Import failed: ' + err.message, 'err');
       }
       e.target.value = '';
     };
@@ -63,151 +107,81 @@ export default function Settings() {
   }
 
   function exportBackup() {
-    const blob = new Blob([JSON.stringify(getState(), null, 1)], {
-      type: 'application/json',
-    });
+    // The TMDB key is deliberately left out (see backupState).
+    const blob = new Blob([JSON.stringify(backupState(getState()), null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `watchnext-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = backupFileName(localISODate());
     a.click();
     URL.revokeObjectURL(a.href);
+    say('Backup downloaded. Your TMDB key is not included in the file.');
   }
 
-  function reset() {
-    if (confirm('Delete all local WatchNext data? This cannot be undone.')) {
-      resetAll();
-      setKey('');
-      setMsg('All local data deleted.');
-    }
+  function confirmDeleteShow() {
+    const sh = state.shows[confirm.id];
+    deleteShow(confirm.id);
+    setConfirm(null);
+    say(`Deleted “${sh ? sh.name : 'show'}”.`);
   }
+  function confirmDeleteAll() {
+    resetAll();
+    setKey('');
+    setConfirm(null);
+    say('All data on this device was deleted.');
+  }
+
+  const target = confirm && confirm.type === 'show' ? state.shows[confirm.id] : null;
+  const targetSeen = target ? watchedCount(target) : 0;
+  const signedIn = cloudOn && !!cloudUser;
 
   return (
-    <div>
-      <h2 className="section">Sync across devices</h2>
-      {!isCloudAvailable() && (
-        <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-          Cloud sync isn't configured for this deployment yet — see the README
-          for setup. Until then, use the backup file below to move data
-          between devices.
-        </p>
-      )}
-      {isCloudAvailable() && !cloudUser && (
-        <>
-          <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-            Sign in with Google to keep this browser and every other device
-            you sign into showing the same watch history automatically.
-          </p>
-          <button className="btn primary" onClick={handleSignIn} disabled={cloudBusy}>
-            {cloudBusy ? 'Opening sign-in…' : 'Sign in with Google'}
-          </button>
-        </>
-      )}
-      {isCloudAvailable() && cloudUser && (
-        <>
-          <p style={{ fontSize: 13.5 }}>
-            Signed in as <strong>{cloudUser.email}</strong>. Changes here sync
-            to the cloud automatically and appear on your other signed-in
-            devices within a few seconds.
-          </p>
-          <button className="btn" onClick={() => signOutCloud()}>
-            Sign out
-          </button>
-        </>
-      )}
+    <div className="sd-page sd-setpage">
+      <h1 className="sd-title">Settings</h1>
+      <Banner msg={msg} onClose={() => setMsg(null)} bannerRef={bannerRef} />
 
-      <h2 className="section">TMDB API key</h2>
-      <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-        Show posters, episode lists and air dates come from The Movie Database.
-        Create a free account at themoviedb.org, request an API key under
-        Settings → API, and paste the v3 key here. The key is stored only in
-        this browser.
-      </p>
-      <div className="row">
-        <input
-          type="password"
-          placeholder="TMDB v3 API key"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          style={{ flex: 1 }}
-          autoComplete="off"
+      <div className="sd-set">
+        <SyncCard available={cloudOn} user={cloudUser} busy={cloudBusy} onSignIn={handleSignIn} onSignOut={() => signOutCloud()} />
+        <KeyCard status={keyStatus(savedKey, key)} value={key} onChange={setKey} onSave={saveKey} />
+        <ImportCard
+          command={IMPORT_COMMAND}
+          copied={copied}
+          onCopy={copyCommand}
+          onChoose={() => fileRef.current.click()}
+          fileRef={fileRef}
+          onFile={onImportFile}
         />
-        <button className="btn primary" onClick={saveKey}>
-          Save key
-        </button>
+        <CleanupCard rows={orphans} onAskDelete={(id) => setConfirm({ type: 'show', id })} />
+        <BackupCard onDownload={exportBackup} />
+        <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} />
       </div>
 
-      <h2 className="section">Import TV Time history</h2>
-      <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-        Run <code>python tools/convert_tvtime.py gdpr-data.zip -o tvtime_import.json</code>{' '}
-        on your TV Time export, then load the JSON here. Importing merges with
-        anything already tracked; it never deletes.
-      </p>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="application/json"
-        onChange={onImportFile}
-        style={{ display: 'none' }}
-      />
-      <button className="btn primary" onClick={() => fileRef.current.click()}>
-        Choose import file
-      </button>
-
-      {msg && <div className="notice accent">{msg}</div>}
-
-      {orphans.length > 0 && (
-        <>
-          <h2 className="section">Clean up shows</h2>
-          <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-            These {orphans.length} show{orphans.length === 1 ? ' is' : 's are'} in
-            your data but not in your library or watchlist — usually leftovers
-            from unfollowing or old test imports. Deleting one removes it for
-            good, including from the cloud and your other devices.
-          </p>
-          {orphans.map(([id, sh]) => {
-            const seen = watchedCount(sh);
-            return (
-              <div
-                key={id}
-                className="row"
-                style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}
-              >
-                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {sh.name}
-                </span>
-                <span className="muted" style={{ fontSize: 12 }}>
-                  {seen ? `${seen} watched` : 'no history'}
-                </span>
-                <div className="spacer" />
-                <button
-                  className="btn danger"
-                  onClick={() => {
-                    if (confirm(`Delete "${sh.name}" for good?`)) deleteShow(id);
-                  }}
-                >
-                  Delete
-                </button>
+      {target && (
+        <ConfirmDialog
+          title="Delete this show?"
+          summary={
+            <div className="sd-confirm-show">
+              <ShowThumb show={target} />
+              <div>
+                <div className="nm">{target.name}</div>
+                <div className={'mt' + (targetSeen ? '' : ' none')}>{targetSeen ? `${targetSeen.toLocaleString()} watched` : 'no history'}</div>
               </div>
-            );
-          })}
-        </>
+            </div>
+          }
+          effects={deleteShowEffects(targetSeen)}
+          confirmLabel="Delete show"
+          onConfirm={confirmDeleteShow}
+          onCancel={() => setConfirm(null)}
+        />
       )}
-
-      <h2 className="section">Backup</h2>
-      <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-        Everything lives in this browser's storage. Download a backup now and
-        then whenever you have marked a lot of episodes — a backup file can be
-        re-imported on any device.
-      </p>
-      <div className="row">
-        <button className="btn" onClick={exportBackup}>
-          Download backup
-        </button>
-        <div className="spacer" />
-        <button className="btn danger" onClick={reset}>
-          Delete all data
-        </button>
-      </div>
+      {confirm && confirm.type === 'all' && (
+        <ConfirmDialog
+          title="Delete all data on this device?"
+          effects={deleteAllEffects(signedIn)}
+          confirmLabel="Delete all data"
+          onConfirm={confirmDeleteAll}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </div>
   );
 }

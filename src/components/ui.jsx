@@ -84,7 +84,7 @@ export function Avatar({ name, path, size = 40, tint = 0, ring = false, style })
 // top of the cast sheet closes first.
 const openSheets = [];
 
-export function Sheet({ open, title, subtitle, action, onClose, children, variant }) {
+export function Sheet({ open, title, subtitle, action, onClose, children, variant, role = 'dialog' }) {
   const panel = useRef(null);
   const token = useRef({});
   // Remember what had focus BEFORE the sheet opened. This has to be read during
@@ -128,7 +128,7 @@ export function Sheet({ open, title, subtitle, action, onClose, children, varian
     <div className="sd-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         className={'sd-sheet' + (variant ? ` sd-sheet--${variant}` : '')}
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}

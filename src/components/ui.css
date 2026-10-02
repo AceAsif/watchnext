@@ -1210,3 +1210,110 @@
   .sd-ltile-art, .sd-lprog .bar i { transition: none; }
   .sd-ltile:hover .sd-ltile-art { transform: none; }
 }
+
+/* ======================================================================
+   Settings (Claude Design, Direction A): one column of cards
+   ====================================================================== */
+.sd-setpage .sd-title { padding-top: 6px; }
+.sd-set { display: flex; flex-direction: column; gap: 16px; margin-top: 12px; }
+.sd-setcard { padding: 16px; box-sizing: border-box; }
+.sd-setcard.danger { border-color: rgba(229, 105, 94, 0.4); background: #16151a; }
+.sd-sethead { display: flex; align-items: center; gap: 12px; }
+.sd-sethead .ico { width: 40px; height: 40px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--text-dim); flex: none; }
+.sd-setcard.on .sd-sethead .ico { color: var(--teal); }
+.sd-sethead .txt { flex: 1; min-width: 0; }
+.sd-sethead .sd-lbl { margin-bottom: 2px; }
+.sd-sethead h2, .sd-danger-body h2 { margin: 0; font-family: var(--font-display); font-weight: 700; }
+.sd-sethead h2 { font-size: 20px; line-height: 1.15; }
+.sd-pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; flex: none; }
+.sd-pill.teal { background: rgba(86, 200, 181, 0.12); color: var(--teal); }
+.sd-pill.amber { background: rgba(242, 163, 60, 0.12); color: var(--amber); }
+.sd-pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.sd-setp { margin: 12px 0 0; font-size: 14.5px; line-height: 1.55; color: #c3cad5; max-width: 560px; }
+.sd-setacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.sd-setacts .sd-setbtn { flex: 1 1 auto; }
+
+.sd-setbtn {
+  height: 44px; padding: 0 16px; border-radius: 12px; background: var(--bg-card); color: var(--text); border: 1px solid #2c3441;
+  font: inherit; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; cursor: pointer; flex: none;
+}
+.sd-setbtn.primary { background: var(--amber); color: #0d1015; border: none; font-weight: 600; }
+.sd-setbtn.danger { background: rgba(229, 105, 94, 0.1); color: var(--red); border-color: rgba(229, 105, 94, 0.4); font-weight: 600; }
+.sd-setbtn.solid-danger { background: var(--red); color: #0d1015; border: none; font-weight: 600; }
+.sd-setbtn:disabled { opacity: 0.5; cursor: default; }
+.sd-setbtn:not(:disabled):focus-visible, .sd-setlink:focus-visible, .sd-code .cp:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.sd-acct { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--line); }
+.sd-acct .av { width: 36px; height: 36px; border-radius: 50%; background: rgba(242, 163, 60, 0.12); color: var(--amber); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; flex: none; }
+.sd-acct .who { min-width: 0; }
+.sd-acct .em { font-size: 15px; font-weight: 600; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.sd-setlink { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; min-height: 44px; color: var(--amber); font-size: 14px; font-weight: 600; text-decoration: none; }
+.sd-keyrow { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.sd-keyfield { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-sizing: border-box; color: var(--text-dim); }
+.sd-keyfield.saved { border-color: var(--teal); }
+.sd-keyfield:focus-within { border-color: var(--amber); }
+.sd-keyfield input[type='password'] {
+  flex: 1; min-width: 0; width: auto; height: 100%; padding: 0; background: transparent; border: none; border-radius: 0; outline: none;
+  color: var(--text); font: 400 14px var(--font-mono); letter-spacing: 0.12em;
+}
+.sd-keyfield input[type='password']::placeholder { font-family: var(--font-body); letter-spacing: normal; color: var(--text-dim); opacity: 1; }
+.sd-setnote { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--text-dim); }
+
+.sd-steps { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 18px; }
+.sd-steps li { display: flex; gap: 12px; }
+.sd-steps .num { width: 24px; height: 24px; border-radius: 50%; border: 1px solid #36404f; color: var(--text-dim); font-family: var(--font-mono); font-size: 12px; display: flex; align-items: center; justify-content: center; flex: none; margin-top: 1px; }
+.sd-steps .body { flex: 1; min-width: 0; }
+.sd-steps .st { font-size: 14.5px; font-weight: 600; line-height: 1.35; margin-bottom: 10px; }
+.sd-code { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.sd-code .bar { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 4px 0 14px; border-bottom: 1px solid var(--line); }
+.sd-code .cp { height: 44px; margin: -2px 0; padding: 0 12px; border: none; background: transparent; color: var(--amber); font: inherit; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.sd-code pre { margin: 0; padding: 12px 14px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55; color: #c3cad5; white-space: pre-wrap; word-break: break-all; user-select: text; }
+.sd-code .py { color: var(--teal); }
+.sd-setinfo { display: flex; gap: 10px; margin-top: 16px; padding: 10px 12px; border-radius: 12px; background: var(--bg-card); font-size: 13px; line-height: 1.5; color: #c3cad5; }
+.sd-setinfo svg { margin-top: 2px; }
+
+.sd-orphs { list-style: none; margin: 12px 0 -4px; padding: 0; }
+.sd-orphs li { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+.sd-orphs li + li { border-top: 1px solid var(--line); }
+.sd-orphs .who { flex: 1; min-width: 0; }
+.sd-orphs .nm, .sd-confirm-show .nm { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sd-orphs .mt, .sd-confirm-show .mt { font-size: 12.5px; margin-top: 3px; color: var(--text-dim); }
+.sd-orphs .mt.none, .sd-confirm-show .mt.none { font-style: italic; }
+.sd-orph-poster { border-radius: 8px; border: 1px solid var(--line); flex: none; object-fit: cover; box-sizing: border-box; display: block; }
+.sd-orph-poster.ph { display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 18px; font-weight: 800; color: rgba(255, 255, 255, 0.2); }
+
+.sd-lbl.danger { color: var(--red); margin-bottom: 10px; }
+.sd-danger-body { display: flex; flex-direction: column; gap: 14px; }
+.sd-danger-body h2 { font-size: 18px; }
+.sd-danger-body .sd-setp { margin-top: 6px; font-size: 14px; max-width: 520px; }
+
+.sd-banner { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 12px 8px 12px 14px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--teal); font-size: 14px; line-height: 1.45; }
+.sd-banner.err { border-color: var(--red); }
+.sd-banner .ico { margin-top: 2px; color: var(--teal); display: flex; }
+.sd-banner.err .ico { color: var(--red); }
+.sd-banner .txt { flex: 1; min-width: 0; overflow-wrap: anywhere; padding-top: 1px; }
+.sd-banner .x { width: 44px; height: 44px; margin: -12px 0 -12px 0; border: none; background: transparent; color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; flex: none; }
+
+.sd-confirm-show { display: flex; align-items: center; gap: 12px; margin-top: 4px; padding: 10px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
+.sd-effects { list-style: none; margin: 6px 0 0; padding: 0; }
+.sd-effects li { display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: #c3cad5; margin-top: 8px; }
+.sd-effects .ico { color: var(--red); margin-top: 2px; display: flex; }
+.sd-undo { margin: 12px 0 0; font-size: 13.5px; color: var(--text-dim); }
+.sd-confirm-acts { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.sd-confirm-acts .sd-setbtn { width: 100%; height: 48px; }
+
+@media (min-width: 900px) {
+  .sd-setpage { max-width: 640px; margin-left: auto; margin-right: auto; }
+  .sd-setacts .sd-setbtn { flex: none; }
+  .sd-keyrow { flex-direction: row; align-items: center; }
+  .sd-danger-body { flex-direction: row; align-items: center; justify-content: space-between; gap: 24px; }
+  .sd-sheet--confirm { width: 480px; max-width: calc(100vw - 48px); }
+  .sd-confirm-acts { flex-direction: row-reverse; justify-content: flex-start; }
+  .sd-confirm-acts .sd-setbtn { width: auto; padding: 0 20px; }
+}
+@media (hover: hover) {
+  .sd-setbtn:not(:disabled):not(.primary):not(.solid-danger):hover { border-color: var(--amber); }
+  .sd-setbtn.danger:not(:disabled):hover { border-color: var(--red); }
+  .sd-setlink:hover { text-decoration: underline; }
+}
