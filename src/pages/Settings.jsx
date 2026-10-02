@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useStore } from '../store/useStore.js';
-import { setTmdbKey, importTvTime, getState, resetAll, deleteShow, watchedCount } from '../store/db.js';
+import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount } from '../store/db.js';
+import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
 import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud } from '../store/cloud.js';
 import { localISODate } from '../components/showLogic.js';
 import {
@@ -8,6 +9,7 @@ import {
   backupState,
   backupFileName,
   importResultText,
+  restoreResultText,
   orphanShows,
   deleteShowEffects,
   deleteAllEffects,
@@ -41,6 +43,7 @@ export default function Settings() {
   const [confirm, setConfirm] = useState(null); // { type: 'show', id } | { type: 'all' }
   const [cloudBusy, setCloudBusy] = useState(false);
   const fileRef = useRef();
+  const restoreRef = useRef();
   const bannerRef = useRef();
   const copyTimer = useRef();
   const cloudUser = useSyncExternalStore(subscribeCloudUser, getCloudUser);
@@ -96,10 +99,32 @@ export default function Settings() {
     reader.onload = () => {
       try {
         const json = JSON.parse(reader.result);
+        if (isBackupFile(json)) {
+          throw new Error('That is a WatchNext backup, not a TV Time export. Use “Restore from backup” in the Backup card instead.');
+        }
         if (!json.shows && !json.movies) throw new Error('That file does not look like a WatchNext import.');
         say(importResultText(importTvTime(json)));
       } catch (err) {
         say('Import failed: ' + err.message, 'err');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  }
+
+  function onRestoreFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const json = JSON.parse(reader.result);
+        if (isTvTimeFile(json)) {
+          throw new Error('That looks like a TV Time export. Use “Import TV Time history” above instead.');
+        }
+        say(restoreResultText(restoreBackup(json)));
+      } catch (err) {
+        say('Restore failed: ' + err.message, 'err');
       }
       e.target.value = '';
     };
@@ -151,7 +176,7 @@ export default function Settings() {
           onFile={onImportFile}
         />
         <CleanupCard rows={orphans} onAskDelete={(id) => setConfirm({ type: 'show', id })} />
-        <BackupCard onDownload={exportBackup} />
+        <BackupCard onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} />
         <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} />
       </div>
 

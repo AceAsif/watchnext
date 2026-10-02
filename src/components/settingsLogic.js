@@ -41,6 +41,18 @@ export function importResultText(res) {
   );
 }
 
+// The banner after "Restore from backup". `sum` is restoreBackup's summary.
+export function restoreResultText(sum) {
+  const parts = [];
+  if (sum.showsAdded) parts.push(`${n(sum.showsAdded, 'show', 'shows')} added`);
+  if (sum.showsUpdated) parts.push(`${n(sum.showsUpdated, 'show', 'shows')} updated`);
+  if (sum.watchesAdded) parts.push(`${n(sum.watchesAdded, 'episode watch', 'episode watches')} restored`);
+  if (sum.moviesAdded) parts.push(`${n(sum.moviesAdded, 'movie', 'movies')} added`);
+  if (!parts.length && !sum.skipped) return 'Nothing to restore — this device already has everything in that file.';
+  if (sum.skipped) parts.push(`${n(sum.skipped, 'unreadable entry', 'unreadable entries')} skipped`);
+  return `Restored from backup: ${parts.join(', ')}.`;
+}
+
 // ---------------------------------------------------------------- clean up
 // Shows sitting in the data but in neither the library nor the watchlist —
 // leftovers from unfollowing or old imports (unfollow only hides; it never

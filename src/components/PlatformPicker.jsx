@@ -15,6 +15,7 @@ export const PLATFORMS = [
   { id: 'binge', label: 'Binge', color: '#FF5A36', dark: false },
   { id: 'iview', label: 'ABC iview', color: '#00B2A9', dark: true },
   { id: 'youtube', label: 'YouTube', color: '#FF0000', dark: false },
+  { id: 'cinema', label: 'Cinema', color: '#F5C518', dark: true }, // in a cinema/theatre (movies, mostly); never auto-detected
   { id: 'other', label: 'Other / unofficial', color: '#9AA4B2', dark: true },
 ];
 

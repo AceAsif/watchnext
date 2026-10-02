@@ -219,16 +219,19 @@ export function CleanupCard({ rows, onAskDelete }) {
 }
 
 // ---------------------------------------------------------------- Backup + danger zone
-export function BackupCard({ onDownload }) {
+export function BackupCard({ onDownload, onRestore, restoreRef, onRestoreFile }) {
   return (
     <SetCard icon={I.drive} label="Your data" title="Backup">
       <p className="sd-setp">
         Everything lives in this browser’s storage. Download a backup now and then, especially after marking a lot
-        of episodes. A backup file can be re-imported on any device.
+        of episodes. A backup file can be restored here, on any device.
       </p>
       <div className="sd-setacts">
         <button type="button" className="sd-setbtn" onClick={onDownload}>{I.download} Download backup</button>
+        <input ref={restoreRef} type="file" accept="application/json" onChange={onRestoreFile} style={{ display: 'none' }} aria-label="Backup file to restore" />
+        <button type="button" className="sd-setbtn" onClick={onRestore}>{I.upload} Restore from backup</button>
       </div>
+      <div className="sd-setinfo">{I.info}<span>Restoring adds what’s missing and never deletes or overwrites what you already have.</span></div>
       <div className="sd-setnote">{I.lock}Your TMDB key is not included in the file.</div>
     </SetCard>
   );

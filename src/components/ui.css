@@ -1250,7 +1250,7 @@
 
 .sd-setlink { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; min-height: 44px; color: var(--amber); font-size: 14px; font-weight: 600; text-decoration: none; }
 .sd-keyrow { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
-.sd-keyfield { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-sizing: border-box; color: var(--text-dim); }
+.sd-keyfield { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px; height: 44px; min-height: 44px; /* 'flex: 1' alone collapsed the height in the phone's column layout */ padding: 0 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-sizing: border-box; color: var(--text-dim); }
 .sd-keyfield.saved { border-color: var(--teal); }
 .sd-keyfield:focus-within { border-color: var(--amber); }
 .sd-keyfield input[type='password'] {

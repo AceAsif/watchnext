@@ -1,3 +1,5 @@
+import { mergeBackup } from './backupMerge.js';
+
 // Simple localStorage-backed store with a subscribe API.
 // Single-user app, so no backend needed: everything lives in the browser.
 
@@ -501,6 +503,22 @@ export function applyTmdbDetails(id, details) {
 // ---------------------------------------------------------------------------
 // Import from the converter's JSON
 // ---------------------------------------------------------------------------
+
+// Restore a WatchNext backup file (what "Download backup" writes). ADDITIVE: it
+// brings back what's missing and never deletes or overwrites what you have (see
+// backupMerge.js). Restored shows are marked for cloud sync and any delete
+// tombstone for them is lifted — like re-importing, restoring is deliberate.
+export function restoreBackup(json) {
+  const r = mergeBackup(state, json); // throws if the file isn't a backup
+  update((s) => {
+    s.shows = r.shows;
+    s.movies = r.movies;
+  });
+  r.touchedIds.forEach(markShowDirty);
+  r.touchedIds.forEach(clearTombstone);
+  if (r.moviesChanged) markMoviesDirty();
+  return r.summary;
+}
 
 export function importTvTime(json) {
   let shows = 0;
