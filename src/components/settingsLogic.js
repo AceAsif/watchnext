@@ -48,6 +48,7 @@ export function restoreResultText(sum) {
   if (sum.showsUpdated) parts.push(`${n(sum.showsUpdated, 'show', 'shows')} updated`);
   if (sum.watchesAdded) parts.push(`${n(sum.watchesAdded, 'episode watch', 'episode watches')} restored`);
   if (sum.moviesAdded) parts.push(`${n(sum.moviesAdded, 'movie', 'movies')} added`);
+  if (sum.notesAdded) parts.push(`${n(sum.notesAdded, 'note', 'notes')} restored`);
   if (!parts.length && !sum.skipped) return 'Nothing to restore — this device already has everything in that file.';
   if (sum.skipped) parts.push(`${n(sum.skipped, 'unreadable entry', 'unreadable entries')} skipped`);
   return `Restored from backup: ${parts.join(', ')}.`;

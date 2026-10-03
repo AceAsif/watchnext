@@ -1,4 +1,5 @@
 import { mergeBackup } from './backupMerge.js';
+import { setNoteIn, withNotes, withMovieNote } from './notes.js';
 
 // Simple localStorage-backed store with a subscribe API.
 // Single-user app, so no backend needed: everything lives in the browser.
@@ -649,6 +650,25 @@ export function markPlannedMovieWatched(index) {
   markMoviesDirty();
 }
 
+// Episode note/reaction. Stored in show.notes (a map keyed "SxE"), NOT in
+// show.watched, so un-marking an episode never deletes what you wrote. An empty
+// note removes the key (and the whole map when it was the last) — never undefined.
+export function setEpisodeNote(showId, epKey, input) {
+  if (!state.shows[showId]) return;
+  update((s) => {
+    const show = s.shows[showId];
+    s.shows[showId] = withNotes(show, setNoteIn(show.notes, epKey, input, new Date().toISOString()));
+  });
+  markShowDirty(showId);
+}
+// Movie thoughts live on the watch entry itself (react + note), so each viewing
+// — including a rewatch — has its own. Rides the existing movies sync doc.
+export function setMovieNote(index, input) {
+  update((s) => {
+    s.movies = s.movies.map((m, i) => (i === index ? withMovieNote(m, input) : m));
+  });
+  markMoviesDirty();
+}
 export function setMovieRating(index, rating) {
   // rating: 0–5. 0 clears it. ratedAt records when you rated it. Rides the
   // existing movies sync doc.

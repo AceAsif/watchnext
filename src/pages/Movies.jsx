@@ -7,10 +7,13 @@ import {
   updateMovie,
   setMovieRating,
   setMoviePlatform,
+  setMovieNote,
   movieStatus,
 } from '../store/db.js';
 import { searchMovies, movieDetails, hasKey, img, movieVideos, pickTrailer } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
+import { NoteEditor } from '../components/NoteEditor.jsx';
+import { movieNoteOf } from '../store/notes.js';
 import PlatformPicker, { PlatformChip } from '../components/PlatformPicker.jsx';
 import { Sheet } from '../components/ui.jsx';
 import { SearchField, MediaRow, Poster } from '../components/LibraryUI.jsx';
@@ -326,6 +329,17 @@ export default function Movies() {
                   <p className="sd-mdet-over">{d.overview || 'No description available on TMDB.'}</p>
                 </>
               )}
+            </div>
+
+            <div className="sd-mdet-sec">
+              <span className="sd-lbl">Your thoughts</span>
+              <NoteEditor
+                key={`${sel.index}|${sel.watchedAt}`}
+                value={movieNoteOf(sel)}
+                saveLabel="Save thoughts"
+                onSave={(v) => setMovieNote(sel.index, v)}
+                onRemove={() => setMovieNote(sel.index, {})}
+              />
             </div>
 
             <div className="sd-mdet-sec">

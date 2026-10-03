@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore.js';
 import {
   markEpisode,
+  setEpisodeNote,
   markSeason,
   logEpisodeRewatch,
   toggleFollow,
@@ -28,6 +29,8 @@ import {
 } from '../api/tmdb.js';
 import { PLATFORMS, platformById } from '../components/PlatformPicker.jsx';
 import CastCrew from '../components/CastCrew.jsx';
+import { NoteSheet } from '../components/NoteEditor.jsx';
+import { reactionById } from '../store/notes.js';
 import AnimeSheet from '../components/AnimeSheet.jsx';
 import { looksLikeAnime, altTitles, summaryLine } from '../components/animeLogic.js';
 import { Bar, Chevron, Sheet } from '../components/ui.jsx';
@@ -78,6 +81,7 @@ function Season({ id, show, season, info, isCurrent, next }) {
   const [open, setOpen] = useState(isCurrent);
   const [err, setErr] = useState(null);
   const [expandDone, setExpandDone] = useState(false);
+  const [noteEp, setNoteEp] = useState(null); // { n, name } of the episode whose note is open
 
   async function load() {
     if (eps || !show.tmdbId) return;
@@ -186,6 +190,8 @@ function Season({ id, show, season, info, isCurrent, next }) {
           } else if (!on && ep.air_date && ep.air_date > today) {
             sub = { text: `Airs ${fmtDate(ep.air_date)}`, color: 'var(--amber)' };
           }
+          const note = (show.notes || {})[k];
+          const noteReaction = note && reactionById(note.react);
           return (
             <div className="sd-ep" key={ep.id}>
               <span className="sd-mono" style={{ width: 30, fontSize: 12, color: isNext ? 'var(--amber)' : 'var(--text-dim)' }}>
@@ -195,6 +201,24 @@ function Season({ id, show, season, info, isCurrent, next }) {
                 <div style={{ fontSize: 14 }}>{ep.name || `Episode ${ep.episode_number}`}</div>
                 {sub && <div style={{ fontSize: 12, color: sub.color, marginTop: 2 }}>{sub.text}</div>}
               </div>
+              {(on || note) && (
+                <button
+                  className="sd-check"
+                  style={{ width: 36 }}
+                  title={note ? 'Edit your note' : 'Add a note or reaction'}
+                  aria-label={`${note ? 'Edit note for' : 'Add note for'} ${code}`}
+                  onClick={() => setNoteEp({ n: ep.episode_number, name: ep.name || `Episode ${ep.episode_number}` })}
+                >
+                  {noteReaction ? (
+                    <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}>{noteReaction.emoji}</span>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={note ? 'var(--amber)' : 'var(--text-dim)'}
+                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M4 5h16v11H9l-5 4z" />
+                    </svg>
+                  )}
+                </button>
+              )}
               {on && (
                 <button
                   className="sd-check"
@@ -220,6 +244,16 @@ function Season({ id, show, season, info, isCurrent, next }) {
             </div>
           );
         })}
+      {noteEp && (
+        <NoteSheet
+          title={`S${season.n}E${noteEp.n}`}
+          subtitle={noteEp.name}
+          value={(show.notes || {})[epKey(season.n, noteEp.n)]}
+          onSave={(v) => { setEpisodeNote(id, epKey(season.n, noteEp.n), v); setNoteEp(null); }}
+          onRemove={() => { setEpisodeNote(id, epKey(season.n, noteEp.n), {}); setNoteEp(null); }}
+          onClose={() => setNoteEp(null)}
+        />
+      )}
     </div>
   );
 }

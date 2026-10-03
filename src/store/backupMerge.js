@@ -14,6 +14,8 @@
 
 // Ids / keys that must never be copied from a file: assigning to one of these on
 // a plain object can rewrite its prototype.
+import { mergeNotes, withMovieNote, movieNoteOf } from './notes.js';
+
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -54,6 +56,12 @@ function mergeShow(local, back) {
   }
   out.watched = watched;
 
+  // episode notes: union, yours win per episode; everything from the file is sanitised
+  delete out.notes;
+  const notes = mergeNotes(local.notes, back.notes);
+  if (notes) out.notes = notes;
+  const notesAdded = Math.max(0, Object.keys(notes || {}).length - Object.keys(local.notes || {}).length);
+
   // library / watchlist: being in the library beats being on the watchlist
   // (only written when the value actually changes, so a show that simply never
   // had these keys isn't rewritten — restoring the same file twice stays a no-op)
@@ -70,7 +78,7 @@ function mergeShow(local, back) {
     out.rating = back.rating;
     if (!blank(back.ratedAt)) out.ratedAt = back.ratedAt;
   }
-  return { show: out, watchesAdded };
+  return { show: out, watchesAdded, notesAdded };
 }
 
 // local: { shows, movies }.  backup: the parsed file.
@@ -81,7 +89,7 @@ export function mergeBackup(local, backup) {
 
   const shows = { ...local.shows };
   const touchedIds = [];
-  const summary = { showsAdded: 0, showsUpdated: 0, watchesAdded: 0, moviesAdded: 0, skipped: 0 };
+  const summary = { showsAdded: 0, showsUpdated: 0, watchesAdded: 0, moviesAdded: 0, notesAdded: 0, skipped: 0 };
 
   for (const [id, back] of Object.entries(backup.shows)) {
     if (BAD_KEYS.has(id) || !isObj(back)) {
@@ -92,16 +100,23 @@ export function mergeBackup(local, backup) {
     if (!mine) {
       const copy = clone(back);
       if (!isObj(copy.watched)) copy.watched = {};
+      const n = mergeNotes(undefined, copy.notes); // sanitise (a file isn't trusted)
+      delete copy.notes;
+      if (n) {
+        copy.notes = n;
+        summary.notesAdded += Object.keys(n).length;
+      }
       shows[id] = copy;
       summary.showsAdded++;
       summary.watchesAdded += Object.keys(copy.watched).length;
       touchedIds.push(id);
     } else {
-      const { show, watchesAdded } = mergeShow(mine, back);
+      const { show, watchesAdded, notesAdded } = mergeShow(mine, back);
       if (JSON.stringify(show) !== JSON.stringify(mine)) {
         shows[id] = show;
         summary.showsUpdated++;
         summary.watchesAdded += watchesAdded;
+        summary.notesAdded += notesAdded;
         touchedIds.push(id);
       }
     }
@@ -112,6 +127,7 @@ export function mergeBackup(local, backup) {
   const have = new Set(movies.map(movieKey));
   const startLen = movies.length;
   let removedPlanned = 0;
+  const fill = new Map(); // movie key -> the backup's react/note, for entries you already have
   for (const m of Array.isArray(backup.movies) ? backup.movies : []) {
     if (!isObj(m) || (m.name == null && m.tmdbId == null)) {
       summary.skipped++;
@@ -125,12 +141,33 @@ export function mergeBackup(local, backup) {
       removedPlanned += before - movies.length;
     }
     const k = movieKey(m);
-    if (have.has(k)) continue;
-    movies.push(clone(m));
+    if (have.has(k)) {
+      const c = movieNoteOf(m);
+      if (c.react || c.text) fill.set(k, c);
+      continue;
+    }
+    const added = withMovieNote(clone(m), movieNoteOf(m)); // sanitise react/note
+    movies.push(added);
     have.add(k);
     summary.moviesAdded++;
+    if (added.react || added.note) summary.notesAdded++;
   }
-  const moviesChanged = summary.moviesAdded > 0 || removedPlanned > 0 || movies.length !== startLen;
+  // an entry you already have keeps your react/note; the backup only fills what's blank
+  let filled = 0;
+  if (fill.size) {
+    movies = movies.map((x) => {
+      const f = fill.get(movieKey(x));
+      if (!f) return x;
+      const patch = {};
+      if (!x.react && f.react) patch.react = f.react;
+      if (!x.note && f.text) patch.note = f.text;
+      if (!Object.keys(patch).length) return x;
+      filled++;
+      return { ...x, ...patch };
+    });
+    summary.notesAdded += filled;
+  }
+  const moviesChanged = summary.moviesAdded > 0 || removedPlanned > 0 || movies.length !== startLen || filled > 0;
 
   return { shows, movies, touchedIds, moviesChanged, summary };
 }

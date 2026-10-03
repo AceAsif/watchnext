@@ -1317,3 +1317,30 @@
   .sd-setbtn.danger:not(:disabled):hover { border-color: var(--red); }
   .sd-setlink:hover { text-decoration: underline; }
 }
+
+/* ======================================================================
+   Notes & reactions (episodes + movies)
+   ====================================================================== */
+.sd-noted { display: flex; flex-direction: column; gap: 10px; }
+.sd-reacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sd-react {
+  height: 48px; padding: 0 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-raise); color: #c3cad5;
+  font: inherit; font-size: 13.5px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; min-width: 0;
+}
+.sd-react .e { font-size: 18px; line-height: 1; }
+.sd-react .l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sd-react.on { border-color: var(--amber); background: rgba(242, 163, 60, 0.12); color: var(--amber); font-weight: 600; }
+.sd-react:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sd-notefield { display: block; }
+.sd-notearea {
+  display: block; width: 100%; min-height: 96px; padding: 12px 14px; box-sizing: border-box; border-radius: 12px; background: var(--bg);
+  border: 1px solid var(--line); color: var(--text); font: inherit; font-size: 15px; line-height: 1.5; resize: vertical;
+}
+.sd-notearea::placeholder { color: var(--text-dim); opacity: 1; }
+.sd-notearea:focus { outline: none; border-color: var(--amber); }
+.sd-notecount { margin-top: -4px; text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+.sd-notecount.near { color: var(--amber); }
+.sd-noteacts { display: flex; gap: 8px; }
+.sd-noteacts .sd-setbtn { flex: 1; }
+@media (min-width: 900px) { .sd-noteacts .sd-setbtn { flex: none; min-width: 120px; } }
+@media (hover: hover) { .sd-react:not(.on):hover { border-color: var(--amber); } }
