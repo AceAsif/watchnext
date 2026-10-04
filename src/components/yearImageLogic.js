@@ -72,7 +72,15 @@ export function factCells(data) {
   return f;
 }
 
-export const ROW = { pitch: 140, posterW: 78, posterH: 117 };
+// Top shows are three big posters across (like the original image), 2:3 each.
+export const GRID = { cols: 3, gap: 28 };
+export const POSTER_W = (IMG_W - 2 * IMG_PAD - (GRID.cols - 1) * GRID.gap) / GRID.cols; // ~298.7
+export const POSTER_H = Math.round(POSTER_W * 1.5); // 448
+
+// Box of poster `i` (0-based) given the plan's gridTop.
+export function posterBox(plan, i) {
+  return { x: IMG_PAD + i * (POSTER_W + GRID.gap), y: plan.gridTop, w: POSTER_W, h: POSTER_H };
+}
 
 // Vertical plan. Sections that have no data are skipped and everything below
 // moves up; the footer is pinned to the bottom. Returns baselines/tops in px
@@ -96,18 +104,20 @@ export function planYearImage(data) {
   const statsLabelY = statsTop + 96;
   y = statsTop + 110;
 
-  let showsLabelY = null, rowsTop = null;
+  let showsLabelY = null, gridTop = null, nameY = null, epsY = null;
   if (shows.length) {
-    showsLabelY = y + 56;
-    rowsTop = showsLabelY + 28;
-    y = rowsTop + (shows.length - 1) * ROW.pitch + ROW.posterH;
+    showsLabelY = y + 48;
+    gridTop = showsLabelY + 24;
+    nameY = gridTop + POSTER_H + 40;
+    epsY = nameY + 32;
+    y = epsY + 8;
   }
 
   let factsRule = null, factsLabelY = null, factsValueY = null;
   if (facts.length) {
-    factsRule = y + 44;
-    factsLabelY = factsRule + 48;
-    factsValueY = factsLabelY + 44;
+    factsRule = y + 36;
+    factsLabelY = factsRule + 44;
+    factsValueY = factsLabelY + 40;
     y = factsValueY + 10;
   }
 
@@ -115,7 +125,7 @@ export function planYearImage(data) {
   const footerRule = footerBase - 52;
   return {
     labelY, yearBase, deltaY, statsTop, statsValueY, statsLabelY,
-    showsLabelY, rowsTop, shows, factsRule, factsLabelY, factsValueY, facts,
+    showsLabelY, gridTop, nameY, epsY, shows, factsRule, factsLabelY, factsValueY, facts,
     delta, footerBase, footerRule, bottom: y,
   };
 }

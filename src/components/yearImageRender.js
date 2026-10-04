@@ -1,4 +1,4 @@
-import { IMG_W, IMG_H, IMG_PAD, IMG_URL, COLORS as C, GLOWS, ROW, fitText, initialOf, statCells, planYearImage } from './yearImageLogic.js';
+import { IMG_W, IMG_H, IMG_PAD, IMG_URL, COLORS as C, GLOWS, fitText, initialOf, statCells, planYearImage, posterBox } from './yearImageLogic.js';
 
 const DISPLAY = '"Bricolage Grotesque", sans-serif';
 const BODY = '"Inter", "Hiragino Sans", "Noto Sans JP", sans-serif';
@@ -78,44 +78,34 @@ export async function renderYearImage(data, { loadImg, posterUrl }) {
     label(l, x, plan.statsLabelY);
   });
 
-  // top shows as rows: rank, poster, name, "N eps"
+  // top shows: three big posters across, name + "N eps" underneath
   if (plan.shows.length) {
     label('TOP SHOWS', P, plan.showsLabelY);
     plan.shows.forEach((sh, i) => {
-      const top = plan.rowsTop + i * ROW.pitch;
-      const px = P + 52, pw = ROW.posterW, ph = ROW.posterH;
-      const mid = top + ph / 2;
-
-      ctx.font = `700 24px ${MONO}`; ctx.fillStyle = C.dim; ctx.textAlign = 'center';
-      ctx.fillText(String(i + 1), P + 14, mid + 8); ctx.textAlign = 'left';
-
+      const { x, y, w: pw, h: ph } = posterBox(plan, i);
       ctx.save();
-      rr(ctx, px, top, pw, ph, 10); ctx.clip();
+      rr(ctx, x, y, pw, ph, 16); ctx.clip();
       const im = imgs[i];
       if (im) {
         const ar = im.width / im.height, tar = pw / ph;
         let sw, sh2, sx, sy;
         if (ar > tar) { sh2 = im.height; sw = sh2 * tar; sx = (im.width - sw) / 2; sy = 0; }
         else { sw = im.width; sh2 = sw / tar; sx = 0; sy = (im.height - sh2) / 2; }
-        ctx.drawImage(im, sx, sy, sw, sh2, px, top, pw, ph);
+        ctx.drawImage(im, sx, sy, sw, sh2, x, y, pw, ph);
       } else {
-        ctx.fillStyle = C.raise; ctx.fillRect(px, top, pw, ph);
-        ctx.fillStyle = C.dim; ctx.font = `800 40px ${DISPLAY}`; ctx.textAlign = 'center';
-        ctx.fillText(initialOf(sh.name), px + pw / 2, mid + 14); ctx.textAlign = 'left';
+        ctx.fillStyle = C.raise; ctx.fillRect(x, y, pw, ph);
+        ctx.fillStyle = C.dim; ctx.font = `800 120px ${DISPLAY}`; ctx.textAlign = 'center';
+        ctx.fillText(initialOf(sh.name), x + pw / 2, y + ph / 2 + 42); ctx.textAlign = 'left';
       }
       ctx.restore();
       ctx.strokeStyle = C.line; ctx.lineWidth = 1;
-      rr(ctx, px, top, pw, ph, 10); ctx.stroke();
+      rr(ctx, x, y, pw, ph, 16); ctx.stroke();
 
-      const tx = px + pw + 28;
-      const epsText = `${sh.count} eps`;
-      ctx.font = `400 24px ${MONO}`;
-      const epsW = ctx.measureText(epsText).width;
       ctx.fillStyle = C.text;
-      ctx.font = `600 34px ${BODY}`;
-      ctx.fillText(fit(sh.name, `600 34px ${BODY}`, W - P - epsW - 28 - tx), tx, mid + 12);
-      ctx.fillStyle = C.dim; ctx.font = `400 24px ${MONO}`; ctx.textAlign = 'right';
-      ctx.fillText(epsText, W - P, mid + 10); ctx.textAlign = 'left';
+      ctx.font = `600 30px ${BODY}`;
+      ctx.fillText(fit(sh.name, `600 30px ${BODY}`, pw - 4), x, plan.nameY);
+      ctx.fillStyle = C.dim; ctx.font = `400 22px ${MONO}`;
+      ctx.fillText(`${sh.count} eps`, x, plan.epsY);
     });
   }
 
