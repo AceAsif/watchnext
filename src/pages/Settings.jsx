@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } fro
 import { useStore } from '../store/useStore.js';
 import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount } from '../store/db.js';
 import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
-import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud } from '../store/cloud.js';
+import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud, wipeEverywhere } from '../store/cloud.js';
+import { wipeDoneText, wipeFailText } from '../store/wipeLogic.js';
 import { localISODate } from '../components/showLogic.js';
 import { buildCsv, csvDoneText } from '../components/csvExport.js';
 import {
@@ -23,6 +24,7 @@ import {
   CleanupCard,
   BackupCard,
   CsvCard,
+  WipeDialog,
   DangerCard,
   ConfirmDialog,
   ShowThumb,
@@ -160,6 +162,28 @@ export default function Settings() {
     setConfirm(null);
     say(`Deleted “${sh ? sh.name : 'show'}”.`);
   }
+  const [wiping, setWiping] = useState(false);
+  // Delete everywhere: download a backup FIRST, give the browser a moment to start
+  // that download, then wipe the cloud and this device. If anything fails the
+  // dialog closes with an error and the backup file is already saved.
+  async function confirmWipeEverywhere() {
+    if (wiping) return;
+    setWiping(true);
+    try {
+      exportBackup();
+      await new Promise((r) => setTimeout(r, 800));
+      const res = await wipeEverywhere();
+      setKey('');
+      setConfirm(null);
+      say(wipeDoneText(res.shows));
+    } catch (err) {
+      console.error('Delete everywhere failed', err);
+      setConfirm(null);
+      say(wipeFailText(err), 'err');
+    } finally {
+      setWiping(false);
+    }
+  }
   function confirmDeleteAll() {
     resetAll();
     setKey('');
@@ -190,7 +214,7 @@ export default function Settings() {
         <CleanupCard rows={orphans} onAskDelete={(id) => setConfirm({ type: 'show', id })} />
         <BackupCard onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} />
         <CsvCard onExport={exportCsv} />
-        <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} />
+        <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} onAskEverywhere={() => setConfirm({ type: 'everywhere' })} />
       </div>
 
       {target && (
@@ -219,6 +243,9 @@ export default function Settings() {
           onConfirm={confirmDeleteAll}
           onCancel={() => setConfirm(null)}
         />
+      )}
+      {confirm && confirm.type === 'everywhere' && signedIn && (
+        <WipeDialog busy={wiping} onConfirm={confirmWipeEverywhere} onCancel={() => setConfirm(null)} />
       )}
     </div>
   );

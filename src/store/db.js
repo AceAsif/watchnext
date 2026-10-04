@@ -105,6 +105,14 @@ export function clearTombstone(id) {
   if (tombstones.delete(id)) persistTombstones();
 }
 
+// Remember many deleted ids at once WITHOUT queueing Firestore deletes (the
+// caller has already deleted them in the cloud). One localStorage write.
+export function addTombstones(ids) {
+  let changed = false;
+  for (const id of ids) if (!tombstones.has(id)) { tombstones.add(id); changed = true; }
+  if (changed) persistTombstones();
+}
+
 export function markShowDirty(id) {
   dirtyShows.add(id);
 }
@@ -260,14 +268,23 @@ export function toggleFollow(id) {
 // choice on this device win; droppedAt is an ISO time, or null once resumed
 // (null, never undefined — Firestore rejects undefined). Watch history,
 // ratings and notes are untouched, and the show stays in the library.
-export function setShowDropped(id, dropped) {
+// `at` (optional ISO string) lets Undo put the ORIGINAL drop date back.
+export function setShowDropped(id, dropped, at) {
   update((s) => {
     const show = s.shows[id];
     if (!show) return;
-    s.shows[id] = { ...show, dropped: !!dropped, droppedAt: dropped ? new Date().toISOString() : null };
+    const when = typeof at === 'string' && at ? at : new Date().toISOString();
+    s.shows[id] = { ...show, dropped: !!dropped, droppedAt: dropped ? when : null };
   });
   markShowDirty(id);
 }
+
+// Watching something is the clearest sign you're back on a dropped show, so
+// marking an episode / a season, or logging a rewatch, resumes it (the show page
+// offers an Undo). Un-marking never resumes. Returns the patch to spread into
+// the show record — empty when the show isn't dropped.
+const RESUME = { dropped: false, droppedAt: null };
+const resumePatch = (show) => (show.dropped === true ? RESUME : {});
 
 export function setShowRating(id, rating) {
   // rating: 0–5. 0 clears it. ratedAt records when you rated it (for the
@@ -405,7 +422,7 @@ export function markEpisode(id, season, episode, runtimeMin, watched = true) {
     } else {
       delete map[k];
     }
-    s.shows[id] = { ...show, watched: map };
+    s.shows[id] = { ...show, watched: map, ...(watched ? resumePatch(show) : {}) };
   });
   markShowDirty(id);
 }
@@ -427,7 +444,7 @@ export function markSeason(id, season, episodes, watched = true) {
         delete map[k];
       }
     }
-    s.shows[id] = { ...show, watched: map };
+    s.shows[id] = { ...show, watched: map, ...(watched && episodes.length ? resumePatch(show) : {}) };
   });
   markShowDirty(id);
 }
@@ -451,7 +468,7 @@ export function logEpisodeRewatch(id, season, episode, runtimeMin) {
     map[k] = existing
       ? { ...existing, at: new Date().toISOString(), n: (existing.n || 1) + 1, min: runtimeMin || existing.min }
       : { at: new Date().toISOString(), min: runtimeMin || show.runtimeMin || null, n: 1 };
-    s.shows[id] = { ...show, watched: map };
+    s.shows[id] = { ...show, watched: map, ...resumePatch(show) };
   });
   markShowDirty(id);
 }
@@ -585,6 +602,17 @@ export function importTvTime(json) {
 export function resetAll() {
   state = empty();
   commit();
+}
+
+// Another device wiped the whole account: clear the shows and movies here but
+// keep this device's own settings (its TMDB key), and drop any queued uploads so
+// nothing stale is pushed back up. Tombstones are left alone.
+export function wipeLibrary() {
+  state = { ...empty(), settings: state.settings };
+  commit();
+  dirtyShows = new Set();
+  dirtyMovies = false;
+  deletedShows = new Set();
 }
 
 // ---------------------------------------------------------------------------

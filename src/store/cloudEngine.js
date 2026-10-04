@@ -30,14 +30,46 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
-import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markShowDeleted, isTombstoned } from './db.js';
+import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markShowDeleted, isTombstoned, resetAll, wipeLibrary, addTombstones } from './db.js';
 import { mergeNotes } from './notes.js';
+import { runWipe, wipeDecision, readMeta, writeMeta } from './wipeLogic.js';
 
 // --- sync engine state ---
 let uid = null;
 let unsubShows = null;
 let flushTimer = null;
 let applyingRemote = false;
+let wiping = false; // true while wipeEverywhere() runs: pauses the normal flush
+
+// --- per-account sync record (localStorage) -------------------------------
+// lastSync = the last time this device finished a pull or a successful push;
+// seenWipeId = the last wipe marker this device has handled. wipeLogic.js uses
+// them to decide whether a wipe from another device applies here. lastSync is
+// only advanced AFTER the first pull of a session (pulledOnce), because the pull
+// is where a wipe marker is checked.
+const META_KEY = 'watchnext-sync-v1';
+let pulledOnce = false;
+function syncMeta(forUid) {
+  try { return readMeta(localStorage.getItem(META_KEY), forUid); } catch (e) { return {}; }
+}
+function patchSyncMeta(forUid, patch) {
+  try { localStorage.setItem(META_KEY, writeMeta(syncMeta(forUid), forUid, patch)); } catch (e) { /* storage full: best effort */ }
+}
+function touchSync(forUid) {
+  if (pulledOnce && forUid) patchSyncMeta(forUid, { lastSync: new Date().toISOString() });
+}
+// Returns wipeDecision's verdict after acting on it.
+function handleWipeDoc(forUid, data) {
+  const verdict = wipeDecision(data, syncMeta(forUid));
+  if (verdict === 'apply') {
+    wipeLibrary(); // clear shows + movies here, keep this device's settings, drop queued uploads
+    patchSyncMeta(forUid, { seenWipeId: data.id, lastSync: new Date().toISOString() });
+  } else if (verdict === 'record') {
+    patchSyncMeta(forUid, { seenWipeId: data.id });
+  }
+  return verdict;
+}
+let unsubWipe = null;
 
 // Flush is normally on a 2.5s timer, but that timer is throttled or paused
 // while the tab is in the background — so a change made right before switching
@@ -71,7 +103,17 @@ export function signOutCloud() {
 
 function startSync(newUid) {
   uid = newUid;
-  pullAndMerge(uid);
+  pulledOnce = false;
+  // The pull checks for a wipe marker BEFORE merging. Only after it has finished
+  // do we start listening for markers written later, so the two never race.
+  pullAndMerge(uid)
+    .catch((err) => console.error('Cloud pull failed:', err))
+    .then(() => {
+      if (uid !== newUid || unsubWipe) return;
+      unsubWipe = onSnapshot(doc(db, 'users', newUid, 'library', 'wipe'), (snap) => {
+        if (snap.exists()) handleWipeDoc(newUid, snap.data());
+      });
+    });
 
   unsubShows = onSnapshot(collection(db, 'users', uid, 'shows'), (snap) => {
     applyingRemote = true;
@@ -105,6 +147,9 @@ function startSync(newUid) {
 function stopSync() {
   if (unsubShows) unsubShows();
   unsubShows = null;
+  if (unsubWipe) unsubWipe();
+  unsubWipe = null;
+  pulledOnce = false;
   uid = null;
   clearInterval(flushTimer);
   flushTimer = null;
@@ -113,6 +158,12 @@ function stopSync() {
 }
 
 async function pullAndMerge(forUid) {
+  // A wipe-everywhere from another device? Check BEFORE reading shows/movies: the
+  // wipe is committed atomically, so if the marker is visible, the shows and movies
+  // read next are already the post-wipe ones and nothing stale can be merged back.
+  const wipeSnap = await getDoc(doc(db, 'users', forUid, 'library', 'wipe'));
+  if (wipeSnap.exists()) handleWipeDoc(forUid, wipeSnap.data());
+
   const [showsSnap, moviesSnap] = await Promise.all([
     getDocs(collection(db, 'users', forUid, 'shows')),
     getDoc(doc(db, 'users', forUid, 'library', 'movies')),
@@ -159,11 +210,13 @@ async function pullAndMerge(forUid) {
   // Push the merged result back up once, so both sides converge.
   Object.keys(getState().shows).forEach(markShowDirty);
   markMoviesDirty();
+  pulledOnce = true;
+  touchSync(forUid);
   flush();
 }
 
 async function flush() {
-  if (!uid || applyingRemote) return;
+  if (!uid || applyingRemote || wiping) return;
   const { showIds, movies, deletedIds } = takeDirty();
   const hasDeletes = deletedIds && deletedIds.size > 0;
   if (showIds.size === 0 && !movies && !hasDeletes) return;
@@ -186,11 +239,56 @@ async function flush() {
 
   try {
     await batch.commit();
+    touchSync(uid);
   } catch (err) {
     console.error('Cloud sync failed, will retry on next change:', err);
     // put everything back so the next flush retries it
     showIds.forEach(markShowDirty);
     if (hasDeletes) deletedIds.forEach(markShowDeleted);
     if (movies) markMoviesDirty();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// "Delete everywhere": wipe the whole account, not just this device. The flow
+// (and why it works) lives in wipeLogic.js; this just connects it to Firestore.
+// Needs no rules change: firestore.rules already allows users/{uid}/**.
+// ---------------------------------------------------------------------------
+const newId = () =>
+  (globalThis.crypto && globalThis.crypto.randomUUID ? globalThis.crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
+
+export async function wipeEverywhere() {
+  if (!uid) throw new Error('You are not signed in');
+  const forUid = uid;
+  const showDoc = (id) => doc(db, 'users', forUid, 'shows', id);
+  wiping = true;
+  try {
+    return await runWipe({
+      listRemoteIds: async () => (await getDocs(collection(db, 'users', forUid, 'shows'))).docs.map((d) => d.id),
+      localIds: () => Object.keys(getState().shows),
+      markSeen: (id) => patchSyncMeta(forUid, { seenWipeId: id }),
+      commitDeletes: async (ids) => {
+        const b = writeBatch(db);
+        ids.forEach((id) => b.delete(showDoc(id)));
+        await b.commit();
+      },
+      commitFinal: async (ids, marker) => {
+        const b = writeBatch(db);
+        ids.forEach((id) => b.delete(showDoc(id)));
+        b.set(doc(db, 'users', forUid, 'library', 'movies'), { movies: [] });
+        b.set(doc(db, 'users', forUid, 'library', 'wipe'), marker);
+        await b.commit();
+      },
+      clearLocal: (ids) => {
+        resetAll(); // same as "Delete all data": shows, movies, settings (TMDB key) on this device
+        takeDirty(); // nothing queued may be pushed back up
+        addTombstones(ids); // so a stale device pushing these back can't resurrect them here
+        patchSyncMeta(forUid, { lastSync: new Date().toISOString() });
+      },
+      now: () => new Date().toISOString(),
+      randomId: newId,
+    });
+  } finally {
+    wiping = false;
   }
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/useStore.js';
 import {
   markEpisode,
@@ -77,7 +77,10 @@ const StarIcon = ({ on }) => (
 );
 
 // ---------------------------------------------------------------- seasons
-function Season({ id, show, season, info, isCurrent, next }) {
+function Season({ id, show, season, info, isCurrent, next, onResumed }) {
+  // Watching anything resumes a dropped show (see db.js); tell the page so it can
+  // offer Undo. `on` is whether the action marks something as watched.
+  const resumes = (on) => { if (on && show.dropped === true && onResumed) onResumed(show.droppedAt || null); };
   const [eps, setEps] = useState(null);
   const [open, setOpen] = useState(isCurrent);
   const [err, setErr] = useState(null);
@@ -154,7 +157,7 @@ function Season({ id, show, season, info, isCurrent, next }) {
         <div className="sd-ep" style={{ minHeight: 44 }}>
           <button
             className="sd-linkbtn"
-            onClick={() => markSeason(id, season.n, eps, !done)}
+            onClick={() => { resumes(!done && eps.length > 0); markSeason(id, season.n, eps, !done); }}
           >
             {done ? 'Unmark season' : 'Mark season watched'}
           </button>
@@ -226,7 +229,7 @@ function Season({ id, show, season, info, isCurrent, next }) {
                   style={{ width: 36 }}
                   title="Log another watch of this episode"
                   aria-label={`Log another watch of ${code}`}
-                  onClick={() => logEpisodeRewatch(id, season.n, ep.episode_number, ep.runtime)}
+                  onClick={() => { resumes(true); logEpisodeRewatch(id, season.n, ep.episode_number, ep.runtime); }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)"
                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -238,7 +241,7 @@ function Season({ id, show, season, info, isCurrent, next }) {
                 className={'sd-check' + (on ? ' on' : isNext ? ' next' : '')}
                 aria-pressed={on}
                 aria-label={`Mark ${code} ${on ? 'unwatched' : 'watched'}`}
-                onClick={() => markEpisode(id, season.n, ep.episode_number, ep.runtime, !on)}
+                onClick={() => { resumes(!on); markEpisode(id, season.n, ep.episode_number, ep.runtime, !on); }}
               >
                 <span>{on && <CheckIcon size={16} w={3} />}</span>
               </button>
@@ -270,6 +273,20 @@ export default function ShowDetail({ id, onBack }) {
   const [streamLoading, setStreamLoading] = useState(false);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  // "Resumed" toast with Undo (shown when watching something resumes a dropped show)
+  const [resumed, setResumed] = useState(null); // { at } = the original drop date, so Undo can restore it
+  const resumedTimer = useRef(null);
+  useEffect(() => () => clearTimeout(resumedTimer.current), []);
+  function showResumed(at) {
+    setResumed({ at });
+    clearTimeout(resumedTimer.current);
+    resumedTimer.current = setTimeout(() => setResumed(null), 6000);
+  }
+  function undoResume() {
+    if (resumed) setShowDropped(id, true, resumed.at || undefined);
+    clearTimeout(resumedTimer.current);
+    setResumed(null);
+  }
 
   // Opens a blank tab synchronously (within the click handler, before any
   // await) so browsers treat it as a direct result of the user's click and
@@ -366,6 +383,8 @@ export default function ShowDetail({ id, onBack }) {
       </div>
     );
   }
+
+  const noteResumed = () => { if (show.dropped === true) showResumed(show.droppedAt || null); };
 
   // ---- derived state
   const today = isoToday();
@@ -487,7 +506,7 @@ export default function ShowDetail({ id, onBack }) {
           <button
             className="sd-btn primary"
             style={{ width: '100%', height: 52, fontSize: 15 }}
-            onClick={() => markEpisode(id, next.season, next.episode, null, true)}
+            onClick={() => { noteResumed(); markEpisode(id, next.season, next.episode, null, true); }}
           >
             <CheckIcon size={18} />
             <span>
@@ -674,6 +693,7 @@ export default function ShowDetail({ id, onBack }) {
             info={info}
             isCurrent={se.n === currentN}
             next={next}
+            onResumed={showResumed}
           />
         ))}
       </section>
@@ -768,6 +788,8 @@ export default function ShowDetail({ id, onBack }) {
             className="sd-row"
             onClick={() => {
               setShowDropped(id, show.dropped !== true);
+              clearTimeout(resumedTimer.current);
+              setResumed(null);
               setSheet(null);
             }}
           >
@@ -864,6 +886,15 @@ export default function ShowDetail({ id, onBack }) {
       </Sheet>
 
       {sheet === 'anime' && <AnimeSheet id={id} show={show} onClose={() => setSheet(null)} />}
+
+      {resumed && (
+        <div className="sd-toast" role="status">
+          <span className="sd-ell" style={{ flex: 1 }}>Resumed · {show.name}</span>
+          <button className="sd-linkbtn" style={{ height: 44, padding: '0 14px', fontSize: 14 }} onClick={undoResume}>
+            Undo
+          </button>
+        </div>
+      )}
     </div>
   );
 }

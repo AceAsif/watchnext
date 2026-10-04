@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Sheet } from './ui.jsx';
 import { img } from '../api/tmdb.js';
 import { posterTint, initialOf } from './libraryLogic.js';
 import { orphanIntro, orphanMeta, deleteAllIntro } from './settingsLogic.js';
+import { WIPE_WORD, confirmOk, wipeIntro, wipeEffects, wipeBackupLine } from '../store/wipeLogic.js';
 
 // The Settings cards (Claude Design, Direction A). Purely presentational: the
 // page owns the state and handlers, which keeps these easy to test. Styling is
@@ -255,7 +256,7 @@ export function CsvCard({ onExport }) {
   );
 }
 
-export function DangerCard({ signedIn, onAsk }) {
+export function DangerCard({ signedIn, onAsk, onAskEverywhere }) {
   return (
     <section className="sd-card sd-setcard danger" aria-label="Danger zone">
       <div className="sd-lbl danger">Danger zone</div>
@@ -266,6 +267,15 @@ export function DangerCard({ signedIn, onAsk }) {
         </div>
         <button type="button" className="sd-setbtn danger" onClick={onAsk}>{I.trash} Delete all data</button>
       </div>
+      {signedIn && onAskEverywhere && (
+        <div className="sd-danger-body sd-danger-everywhere">
+          <div className="txt">
+            <h2>Delete everywhere</h2>
+            <p className="sd-setp">{wipeIntro}</p>
+          </div>
+          <button type="button" className="sd-setbtn danger" onClick={onAskEverywhere}>{I.trash} Delete everywhere</button>
+        </div>
+      )}
     </section>
   );
 }
@@ -286,6 +296,51 @@ export function ConfirmDialog({ title, summary, effects, confirmLabel, onConfirm
       <div className="sd-confirm-acts">
         <button type="button" className="sd-setbtn solid-danger" onClick={onConfirm}>{confirmLabel}</button>
         <button type="button" className="sd-setbtn" autoFocus onClick={onCancel}>Cancel</button>
+      </div>
+    </Sheet>
+  );
+}
+
+// Typed confirmation for "Delete everywhere": the button stays disabled until
+// DELETE has been typed, and Cancel (not the delete button) takes focus first.
+export function WipeDialog({ busy, onConfirm, onCancel }) {
+  const [text, setText] = useState('');
+  const ok = confirmOk(text);
+  // Sheet keeps the onClose it had when it opened (its Escape handler is attached
+  // once), so a plain `busy ? noop : onCancel` would go stale and Escape would close
+  // the dialog mid-delete. A ref always holds the live value.
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const close = () => { if (!busyRef.current) onCancel(); };
+  return (
+    <Sheet open title="Delete everywhere?" role="alertdialog" variant="confirm" onClose={close} action={<span />}>
+      <ul className="sd-effects">
+        {wipeEffects().map((e) => (
+          <li key={e}><span className="ico">{I.x}</span><span>{e}</span></li>
+        ))}
+      </ul>
+      <div className="sd-setinfo">{I.download}<span>{wipeBackupLine}</span></div>
+      <label className="sd-wipefield">
+        <span>Type <b>{WIPE_WORD}</b> to confirm</span>
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={WIPE_WORD}
+          aria-label={`Type ${WIPE_WORD} to confirm`}
+          autoCapitalize="characters"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          disabled={busy}
+        />
+      </label>
+      <p className="sd-undo">This can’t be undone.</p>
+      <div className="sd-confirm-acts">
+        <button type="button" className="sd-setbtn solid-danger" disabled={!ok || busy} onClick={onConfirm}>
+          {busy ? 'Deleting…' : 'Delete everywhere'}
+        </button>
+        <button type="button" className="sd-setbtn" autoFocus disabled={busy} onClick={onCancel}>Cancel</button>
       </div>
     </Sheet>
   );

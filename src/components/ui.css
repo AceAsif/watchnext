@@ -1299,6 +1299,16 @@
 .sd-danger-body { display: flex; flex-direction: column; gap: 14px; }
 .sd-danger-body h2 { font-size: 18px; }
 .sd-danger-body .sd-setp { margin-top: 6px; font-size: 14px; max-width: 520px; }
+.sd-danger-everywhere { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(229, 105, 94, 0.25); }
+.sd-wipefield { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; font-size: 14px; color: #c3cad5; }
+.sd-wipefield b { color: var(--red); letter-spacing: 0.06em; }
+.sd-wipefield input {
+  height: 44px; padding: 0 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-sizing: border-box;
+  color: var(--text); font: inherit; font-family: var(--font-mono); font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.sd-wipefield input::placeholder { color: #4a5362; }
+.sd-wipefield input:focus { outline: none; border-color: var(--red); }
+.sd-setbtn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .sd-banner { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 12px 8px 12px 14px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--teal); font-size: 14px; line-height: 1.45; }
 .sd-banner.err { border-color: var(--red); }

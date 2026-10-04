@@ -56,6 +56,14 @@ export async function signIn() {
   return mod.signIn();
 }
 
+// Delete the whole account (cloud + this device) and tell other devices to clear
+// themselves. Resolves with { shows, marker }; rejects (changing nothing locally)
+// if the cloud write fails. See store/wipeLogic.js.
+export async function wipeEverywhere() {
+  const mod = await import('./cloudEngine.js');
+  return mod.wipeEverywhere();
+}
+
 export async function signOutCloud() {
   const mod = await import('./cloudEngine.js');
   return mod.signOutCloud();
