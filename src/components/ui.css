@@ -684,6 +684,7 @@
   letter-spacing: -0.02em;
 }
 .sd-yir-delta { font-size: 13px; }
+.sd-yir-sub { font-size: 12px; letter-spacing: 0.08em; color: var(--text-dim); text-transform: uppercase; }
 .sd-yir-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .sd-yir-stats > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .sd-yir-v { font-family: var(--font-display); font-size: 22px; font-weight: 800; line-height: 1; }
@@ -1415,3 +1416,9 @@ button.sd-nitem:focus-visible { outline: 2px solid var(--amber); outline-offset:
   .sd-nlist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .sd-nitem:is(button):hover { border-color: #3a4352; }
 }
+
+/* "You finished <show>" card preview (FinishCardSheet) */
+.sd-fc-preview { display: block; width: 100%; height: auto; border-radius: 16px; border: 1px solid var(--line); box-sizing: border-box; background: var(--bg-card); }
+.sd-fc-note { margin: 8px 0; font-size: 14px; color: var(--text-dim); text-align: center; }
+.sd-fc-note.err { color: var(--red); }
+@media (min-width: 900px) { .sd-fc-preview { max-width: 420px; margin: 0 auto; } }

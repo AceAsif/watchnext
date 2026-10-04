@@ -4,6 +4,7 @@ import { Chevron } from '../components/ui.jsx';
 import { movieStatus } from '../store/db.js';
 import Stars from '../components/Stars.jsx';
 import YearInReview from '../components/YearInReview.jsx';
+import MonthInReview from '../components/MonthInReview.jsx';
 import { platformById } from '../components/PlatformPicker.jsx';
 import Heatmap from '../components/Heatmap.jsx';
 import { StatTile, TabBar, YearSelect, BarList, Section, Note } from '../components/StatsUI.jsx';
@@ -365,6 +366,7 @@ export default function Stats({ onOpenNotes }) {
       </div>
       <div className="sd-stack">
         {review && <YearInReview data={review} years={base.years} onYear={setReviewYear} />}
+        <MonthInReview shows={state.shows} movies={state.movies} />
       </div>
     </div>
   );

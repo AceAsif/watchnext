@@ -66,6 +66,7 @@ export function statCells(data) {
 }
 
 export function factCells(data) {
+  if (Array.isArray(data.facts)) return data.facts.filter((c) => Array.isArray(c) && c[1]).slice(0, 2); // caller-supplied (Month in review)
   const f = [];
   if (data.busiestMonth && data.busiestMonth.name) f.push(['BUSIEST MONTH', data.busiestMonth.name]);
   if (data.topGenre) f.push(['TOP GENRE', data.topGenre]);
@@ -98,8 +99,8 @@ export function planYearImage(data) {
   const yearBase = y + 132;
   y = yearBase + 16;
   let deltaY = null;
-  if (delta) { deltaY = y + 34; y = deltaY + 14; }
-  const statsTop = y + 36;
+  if (delta) { deltaY = y + 44; y = deltaY + 14; } // 10px more under the headline so a descender (the p in September) can't touch it
+  const statsTop = y + (delta ? 26 : 36);
   const statsValueY = statsTop + 60;
   const statsLabelY = statsTop + 96;
   y = statsTop + 110;

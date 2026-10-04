@@ -1,66 +1,33 @@
-import { IMG_W, IMG_H, IMG_PAD, IMG_URL, COLORS as C, GLOWS, fitText, initialOf, statCells, planYearImage, posterBox } from './yearImageLogic.js';
+import { IMG_W, IMG_PAD, COLORS as C, initialOf, statCells, planYearImage, posterBox } from './yearImageLogic.js';
+import { DISPLAY, BODY, MONO, rr, newCard, kit, drawCover, drawFooter } from './cardKit.js';
 
-const DISPLAY = '"Bricolage Grotesque", sans-serif';
-const BODY = '"Inter", "Hiragino Sans", "Noto Sans JP", sans-serif';
-const MONO = '"IBM Plex Mono", monospace';
-
-function rr(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
+// Largest font size (stepping down from `start`) at which the text fits `maxW`.
+// `measureAt(size)` returns the text's pixel width at that size.
+export function fitFontSize(measureAt, start, min, maxW) {
+  let size = start;
+  while (size > min && measureAt(size) > maxW) size -= 4;
+  return Math.max(size, min);
 }
 
-// Draw the saved image (1080x1350) onto a fresh canvas and return it.
-// `loadImg(url)` must resolve to a loaded <img> or null (never reject, never
-// a tainted image); `posterUrl(path)` maps a TMDB path to a URL.
-export async function renderYearImage(data, { loadImg, posterUrl }) {
-  if (document.fonts && document.fonts.ready) {
-    try { await document.fonts.ready; } catch (e) { /* ignore */ }
-  }
-  const W = IMG_W, H = IMG_H, P = IMG_PAD;
+// Draw a period card (Year in review or Month in review) at 1080x1350 and return
+// the canvas. `data` has the same shape for both (see planYearImage); `big` is the
+// huge headline text ("2026" or "September") and `label` the small caption above it.
+// `loadImg(url)` must resolve to a loaded <img> or null (never reject, never a
+// tainted image); `posterUrl(path)` maps a TMDB path to a URL.
+export async function renderPeriodImage(data, { loadImg, posterUrl }, { label: caption, big }) {
+  const W = IMG_W, P = IMG_PAD;
   const plan = planYearImage(data);
   const imgs = await Promise.all(plan.shows.map((sh) => loadImg(posterUrl(sh.poster))));
+  const { canvas, ctx } = await newCard();
+  const { spacing, width, fit, label } = kit(ctx);
 
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  const spacing = (v) => { try { ctx.letterSpacing = v; } catch (e) { /* older browser */ } };
-  const fit = (s, font, maxW) => { ctx.font = font; return fitText((t) => ctx.measureText(t).width, s, maxW); };
-  const label = (s, x, y, align = 'left') => {
-    ctx.font = `700 19px ${MONO}`; ctx.fillStyle = C.dim; ctx.textAlign = align;
-    spacing('2px'); ctx.fillText(s, x, y); spacing('0px'); ctx.textAlign = 'left';
-  };
-
-  // background: flat card colour + the same two faint glows as the on-screen card
-  ctx.fillStyle = C.card;
-  ctx.fillRect(0, 0, W, H);
-  for (const g of GLOWS) {
-    const [r, gr, b] = g.rgb;
-    ctx.save();
-    ctx.translate(g.x * W, g.y * H);
-    ctx.scale(g.rx * W, g.ry * H);
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-    grad.addColorStop(0, `rgba(${r},${gr},${b},${g.alpha})`);
-    grad.addColorStop(g.stop, `rgba(${r},${gr},${b},0)`);
-    ctx.fillStyle = grad;
-    ctx.fillRect(-2, -2, 4, 4);
-    ctx.restore();
-  }
-
-  ctx.textBaseline = 'alphabetic';
-  ctx.textAlign = 'left';
-
-  // label + year + delta
-  label('YEAR IN REVIEW', P, plan.labelY);
-  ctx.font = `800 176px ${DISPLAY}`;
+  // caption + headline + delta
+  label(caption, P, plan.labelY);
+  const bigSize = fitFontSize((s) => { spacing('-3px'); const w = width(`800 ${s}px ${DISPLAY}`, big); spacing('0px'); return w; }, 176, 96, W - 2 * P);
+  ctx.font = `800 ${bigSize}px ${DISPLAY}`;
   ctx.fillStyle = C.text;
   spacing('-3px');
-  ctx.fillText(String(data.year), P - 6, plan.yearBase);
+  ctx.fillText(big, P - 6, plan.yearBase);
   spacing('0px');
   if (plan.delta) {
     ctx.font = `500 28px ${BODY}`;
@@ -87,11 +54,7 @@ export async function renderYearImage(data, { loadImg, posterUrl }) {
       rr(ctx, x, y, pw, ph, 16); ctx.clip();
       const im = imgs[i];
       if (im) {
-        const ar = im.width / im.height, tar = pw / ph;
-        let sw, sh2, sx, sy;
-        if (ar > tar) { sh2 = im.height; sw = sh2 * tar; sx = (im.width - sw) / 2; sy = 0; }
-        else { sw = im.width; sh2 = sw / tar; sx = 0; sy = (im.height - sh2) / 2; }
-        ctx.drawImage(im, sx, sy, sw, sh2, x, y, pw, ph);
+        drawCover(ctx, im, x, y, pw, ph);
       } else {
         ctx.fillStyle = C.raise; ctx.fillRect(x, y, pw, ph);
         ctx.fillStyle = C.dim; ctx.font = `800 120px ${DISPLAY}`; ctx.textAlign = 'center';
@@ -122,15 +85,9 @@ export async function renderYearImage(data, { loadImg, posterUrl }) {
     });
   }
 
-  // footer: brand left, URL right
-  ctx.strokeStyle = C.line; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(P, plan.footerRule); ctx.lineTo(W - P, plan.footerRule); ctx.stroke();
-  ctx.font = `800 34px ${DISPLAY}`;
-  ctx.fillStyle = C.text; ctx.fillText('Watch', P, plan.footerBase);
-  const ww = ctx.measureText('Watch').width;
-  ctx.fillStyle = C.amber; ctx.fillText('Next', P + ww, plan.footerBase);
-  ctx.font = `400 22px ${MONO}`; ctx.fillStyle = C.dim; ctx.textAlign = 'right';
-  ctx.fillText(IMG_URL, W - P, plan.footerBase - 2); ctx.textAlign = 'left';
-
+  drawFooter(ctx, plan.footerRule, plan.footerBase);
   return canvas;
 }
+
+export const renderYearImage = (data, deps) =>
+  renderPeriodImage(data, deps, { label: 'YEAR IN REVIEW', big: String(data.year) });

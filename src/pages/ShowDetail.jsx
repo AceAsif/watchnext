@@ -33,6 +33,8 @@ import CastCrew from '../components/CastCrew.jsx';
 import { NoteSheet } from '../components/NoteEditor.jsx';
 import { reactionById } from '../store/notes.js';
 import AnimeSheet from '../components/AnimeSheet.jsx';
+import FinishCardSheet from '../components/FinishCardSheet.jsx';
+import { isFinishedShow, becomesFinished } from '../components/finishCardLogic.js';
 import { looksLikeAnime, altTitles, summaryLine } from '../components/animeLogic.js';
 import { Bar, Chevron, Sheet } from '../components/ui.jsx';
 import {
@@ -77,10 +79,12 @@ const StarIcon = ({ on }) => (
 );
 
 // ---------------------------------------------------------------- seasons
-function Season({ id, show, season, info, isCurrent, next, onResumed }) {
+function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded }) {
   // Watching anything resumes a dropped show (see db.js); tell the page so it can
   // offer Undo. `on` is whether the action marks something as watched.
   const resumes = (on) => { if (on && show.dropped === true && onResumed) onResumed(show.droppedAt || null); };
+  // How many episodes are being newly watched (so the page can offer the finish card).
+  const added = (n) => { if (n > 0 && onAdded) onAdded(n); };
   const [eps, setEps] = useState(null);
   const [open, setOpen] = useState(isCurrent);
   const [err, setErr] = useState(null);
@@ -157,7 +161,7 @@ function Season({ id, show, season, info, isCurrent, next, onResumed }) {
         <div className="sd-ep" style={{ minHeight: 44 }}>
           <button
             className="sd-linkbtn"
-            onClick={() => { resumes(!done && eps.length > 0); markSeason(id, season.n, eps, !done); }}
+            onClick={() => { resumes(!done && eps.length > 0); if (!done) added(eps.filter((e) => !(show.watched || {})[epKey(season.n, e.episode_number)]).length); markSeason(id, season.n, eps, !done); }}
           >
             {done ? 'Unmark season' : 'Mark season watched'}
           </button>
@@ -241,7 +245,7 @@ function Season({ id, show, season, info, isCurrent, next, onResumed }) {
                 className={'sd-check' + (on ? ' on' : isNext ? ' next' : '')}
                 aria-pressed={on}
                 aria-label={`Mark ${code} ${on ? 'unwatched' : 'watched'}`}
-                onClick={() => { resumes(!on); markEpisode(id, season.n, ep.episode_number, ep.runtime, !on); }}
+                onClick={() => { resumes(!on); if (!on) added(1); markEpisode(id, season.n, ep.episode_number, ep.runtime, !on); }}
               >
                 <span>{on && <CheckIcon size={16} w={3} />}</span>
               </button>
@@ -282,6 +286,11 @@ export default function ShowDetail({ id, onBack }) {
     clearTimeout(resumedTimer.current);
     resumedTimer.current = setTimeout(() => setResumed(null), 6000);
   }
+  // "You finished <show>": a card offered right after the final episode is marked.
+  const [finishOpen, setFinishOpen] = useState(false);
+  const [finishToast, setFinishToast] = useState(false);
+  const finishTimer = useRef(null);
+  useEffect(() => () => clearTimeout(finishTimer.current), []);
   function undoResume() {
     if (resumed) setShowDropped(id, true, resumed.at || undefined);
     clearTimeout(resumedTimer.current);
@@ -385,6 +394,16 @@ export default function ShowDetail({ id, onBack }) {
   }
 
   const noteResumed = () => { if (show.dropped === true) showResumed(show.droppedAt || null); };
+  // `n` = episodes about to be newly watched. If that completes the show, offer the card
+  // (it replaces the "Resumed" toast, since only one toast fits on screen).
+  const noteAdded = (n) => {
+    if (!becomesFinished(show, n)) return;
+    clearTimeout(resumedTimer.current);
+    setResumed(null);
+    setFinishToast(true);
+    clearTimeout(finishTimer.current);
+    finishTimer.current = setTimeout(() => setFinishToast(false), 9000);
+  };
 
   // ---- derived state
   const today = isoToday();
@@ -506,7 +525,7 @@ export default function ShowDetail({ id, onBack }) {
           <button
             className="sd-btn primary"
             style={{ width: '100%', height: 52, fontSize: 15 }}
-            onClick={() => { noteResumed(); markEpisode(id, next.season, next.episode, null, true); }}
+            onClick={() => { noteResumed(); noteAdded(1); markEpisode(id, next.season, next.episode, null, true); }}
           >
             <CheckIcon size={18} />
             <span>
@@ -549,6 +568,11 @@ export default function ShowDetail({ id, onBack }) {
             </svg>
           </button>
         </div>
+        {isFinishedShow(show) && (
+          <button type="button" className="sd-btn" data-testid="finish-card-btn" onClick={() => { setFinishToast(false); setFinishOpen(true); }}>
+            Share your “You finished” card
+          </button>
+        )}
         {syncing && <span className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>Syncing with TMDB…</span>}
       </div>
 
@@ -694,6 +718,7 @@ export default function ShowDetail({ id, onBack }) {
             isCurrent={se.n === currentN}
             next={next}
             onResumed={showResumed}
+            onAdded={noteAdded}
           />
         ))}
       </section>
@@ -887,7 +912,18 @@ export default function ShowDetail({ id, onBack }) {
 
       {sheet === 'anime' && <AnimeSheet id={id} show={show} onClose={() => setSheet(null)} />}
 
-      {resumed && (
+      {finishOpen && <FinishCardSheet show={show} allShows={state.shows} onClose={() => setFinishOpen(false)} />}
+
+      {finishToast && (
+        <div className="sd-toast" role="status">
+          <span className="sd-ell" style={{ flex: 1 }}>You finished {show.name}!</span>
+          <button className="sd-linkbtn" style={{ height: 44, padding: '0 14px', fontSize: 14 }} onClick={() => { clearTimeout(finishTimer.current); setFinishToast(false); setFinishOpen(true); }}>
+            Make card
+          </button>
+        </div>
+      )}
+
+      {resumed && !finishToast && (
         <div className="sd-toast" role="status">
           <span className="sd-ell" style={{ flex: 1 }}>Resumed · {show.name}</span>
           <button className="sd-linkbtn" style={{ height: 44, padding: '0 14px', fontSize: 14 }} onClick={undoResume}>
