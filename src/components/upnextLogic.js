@@ -77,7 +77,7 @@ export function relLabel(iso, todayIso) {
 //                silently hidden (it just gets no mark button). A mid-season
 //                show you're caught up on is NOT here; it shows up under "On
 //                the way" with its air date instead.
-//   items        every still-to-air episode of followed shows, soonest first
+//   items        every still-to-air episode of followed (not dropped) shows, soonest first
 //   syncTargets  shows we can pull the full upcoming list for
 export function buildUpNext(entries, today, h) {
   const cont = [];
@@ -86,6 +86,7 @@ export function buildUpNext(entries, today, h) {
 
   for (const [id, show] of entries) {
     if (!show.followed) continue;
+    if (show.dropped === true) continue; // dropped: not in Continue, not on the way, not refreshed
 
     const seen = h.watchedCount(show);
     const total = show.totalEpisodes;

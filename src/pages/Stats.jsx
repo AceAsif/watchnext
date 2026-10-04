@@ -49,6 +49,7 @@ export default function Stats() {
     let finished = 0;
     let inProgress = 0;
     let notStarted = 0;
+    let dropped = 0;
     let genreDataMissing = 0;
     const ratedShows = [];
     const events = []; // one per dated watch: { year, day, wd, minute, ts }
@@ -104,7 +105,8 @@ export default function Stats() {
       if (show.followed) {
         const seen = entries.length;
         const total = show.totalEpisodes;
-        if (total && seen >= total) finished++;
+        if (show.dropped === true) dropped++; // kept out of the completion buckets
+        else if (total && seen >= total) finished++;
         else if (seen > 0) inProgress++;
         else notStarted++;
       }
@@ -284,6 +286,7 @@ export default function Stats() {
         { label: 'Finished', value: finished },
         { label: 'Watching', value: inProgress },
         { label: 'Not started', value: notStarted },
+        ...(dropped > 0 ? [{ label: 'Dropped', value: dropped }] : []),
       ],
     };
   }, [state.shows, state.movies]);

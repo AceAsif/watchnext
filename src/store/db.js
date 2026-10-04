@@ -255,6 +255,20 @@ export function toggleFollow(id) {
   markShowDirty(id);
 }
 
+// Drop / resume a show. `dropped` is stored as an explicit true/false (never
+// deleted) so that cloud sync's "{...remote, ...local}" merge lets the latest
+// choice on this device win; droppedAt is an ISO time, or null once resumed
+// (null, never undefined — Firestore rejects undefined). Watch history,
+// ratings and notes are untouched, and the show stays in the library.
+export function setShowDropped(id, dropped) {
+  update((s) => {
+    const show = s.shows[id];
+    if (!show) return;
+    s.shows[id] = { ...show, dropped: !!dropped, droppedAt: dropped ? new Date().toISOString() : null };
+  });
+  markShowDirty(id);
+}
+
 export function setShowRating(id, rating) {
   // rating: 0–5. 0 clears it. ratedAt records when you rated it (for the
   // "Recently rated" list). Rides the existing per-show sync doc.

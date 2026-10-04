@@ -9,7 +9,7 @@
 // a verbatim copy of the old code.
 
 // ------------------------------------------------------------------ shows
-export const SHOW_STATUSES = ['All', 'Watching', 'Finished', 'Not started'];
+export const SHOW_STATUSES = ['All', 'Watching', 'Finished', 'Not started', 'Dropped'];
 
 // id = the value the sorter understands; label = what the sheet shows.
 export const SHOW_SORTS = [
@@ -22,9 +22,11 @@ export const SHOW_SORTS = [
 
 export const DEFAULT_SHOW_FILTERS = { status: 'All', platform: 'All', query: '' };
 
-// Exactly one of 'Watching' | 'Finished' | 'Not started' per show — the same
-// three buckets the old status buttons used, so the counts always add up.
+// Exactly one of 'Watching' | 'Finished' | 'Not started' | 'Dropped' per show,
+// so the counts always add up. A dropped show is only ever 'Dropped' (its
+// history is kept; it just stops being "Watching" / "Not started").
 export function showStatus(show, h) {
+  if (show.dropped === true) return 'Dropped';
   const seen = h.watchedCount(show);
   const total = show.totalEpisodes;
   if (seen === 0) return 'Not started';
@@ -82,7 +84,7 @@ export function sortShows(list, sortBy, sortDir, h) {
 // Watching / Finished / Not started — and the numbers always add up to All.
 export function statusCounts(entries, f, h) {
   const base = filterShows(entries, { ...f, status: 'All' }, h);
-  const c = { All: base.length, Watching: 0, Finished: 0, 'Not started': 0 };
+  const c = { All: base.length, Watching: 0, Finished: 0, 'Not started': 0, Dropped: 0 };
   for (const [, s] of base) c[showStatus(s, h)]++;
   return c;
 }

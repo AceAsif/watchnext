@@ -70,6 +70,23 @@ function mergeShow(local, back) {
   if (!!out.followed !== followed) out.followed = followed;
   if (!!out.watchlist !== watchlist) out.watchlist = watchlist;
 
+  // dropped: your explicit true/false wins. If you have none, take the file's
+  // value, but only a real boolean (a file isn't trusted); anything else is removed.
+  if (typeof local.dropped === 'boolean') {
+    // yours wins completely, including the date — never import the file's droppedAt next to your flag
+    if (typeof local.droppedAt === 'string') out.droppedAt = local.droppedAt;
+    else if ('droppedAt' in local) out.droppedAt = null;
+    else delete out.droppedAt;
+  } else {
+    if (typeof back.dropped === 'boolean') {
+      out.dropped = back.dropped;
+      out.droppedAt = back.dropped && typeof back.droppedAt === 'string' ? back.droppedAt : null;
+    } else {
+      delete out.dropped;
+      delete out.droppedAt;
+    }
+  }
+
   // your rating wins; otherwise take the backup's (with its date)
   if (local.rating) {
     out.rating = local.rating;
@@ -100,6 +117,8 @@ export function mergeBackup(local, backup) {
     if (!mine) {
       const copy = clone(back);
       if (!isObj(copy.watched)) copy.watched = {};
+      if (typeof copy.dropped !== 'boolean') { delete copy.dropped; delete copy.droppedAt; }
+      else if (typeof copy.droppedAt !== 'string') copy.droppedAt = null;
       const n = mergeNotes(undefined, copy.notes); // sanitise (a file isn't trusted)
       delete copy.notes;
       if (n) {

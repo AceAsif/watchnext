@@ -245,7 +245,7 @@ export default function Shows({ openShow }) {
               onChange={(query) => setFilter({ query })}
               placeholder={`Filter ${followed.length.toLocaleString()} show${followed.length === 1 ? '' : 's'}`}
             />
-            <StatusTabs options={SHOW_STATUSES} value={filters.status} onChange={(status) => setFilter({ status })} counts={counts} />
+            <StatusTabs options={SHOW_STATUSES.filter((o) => o !== 'Dropped' || counts.Dropped > 0 || filters.status === 'Dropped')} value={filters.status} onChange={(status) => setFilter({ status })} counts={counts} />
             <div className="sd-lbar-chips">
               <ChipSelect
                 chip={filters.platform === 'All' ? 'Platform' : platformLabel(filters.platform)}

@@ -237,6 +237,24 @@ export function BackupCard({ onDownload, onRestore, restoreRef, onRestoreFile })
   );
 }
 
+export function CsvCard({ onExport }) {
+  return (
+    <SetCard icon={I.drive} label="Your data" title="Export for Power BI">
+      <p className="sd-setp">
+        Save your history as CSV files you can load into Power BI or Excel. One file for every watched episode,
+        one for your shows and one for your movies.
+      </p>
+      <div className="sd-setacts">
+        <button type="button" className="sd-setbtn" onClick={() => onExport('episodes')}>{I.download} Episodes</button>
+        <button type="button" className="sd-setbtn" onClick={() => onExport('shows')}>{I.download} Shows</button>
+        <button type="button" className="sd-setbtn" onClick={() => onExport('movies')}>{I.download} Movies</button>
+      </div>
+      <div className="sd-setinfo">{I.info}<span>Episode rows carry both the stored UTC time and your local date, and flag bulk-imported history so you can filter it out.</span></div>
+      <div className="sd-setnote">{I.lock}Your TMDB key is not included.</div>
+    </SetCard>
+  );
+}
+
 export function DangerCard({ signedIn, onAsk }) {
   return (
     <section className="sd-card sd-setcard danger" aria-label="Danger zone">

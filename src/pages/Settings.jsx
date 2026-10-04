@@ -4,6 +4,7 @@ import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow
 import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
 import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud } from '../store/cloud.js';
 import { localISODate } from '../components/showLogic.js';
+import { buildCsv, csvDoneText } from '../components/csvExport.js';
 import {
   keyStatus,
   backupState,
@@ -21,6 +22,7 @@ import {
   ImportCard,
   CleanupCard,
   BackupCard,
+  CsvCard,
   DangerCard,
   ConfirmDialog,
   ShowThumb,
@@ -142,6 +144,16 @@ export default function Settings() {
     say('Backup downloaded. Your TMDB key is not included in the file.');
   }
 
+  function exportCsv(kind) {
+    const { text, count, fileName } = buildCsv(kind, getState(), localISODate());
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    say(csvDoneText(kind, count));
+  }
+
   function confirmDeleteShow() {
     const sh = state.shows[confirm.id];
     deleteShow(confirm.id);
@@ -177,6 +189,7 @@ export default function Settings() {
         />
         <CleanupCard rows={orphans} onAskDelete={(id) => setConfirm({ type: 'show', id })} />
         <BackupCard onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} />
+        <CsvCard onExport={exportCsv} />
         <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} />
       </div>
 

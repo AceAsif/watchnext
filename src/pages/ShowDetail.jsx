@@ -6,6 +6,7 @@ import {
   markSeason,
   logEpisodeRewatch,
   toggleFollow,
+  setShowDropped,
   setShowRating,
   setShowPlatform,
   setShowProviders,
@@ -438,6 +439,11 @@ export default function ShowDetail({ id, onBack }) {
                 {alts.join(' · ')}
               </span>
             )}
+            {show.dropped === true && (
+              <span className="sd-mono" data-testid="dropped-pill" style={{ alignSelf: 'flex-start', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-dim)', border: '1px solid var(--line)', borderRadius: 999, padding: '3px 9px' }}>
+                Dropped
+              </span>
+            )}
           </div>
           {show.poster ? (
             <img
@@ -758,15 +764,26 @@ export default function ShowDetail({ id, onBack }) {
 
       <Sheet open={sheet === 'menu'} title={show.name} subtitle="More actions" onClose={() => setSheet(null)}>
         <div className="sd-card">
+          <button
+            className="sd-row"
+            onClick={() => {
+              setShowDropped(id, show.dropped !== true);
+              setSheet(null);
+            }}
+          >
+            <span style={{ flexGrow: 1, color: 'var(--sd-text-2)' }}>
+              {show.dropped === true ? 'Resume watching' : 'Drop this show'}
+            </span>
+          </button>
           {!animeRow && (
-            <button className="sd-row" onClick={() => setSheet('anime')}>
+            <button className="sd-row sd-sep" onClick={() => setSheet('anime')}>
               <span style={{ flexGrow: 1, color: 'var(--sd-text-2)' }}>Anime details (AniList)</span>
               <Chevron />
             </button>
           )}
           {hasKey() && (
             <button
-              className={'sd-row' + (!animeRow ? ' sd-sep' : '')}
+              className="sd-row sd-sep"
               onClick={() => {
                 setFixQuery(show.name);
                 setFixResults(null);
@@ -778,7 +795,7 @@ export default function ShowDetail({ id, onBack }) {
             </button>
           )}
           <button
-            className={'sd-row' + (hasKey() || !animeRow ? ' sd-sep' : '')}
+            className="sd-row sd-sep"
             style={{ color: 'var(--red)' }}
             onClick={() => {
               if (

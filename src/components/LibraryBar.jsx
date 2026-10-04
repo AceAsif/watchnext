@@ -99,6 +99,14 @@ export function FilterField({ value, onChange, placeholder, label }) {
 // Status switch with counts. A real ARIA tab list (arrow keys, Home/End).
 export function StatusTabs({ options, value, onChange, counts }) {
   const refs = useRef({});
+  // With five tabs (the Dropped tab is showing) equal-width buttons are too narrow for
+  // "Not started 1", so size them to their content and let the row scroll sideways on
+  // the narrowest phones. Four tabs or fewer keep the original equal-width look.
+  const roomy = options.length >= 5;
+  useEffect(() => {
+    const el = refs.current[value];
+    if (roomy && el && el.scrollIntoView) el.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }, [value, roomy]);
   const onKeyDown = (e) => {
     const next = nextTab(options, value, e.key);
     if (!next) return;
@@ -107,7 +115,7 @@ export function StatusTabs({ options, value, onChange, counts }) {
     if (refs.current[next]) refs.current[next].focus();
   };
   return (
-    <div className="sd-lstatus" role="tablist" aria-label="Show status">
+    <div className="sd-lstatus" role="tablist" aria-label="Show status" style={roomy ? { overflowX: 'auto', scrollbarWidth: 'none' } : undefined}>
       {options.map((o) => (
         <button
           key={o}
@@ -117,6 +125,7 @@ export function StatusTabs({ options, value, onChange, counts }) {
           ref={(el) => { refs.current[o] = el; }}
           onClick={() => onChange(o)}
           onKeyDown={onKeyDown}
+          style={roomy ? { flex: '1 0 auto', padding: '0 9px' } : undefined}
         >
           {o}
           <span className={'n' + (counts[o] === 0 ? ' z' : '')}>{counts[o]}</span>
@@ -452,18 +461,19 @@ export function ShowTile({ show, seen, onOpen }) {
   const total = show.totalEpisodes || 0;
   const done = total > 0 && seen >= total;
   const pct = total ? Math.min(100, Math.round((seen / total) * 100)) : 0;
-  const label = total ? `${show.name}, ${seen} of ${total} episodes` : `${show.name}, ${seen} episodes watched`;
+  const dropped = show.dropped === true;
+  const label = (total ? `${show.name}, ${seen} of ${total} episodes` : `${show.name}, ${seen} episodes watched`) + (dropped ? ', dropped' : '');
   return (
-    <button type="button" className="sd-ltile" aria-label={label} onClick={onOpen}>
+    <button type="button" className="sd-ltile" aria-label={label} onClick={onOpen} style={dropped ? { opacity: 0.7 } : undefined}>
       <Art path={show.poster} name={show.name}>
-        {total > 0 && !done && seen > 0 ? (
+        {total > 0 && !done && !dropped && seen > 0 ? (
           <span className="sd-ltile-prog" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
         ) : null}
         {done ? <span className="sd-ltile-done" aria-hidden="true"><CheckIcon size={14} sw={2.6} /></span> : null}
       </Art>
       <span className="sd-ltile-name">{show.name}</span>
       <span className="sd-ltile-row">
-        <span className="meta">{total ? `${seen} / ${total} eps` : seen ? `${seen} eps seen` : 'not started'}</span>
+        <span className="meta">{dropped ? (seen ? `Dropped · ${seen} eps` : 'Dropped') : total ? `${seen} / ${total} eps` : seen ? `${seen} eps seen` : 'not started'}</span>
         {show.rating ? (
           <span className="rate"><StarIcon size={10} />{show.rating}</span>
         ) : null}
