@@ -463,6 +463,16 @@
 
 /* ------------------------------------------------ Stats (phone first) */
 .sd-stats-head { display: flex; flex-direction: column; gap: 14px; }
+.sd-stats-titlerow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sd-stats-titlerow .sd-title { margin: 0; }
+.sd-notesbtn {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 10px 0 16px; border-radius: 999px; box-sizing: border-box;
+  border: 1px solid var(--line); background: var(--bg-raise); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.sd-notesbtn .n { font-family: var(--font-mono); font-size: 12px; font-weight: 400; color: var(--amber); }
+.sd-notesbtn svg { color: var(--text-dim); }
+.sd-notesbtn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sd-loved { display: inline-flex; gap: 12px; font-size: 13px; color: var(--text-dim); flex: none; }
 .sd-title {
   font-family: var(--font-display);
   font-size: 28px;
@@ -703,6 +713,7 @@
   .sd-cols-even { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; align-items: start; }
   .sd-title { font-size: 34px; }
   .sd-stats-head { flex-direction: row; align-items: center; justify-content: space-between; }
+  .sd-stats-titlerow { justify-content: flex-start; gap: 18px; }
   .sd-stats-head .sd-title { margin: 0; }
   .sd-tabs { width: 420px; }
   .sd-habits {
@@ -1366,3 +1377,41 @@
 .sd-noteacts .sd-setbtn { flex: 1; }
 @media (min-width: 900px) { .sd-noteacts .sd-setbtn { flex: none; min-width: 120px; } }
 @media (hover: hover) { .sd-react:not(.on):hover { border-color: var(--amber); } }
+
+/* ======================================================================
+   Your notes (Stats -> Notes): search every note and reaction
+   ====================================================================== */
+.sd-notespage { display: flex; flex-direction: column; gap: 12px; }
+.sd-notespage .sd-title { margin: 0; }
+.sd-nsub { margin: -6px 0 4px; font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+.sd-nchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.sd-nchip {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 56px; height: 44px; padding: 0 12px; box-sizing: border-box;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--bg-raise); color: #c3cad5; font: inherit; font-size: 18px; cursor: pointer;
+}
+.sd-nchip.words { font-size: 13px; font-weight: 500; }
+.sd-nchip .n { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+.sd-nchip.z { opacity: 0.5; }
+.sd-nchip.on { border-color: var(--amber); background: rgba(242, 163, 60, 0.12); color: var(--amber); }
+.sd-nchip.on .n { color: var(--amber); }
+.sd-nchip:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sd-ncount { display: flex; align-items: center; justify-content: space-between; min-height: 24px; font-size: 12px; color: var(--text-dim); }
+.sd-nlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.sd-nitem {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 12px; box-sizing: border-box; text-align: left;
+  border-radius: 14px; border: 1px solid var(--line); background: var(--bg-card); color: inherit; font: inherit;
+}
+button.sd-nitem { cursor: pointer; }
+button.sd-nitem:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sd-nitem .art { flex: none; width: 44px; height: 66px; border-radius: 8px; object-fit: cover; border: 1px solid var(--line); background: var(--bg-raise); box-sizing: border-box; display: block; }
+.sd-nitem .art.blank { display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--text-dim); }
+.sd-nitem .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.sd-nitem .name { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-nitem .meta { font-size: 11px; color: var(--text-dim); }
+.sd-nitem .txt { font-size: 14px; line-height: 1.45; color: #c3cad5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sd-nitem .emo { flex: none; font-size: 24px; line-height: 1; }
+@media (min-width: 900px) {
+  .sd-notespage { max-width: 1000px; }
+  .sd-nlist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .sd-nitem:is(button):hover { border-color: #3a4352; }
+}

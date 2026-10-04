@@ -1,6 +1,6 @@
 # WatchNext — Developer Handover (v5)
 
-Paste this whole file into a new chat (and attach `watchnext-test-harness.zip`) to bring an assistant fully up to speed, then ask it to build the next feature. **This supersedes v4.** New since v4: the Year-in-Review saved image (3-across poster grid, matching the on-screen card), Dropped status, CSV export for Power BI, auto-resume of dropped shows, Delete everywhere (account-wide wipe) and Most rewatched (Stats → Rankings). See §6, §7, §9 and the **owner to-do list in §12**. It reflects the complete UI redesign (every tab), AniList, Restore from backup, the Cinema platform, and Notes & reactions. Last verified against the repo at commit `4c08e6f` (2 Oct 2026) plus one pending delivery (§9).
+Paste this whole file into a new chat (and attach `watchnext-test-harness.zip`) to bring an assistant fully up to speed, then ask it to build the next feature. **This supersedes v4.** New since v4: the Year-in-Review saved image (3-across poster grid, matching the on-screen card), Dropped status, CSV export for Power BI, auto-resume of dropped shows, Delete everywhere (account-wide wipe) and Most rewatched (Stats → Rankings), and Notes search + Most loved shows. See §6, §7, §9 and the **owner to-do list in §12**. It reflects the complete UI redesign (every tab), AniList, Restore from backup, the Cinema platform, and Notes & reactions. Last verified against the repo at commit `4c08e6f` (2 Oct 2026) plus one pending delivery (§9).
 
 ---
 
@@ -69,6 +69,7 @@ src/
     Stats.jsx                 tabs Overview/Habits/Rankings/Breakdown (compute block unchanged; render redesigned)
     Settings.jsx              Sync, TMDB key, Import, Clean up, Backup/Restore, Danger zone + confirm dialogs
     Search.jsx                global TMDB search (header icon)
+    Notes.jsx                 "Your notes": search/filter every note and reaction (opened from a button on Stats; state lives in App)
   components/
     ui.jsx                    Sheet, Bar, Chevron, Avatar
     LibraryBar.jsx            FilterField, StatusTabs, ChipSelect (sheet/popover), ToolsMenu, ProgressCard, LibEmpty,
@@ -79,6 +80,7 @@ src/
     yearImageRender.js        canvas drawing of the saved Year-in-Review image
     csvExport.js              PURE: episodes / shows / movies CSV tables for Power BI (BOM, CRLF, formula-safe text)
     rewatchLogic.js           PURE: Most rewatched shows / movies rankings
+    notesSearchLogic.js       PURE: collect every note/reaction, search + filters + facet counts, Most loved shows score
     SettingsCards.jsx         presentational Settings cards, Banner, ConfirmDialog
     NoteEditor.jsx            NoteEditor + NoteSheet                                                [pending commit, §9]
     CastCrew.jsx, AnimeSheet.jsx, AgendaEpisode.jsx, CalendarGrid.jsx, Discover.jsx, Stars.jsx, PlatformPicker.jsx
@@ -145,6 +147,8 @@ localStorage keys: `watchnext-state-v1`, `watchnext-tombstones-v1`.
 - **CSV export (Settings → Export for Power BI):** `watchnext-episodes|shows|movies-<local date>.csv`. Episode rows carry `watched_at_utc` **and** `watched_date_local`/`watched_time_local` (device timezone — settles the UTC-vs-local question for Power BI), `is_bulk_import` (same minute rule as Stats, `BATCH_MIN`), show status, platform, genres, reaction and note. Text starting `= + - @` gets a leading apostrophe. The TMDB key is never included.
 - **Year in Review:** the on-screen card and the saved PNG are the same design — big year + ▲/▼ delta (teal up, dim down), four stats in one row, **top 3 shows as big 2:3 posters across** with name + "N eps", busiest month / top genre, and the same faint warm→teal wash. The PNG is 1080×1350 (Instagram 4:5) with a "WatchNext" + URL footer.
 - **Most rewatched (Stats → Rankings):** "Most rewatched shows" and "Most rewatched movies", up to 8 each, all-time, shown as `12×` (viewings after the first); sections are absent when nothing was rewatched.
+- **Your notes (Stats → "Notes" button next to the title):** a page listing every episode note/reaction and every movie viewing note/reaction, newest first, with a search box (words in the note, show/movie name, reaction label/emoji, and **exact** episode codes `s1e5`/`S01E05`/`1x5`), an All/Episodes/Movies switch, six reaction chips plus **Words only** (a note with no emoji), faceted counts, 50 rows at a time. Episode rows open the show; movie rows are display-only. The page is rendered by **App** (not Stats) with a `notesMemo` ref, so opening a show and pressing Back restores the search, chips and scroll; opening it fresh from Stats starts clean; any bottom tab leaves it.
+- **Most loved shows (Stats → Rankings, left column):** episode reactions only; each 😍 counts 2, each 😂 counts 1 (`LOVE_WEIGHT`/`FUNNY_WEIGHT`); rows show the 😍/😂 counts; ties break on more 😍 then name.
 - **Platforms** (one row each in `PlatformPicker.jsx`): Netflix, Disney+, Prime Video, Max, Apple TV+, Hulu, Crunchyroll, Stan, Binge, ABC iview, YouTube, **Cinema** (#F5C518, manual only, never auto-detected), Other.
 
 ## 8. Notes & reactions (newest feature)
@@ -169,7 +173,7 @@ Six reactions — Loved it 😍, Funny 😂, Shocked 😱, Sad 😢, Angry 😡,
 
 ~200 unit tests (plain node, import from `/home/claude/wl/src/...`) and ~360 browser checks (puppeteer-core + @sparticuz/chromium, headless; fonts stubbed from `fonts.css`; TMDB mocked; date shim pinned to 2026-10-01T22:00Z = Hobart morning 2 Oct; `emulateTimezone('Australia/Hobart')`). See the README inside the zip for setup and the paths each script expects. The Shows/Movies suite also does **parity testing against a baseline build** of the old pages (`wl-base-dist`), which is how "same ordered titles as before" was proven; reuse that technique when redesigning an existing screen. Counts at last run: unit 201; browser — library 119, settings 47, restore 24, notes 35, anime 35, upnext 44, desktop/layout 55 (+ show-page harness), all passing.
 
-**Suites added in v5:** unit — `yearimage` (24), `dropped_csv` (28), `wipe` (23, includes an in-memory two-device simulation), `resume_db` (11, loads the real `db.js` with a localStorage shim), `rewatch` (14); browser — `yearimage` (25), `dropped_csv` (25), `rewatch` (8), `wipe_resume` (32). `wipe_resume` needs a **second, test-only build** where `src/store/cloud.js` is swapped for a fake signed-in `fakecloud.js` via a temporary `vite.fake.config.js` alias (steps in `wipe_resume.README.md`); delete the temp config afterwards, never commit it. Headless Chromium can't sign in to Google, so signed-in UI can only be tested this way.
+**Suites added in v5:** unit — `yearimage` (24), `dropped_csv` (28), `wipe` (23, includes an in-memory two-device simulation), `resume_db` (11, loads the real `db.js` with a localStorage shim), `rewatch` (14), `notes_search` (19); browser — `yearimage` (25), `dropped_csv` (25), `rewatch` (8), `notes_search` (22), `wipe_resume` (32). `wipe_resume` needs a **second, test-only build** where `src/store/cloud.js` is swapped for a fake signed-in `fakecloud.js` via a temporary `vite.fake.config.js` alias (steps in `wipe_resume.README.md`); delete the temp config afterwards, never commit it. Headless Chromium can't sign in to Google, so signed-in UI can only be tested this way.
 
 **Gotchas learned the hard way (don't repeat):**
 - A global `input[type='text']` rule in `styles.css` gives every input a border/padding/background; scope inputs inside custom fields with `.x input[type='text']` (higher specificity) or you get a double border.
@@ -181,6 +185,7 @@ Six reactions — Loved it 😍, Funny 😂, Shocked 😱, Sad 😢, Angry 😡,
 - The "old file" trap: restoring/regenerating shared files from an earlier download silently reverts other sessions' work.
 - The service worker intercepts image requests, which **bypasses puppeteer request interception** (mock posters never arrive and the real network answers 403). Call `page.setBypassServiceWorker(true)`. The app's export cache-busts posters with `?cors=1`, so the SW cache never collides with the card's `<img>`.
 - `Sheet` attaches its Escape handler once, so the `onClose` it holds goes **stale**. A dialog that must not close while busy needs a ref (`busyRef.current`), not `busy ? noop : onCancel` (this was a real bug caught by the Delete-everywhere browser test).
+- Substring search on identifiers is a trap: "s1e5" matched S1E50–S1E59. Episode codes are matched exactly in `notesSearchLogic.js` (caught by the browser test, now unit-tested).
 - Never put a stray `cat > /dev/null` (or any stdin-reading command) in a sandbox command: it waits forever and the call times out.
 - `innerText` is uppercased by CSS `text-transform` for section titles (use a case-insensitive regex or `textContent`).
 
@@ -198,10 +203,10 @@ Six reactions — Loved it 😍, Funny 😂, Shocked 😱, Sad 😢, Angry 😡,
    - [ ] On A: Settings → **Restore from backup** with the downloaded file → everything returns and syncs to B.
    - [ ] Failure path: turn the network off right before confirming → error banner mentions the backup, data untouched.
    - [ ] Only then consider it for the real account — and keep the downloaded backup file somewhere safe.
-2. **Real-device pass** for the other new features: auto-resume toast + Undo on iPhone; saved Year-in-Review PNG on iPhone Safari (and the Stats card with real posters); the three CSV downloads on iPhone; load the CSVs into Power BI (set the date columns to Date type); the `dropped` flag syncing between two devices; Rankings → Most rewatched with the real library.
+2. **Real-device pass** for the other new features: auto-resume toast + Undo on iPhone; saved Year-in-Review PNG on iPhone Safari (and the Stats card with real posters); the three CSV downloads on iPhone; load the CSVs into Power BI (set the date columns to Date type); the `dropped` flag syncing between two devices; Rankings → Most rewatched and Most loved shows with the real library; Stats → Notes with his real notes (search, chips, open a show, Back).
 
 ### Done in v5 (for reference)
-Year-in-Review saved image + poster-grid card · Dropped status · CSV export · auto-resume (with Undo) · Delete everywhere (code + tests; **real-account verification still open**, see above) · Most rewatched.
+Year-in-Review saved image + poster-grid card · Dropped status · CSV export · auto-resume (with Undo) · Delete everywhere (code + tests; **real-account verification still open**, see above) · Most rewatched · Notes search + Most loved shows.
 
 ### Remaining backlog
 1. **Stats day attribution: UTC vs local** (open decision; changes history). The CSV now exposes both columns, so Power BI can use either.

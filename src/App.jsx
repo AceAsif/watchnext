@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import UpNext from './pages/UpNext.jsx';
 import ShowDetail from './pages/ShowDetail.jsx';
 import { initCloudSync } from './store/cloud.js';
@@ -8,6 +8,8 @@ import Watchlist from './pages/Watchlist.jsx';
 import Stats from './pages/Stats.jsx';
 import Settings from './pages/Settings.jsx';
 import Search from './pages/Search.jsx';
+import Notes from './pages/Notes.jsx';
+import { newNotesMemo } from './components/notesSearchLogic.js';
 
 const TABS = [
   {
@@ -73,6 +75,10 @@ export default function App() {
   const [tab, setTab] = useState('next');
   const [showOpen, setShowOpen] = useState(null); // show id or null
   const [searching, setSearching] = useState(false);
+  // "Your notes" (opened from Stats) lives here, not inside Stats, so opening a show
+  // from it and pressing Back returns to the same search, filters and scroll.
+  const [notesOpen, setNotesOpen] = useState(false);
+  const notesMemo = useRef(newNotesMemo());
 
   useEffect(() => {
     const unsub = initCloudSync();
@@ -112,13 +118,15 @@ export default function App() {
         />
       ) : showOpen ? (
         <ShowDetail id={showOpen} onBack={closeShow} />
+      ) : notesOpen ? (
+        <Notes memo={notesMemo.current} openShow={openShow} onBack={() => setNotesOpen(false)} />
       ) : (
         <>
           {tab === 'next' && <UpNext openShow={openShow} />}
           {tab === 'shows' && <Shows openShow={openShow} />}
           {tab === 'movies' && <Movies />}
           {tab === 'watchlist' && <Watchlist openShow={openShow} />}
-          {tab === 'stats' && <Stats />}
+          {tab === 'stats' && <Stats onOpenNotes={() => { notesMemo.current = newNotesMemo(); setNotesOpen(true); }} />}
           {tab === 'settings' && <Settings />}
         </>
       )}
@@ -132,6 +140,7 @@ export default function App() {
               setTab(t.id);
               closeShow();
               setSearching(false);
+              setNotesOpen(false);
             }}
           >
             {t.icon}

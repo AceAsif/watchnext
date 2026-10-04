@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore.js';
+import { Chevron } from '../components/ui.jsx';
 import { movieStatus } from '../store/db.js';
 import Stars from '../components/Stars.jsx';
 import YearInReview from '../components/YearInReview.jsx';
@@ -18,6 +19,7 @@ import {
 } from '../components/statsLogic.js';
 import { localISODate } from '../components/showLogic.js';
 import { rewatchedShows, rewatchedMovies, rewatchSummary } from '../components/rewatchLogic.js';
+import { lovedShows, collectNotes, LOVE_WEIGHT, FUNNY_WEIGHT } from '../components/notesSearchLogic.js';
 
 // Stats — the Claude Design layout: a title, a four-way tab bar, and cards. On
 // a phone each tab is a single column; on desktop (>= 900px) the tabs lay their
@@ -28,11 +30,12 @@ import { rewatchedShows, rewatchedMovies, rewatchSummary } from '../components/r
 const TABS = ['Overview', 'Habits', 'Rankings', 'Breakdown'];
 const plural = (n, one, many) => (n === 1 ? one : many || one + 's');
 
-export default function Stats() {
+export default function Stats({ onOpenNotes }) {
   const state = useStore();
   const [year, setYear] = useState('all');       // Habits day-of-week scope
   const [reviewYear, setReviewYear] = useState(null); // Year in review scope
   const [tab, setTab] = useState('Overview'); // Stats sub-tab
+  const noteCount = useMemo(() => collectNotes(state.shows, state.movies).length, [state.shows, state.movies]);
 
   const base = useMemo(() => {
     let episodes = 0;
@@ -259,6 +262,7 @@ export default function Stats() {
       movieCount: watchedMovieCount,
       movieHours: Math.round(movieMinutes / 60),
       topShows: perShow.slice(0, 12),
+      lovedShows: lovedShows(state.shows),
       rewatchShows: rewatchedShows(state.shows),
       rewatchMovies: rewatchedMovies(state.movies),
       years,          // year strings for the selectors (newest first)
@@ -409,6 +413,7 @@ export default function Stats() {
   // ------------------------------------------------------------- Rankings
   const hasRated = base.topRatedShows.length > 0 || base.topRatedMovies.length > 0;
   const hasRewatches = base.rewatchShows.rows.length > 0 || base.rewatchMovies.rows.length > 0;
+  const hasLoved = base.lovedShows.rows.length > 0;
   const RatedCard = ({ rows, label }) => (
     <div className="sd-card" role="group" aria-label={label}>
       {rows.map((r, i) => (
@@ -420,7 +425,7 @@ export default function Stats() {
     </div>
   );
   const rankings =
-    hasRated || hasRewatches || base.topShows.length > 0 ? (
+    hasRated || hasRewatches || hasLoved || base.topShows.length > 0 ? (
       <div className="sd-cols-even">
         <div className="sd-stack">
           {base.topRatedShows.length > 0 && (
@@ -428,6 +433,26 @@ export default function Stats() {
           )}
           {base.topRatedMovies.length > 0 && (
             <Section title="Recently rated · Movies"><RatedCard rows={base.topRatedMovies} label="Recently rated movies" /></Section>
+          )}
+          {hasLoved && (
+            <Section title="Most loved shows">
+              <div className="sd-card" role="group" aria-label="Most loved shows">
+                {base.lovedShows.rows.map((r, i) => (
+                  <div className={'sd-rated' + (i > 0 ? ' sd-sep' : '')} key={r.label}>
+                    <span className="sd-rated-name" title={r.label}>{r.label}</span>
+                    <span
+                      className="sd-loved sd-mono"
+                      role="img"
+                      aria-label={[r.love > 0 && `${r.love} loved it`, r.funny > 0 && `${r.funny} funny`].filter(Boolean).join(', ')}
+                    >
+                      {r.love > 0 ? <span>😍 {r.love}</span> : null}
+                      {r.funny > 0 ? <span>😂 {r.funny}</span> : null}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <Note>Ranked by episode reactions: each 😍 counts {LOVE_WEIGHT}, each 😂 counts {FUNNY_WEIGHT}.</Note>
+            </Section>
           )}
         </div>
         <div className="sd-stack">
@@ -520,7 +545,15 @@ export default function Stats() {
   return (
     <div className="sd-page">
       <div className="sd-stats-head">
-        <h1 className="sd-title">Stats</h1>
+        <div className="sd-stats-titlerow">
+          <h1 className="sd-title">Stats</h1>
+          {onOpenNotes ? (
+            <button type="button" className="sd-notesbtn" onClick={onOpenNotes} aria-label={`Your notes, ${noteCount} entries`}>
+              Notes{noteCount > 0 ? <span className="n">{noteCount.toLocaleString()}</span> : null}
+              <Chevron />
+            </button>
+          ) : null}
+        </div>
         <TabBar tabs={TABS} value={tab} onChange={setTab} label="Stats sections" />
       </div>
       <div className="sd-stats-body" role="tabpanel" id="stats-panel" aria-labelledby={`stats-tab-${tab}`}>
