@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { img } from '../api/tmdb.js';
 import { Section, YearSelect } from './StatsUI.jsx';
 import { renderYearImage } from './yearImageRender.js';
+import { initialOf } from './yearImageLogic.js';
 
 // Public app URL — included in the share text so a screenshot/link points people
 // back to WatchNext.
@@ -122,14 +123,13 @@ export default function YearInReview({ data, years, onYear }) {
 
         {data.topShows.length > 0 && (
           <div className="sd-yir-top3">
-            <span className="sd-tile-l sd-tile-l--s">Top shows</span>
-            {data.topShows.map((sh, i) => (
+            <span className="sd-tile-l sd-tile-l--s sd-yir-toplabel">Top shows</span>
+            {data.topShows.slice(0, 3).map((sh) => (
               <div className="sd-yir-show" key={sh.name}>
-                <span className="sd-mono sd-yir-rank">{i + 1}</span>
                 {sh.poster ? (
-                  <img className="sd-poster" src={img(sh.poster, 'w92')} alt="" loading="lazy" style={{ width: 28, height: 42, borderRadius: 5 }} />
+                  <img className="sd-yir-art" src={img(sh.poster, 'w342')} alt="" loading="lazy" />
                 ) : (
-                  <span className="sd-poster" aria-hidden="true" style={{ width: 28, height: 42, borderRadius: 5 }} />
+                  <span className="sd-yir-art sd-yir-art--blank" aria-hidden="true">{initialOf(sh.name)}</span>
                 )}
                 <span className="sd-yir-name" title={sh.name}>{sh.name}</span>
                 <span className="sd-mono sd-yir-eps">{sh.count} eps</span>

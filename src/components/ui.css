@@ -677,11 +677,20 @@
 .sd-yir-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .sd-yir-stats > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .sd-yir-v { font-family: var(--font-display); font-size: 22px; font-weight: 800; line-height: 1; }
-.sd-yir-top3 { display: flex; flex-direction: column; gap: 10px; }
-.sd-yir-show { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.sd-yir-rank { width: 14px; font-size: 11px; color: var(--text-dim); text-align: center; flex: none; }
-.sd-yir-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 14px; }
-.sd-yir-eps { flex: none; font-size: 12px; color: var(--text-dim); }
+/* Top shows: three big posters across, like the saved image (name + eps underneath) */
+.sd-yir-top3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 10px; row-gap: 10px; }
+.sd-yir-toplabel { grid-column: 1 / -1; }
+.sd-yir-show { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sd-yir-art {
+  display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg-raise); margin-bottom: 4px; box-sizing: border-box;
+}
+.sd-yir-art--blank {
+  display: flex; align-items: center; justify-content: center; color: var(--text-dim);
+  font-family: var(--font-display); font-weight: 800; font-size: 40px;
+}
+.sd-yir-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 13px; }
+.sd-yir-eps { font-size: 11px; color: var(--text-dim); }
 .sd-yir-facts { display: flex; gap: 32px; padding-top: 16px; border-top: 1px solid var(--line); }
 .sd-yir-facts > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .sd-yir-fact { font-size: 15px; font-weight: 700; }
@@ -715,6 +724,9 @@
   .sd-yir { padding: 28px 28px 24px; }
   .sd-yir-year { font-size: 64px; }
   .sd-yir-v { font-size: 28px; }
+  .sd-yir-top3 { column-gap: 16px; row-gap: 12px; }
+  .sd-yir-name { font-size: 14px; }
+  .sd-yir-eps { font-size: 12px; }
 
   /* The phone column cap is lifted so the page lines up with the header. */
   .sd-page { max-width: none; }
