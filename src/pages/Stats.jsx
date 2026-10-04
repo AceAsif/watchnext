@@ -17,6 +17,7 @@ import {
   streakRangeLabel,
 } from '../components/statsLogic.js';
 import { localISODate } from '../components/showLogic.js';
+import { rewatchedShows, rewatchedMovies, rewatchSummary } from '../components/rewatchLogic.js';
 
 // Stats — the Claude Design layout: a title, a four-way tab bar, and cards. On
 // a phone each tab is a single column; on desktop (>= 900px) the tabs lay their
@@ -258,6 +259,8 @@ export default function Stats() {
       movieCount: watchedMovieCount,
       movieHours: Math.round(movieMinutes / 60),
       topShows: perShow.slice(0, 12),
+      rewatchShows: rewatchedShows(state.shows),
+      rewatchMovies: rewatchedMovies(state.movies),
       years,          // year strings for the selectors (newest first)
       yearBars,
       movieYears,
@@ -405,6 +408,7 @@ export default function Stats() {
 
   // ------------------------------------------------------------- Rankings
   const hasRated = base.topRatedShows.length > 0 || base.topRatedMovies.length > 0;
+  const hasRewatches = base.rewatchShows.rows.length > 0 || base.rewatchMovies.rows.length > 0;
   const RatedCard = ({ rows, label }) => (
     <div className="sd-card" role="group" aria-label={label}>
       {rows.map((r, i) => (
@@ -416,7 +420,7 @@ export default function Stats() {
     </div>
   );
   const rankings =
-    hasRated || base.topShows.length > 0 ? (
+    hasRated || hasRewatches || base.topShows.length > 0 ? (
       <div className="sd-cols-even">
         <div className="sd-stack">
           {base.topRatedShows.length > 0 && (
@@ -430,6 +434,18 @@ export default function Stats() {
           {base.topShows.length > 0 && (
             <Section title="Most watched shows">
               <BarList rows={base.topShows} unit=" eps" ariaLabel="Most watched shows" />
+            </Section>
+          )}
+          {base.rewatchShows.rows.length > 0 && (
+            <Section title="Most rewatched shows">
+              <BarList rows={base.rewatchShows.rows} unit="×" ariaLabel="Most rewatched shows" />
+              <Note>{rewatchSummary(base.rewatchShows.total, base.rewatchShows.titles, 'show')} Each × is a viewing after the first.</Note>
+            </Section>
+          )}
+          {base.rewatchMovies.rows.length > 0 && (
+            <Section title="Most rewatched movies">
+              <BarList rows={base.rewatchMovies.rows} unit="×" ariaLabel="Most rewatched movies" />
+              <Note>{rewatchSummary(base.rewatchMovies.total, base.rewatchMovies.titles, 'movie')} Each × is a viewing after the first.</Note>
             </Section>
           )}
         </div>
