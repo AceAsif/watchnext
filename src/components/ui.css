@@ -1422,3 +1422,13 @@ button.sd-nitem:focus-visible { outline: 2px solid var(--amber); outline-offset:
 .sd-fc-note { margin: 8px 0; font-size: 14px; color: var(--text-dim); text-align: center; }
 .sd-fc-note.err { color: var(--red); }
 @media (min-width: 900px) { .sd-fc-preview { max-width: 420px; margin: 0 auto; } }
+
+/* "When did you watch this?" / "Fix watch dates" sheets */
+.sd-datefield { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; font-size: 14px; color: #c3cad5; }
+.sd-datefield input, .sd-datefield select {
+  height: 44px; padding: 0 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-sizing: border-box;
+  color: var(--text); font: inherit; font-size: 16px; color-scheme: dark; width: 100%;
+}
+.sd-datefield input:focus, .sd-datefield select:focus { outline: none; border-color: var(--amber); }
+.sd-when-hint { margin: 10px 0 0; min-height: 20px; font-size: 13px; color: var(--text-dim); }
+.sd-when-acts { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }

@@ -7,6 +7,8 @@ import {
   logEpisodeRewatch,
   toggleFollow,
   setShowDropped,
+  setWatchDates,
+  restoreWatchDates,
   setShowRating,
   setShowPlatform,
   setShowProviders,
@@ -34,6 +36,8 @@ import { NoteSheet } from '../components/NoteEditor.jsx';
 import { reactionById } from '../store/notes.js';
 import AnimeSheet from '../components/AnimeSheet.jsx';
 import FinishCardSheet from '../components/FinishCardSheet.jsx';
+import { WhenSheet, FixDatesSheet } from '../components/WatchDateSheets.jsx';
+import { stampForDay, fixedToast, watchedList } from '../components/watchDatesLogic.js';
 import { isFinishedShow, becomesFinished } from '../components/finishCardLogic.js';
 import { looksLikeAnime, altTitles, summaryLine } from '../components/animeLogic.js';
 import { Bar, Chevron, Sheet } from '../components/ui.jsx';
@@ -85,6 +89,14 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded })
   const resumes = (on) => { if (on && show.dropped === true && onResumed) onResumed(show.droppedAt || null); };
   // How many episodes are being newly watched (so the page can offer the finish card).
   const added = (n) => { if (n > 0 && onAdded) onAdded(n); };
+  // Marking a whole season asks WHEN it was watched (a show seen years ago must not land in this month).
+  const [whenOpen, setWhenOpen] = useState(false);
+  const markSeasonWhen = (day) => {
+    setWhenOpen(false);
+    resumes(eps.length > 0);
+    added(eps.filter((e) => !(show.watched || {})[epKey(season.n, e.episode_number)]).length);
+    markSeason(id, season.n, eps, true, day ? stampForDay(day) : undefined);
+  };
   const [eps, setEps] = useState(null);
   const [open, setOpen] = useState(isCurrent);
   const [err, setErr] = useState(null);
@@ -161,11 +173,21 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded })
         <div className="sd-ep" style={{ minHeight: 44 }}>
           <button
             className="sd-linkbtn"
-            onClick={() => { resumes(!done && eps.length > 0); if (!done) added(eps.filter((e) => !(show.watched || {})[epKey(season.n, e.episode_number)]).length); markSeason(id, season.n, eps, !done); }}
+            onClick={() => (done ? markSeason(id, season.n, eps, false) : setWhenOpen(true))}
           >
             {done ? 'Unmark season' : 'Mark season watched'}
           </button>
         </div>
+      )}
+      {whenOpen && (
+        <WhenSheet
+          title="When did you watch it?"
+          subtitle={`${show.name} · Season ${season.n}`}
+          today={isoToday()}
+          onNow={() => markSeasonWhen(null)}
+          onDate={markSeasonWhen}
+          onClose={() => setWhenOpen(false)}
+        />
       )}
 
       {open && eps && fold > 0 && (
@@ -286,6 +308,27 @@ export default function ShowDetail({ id, onBack }) {
     clearTimeout(resumedTimer.current);
     resumedTimer.current = setTimeout(() => setResumed(null), 6000);
   }
+  // "Fix watch dates": correct when already-recorded episodes were watched, with Undo.
+  const [fixOpen, setFixOpen] = useState(false);
+  const [datesToast, setDatesToast] = useState(null); // { text, prev }
+  const datesTimer = useRef(null);
+  useEffect(() => () => clearTimeout(datesTimer.current), []);
+  function applyDates(keys, day) {
+    const prev = setWatchDates(id, keys, stampForDay(day));
+    setFixOpen(false);
+    setSheet(null);
+    clearTimeout(resumedTimer.current); setResumed(null);
+    setFinishToast(false);
+    setDatesToast({ text: fixedToast(Object.keys(prev).length, day), prev });
+    clearTimeout(datesTimer.current);
+    datesTimer.current = setTimeout(() => setDatesToast(null), 8000);
+  }
+  function undoDates() {
+    if (datesToast) restoreWatchDates(id, datesToast.prev);
+    clearTimeout(datesTimer.current);
+    setDatesToast(null);
+  }
+
   // "You finished <show>": a card offered right after the final episode is marked.
   const [finishOpen, setFinishOpen] = useState(false);
   const [finishToast, setFinishToast] = useState(false);
@@ -822,6 +865,11 @@ export default function ShowDetail({ id, onBack }) {
               {show.dropped === true ? 'Resume watching' : 'Drop this show'}
             </span>
           </button>
+          {watchedList(show).length > 0 && (
+            <button className="sd-row sd-sep" data-testid="fix-dates-row" onClick={() => { setSheet(null); setFixOpen(true); }}>
+              <span style={{ flexGrow: 1, color: 'var(--sd-text-2)' }}>Fix watch dates…</span>
+            </button>
+          )}
           {!animeRow && (
             <button className="sd-row sd-sep" onClick={() => setSheet('anime')}>
               <span style={{ flexGrow: 1, color: 'var(--sd-text-2)' }}>Anime details (AniList)</span>
@@ -912,6 +960,15 @@ export default function ShowDetail({ id, onBack }) {
 
       {sheet === 'anime' && <AnimeSheet id={id} show={show} onClose={() => setSheet(null)} />}
 
+      {fixOpen && <FixDatesSheet show={show} today={isoToday()} onApply={applyDates} onClose={() => setFixOpen(false)} />}
+
+      {datesToast && !finishToast && (
+        <div className="sd-toast" role="status">
+          <span className="sd-ell" style={{ flex: 1 }}>{datesToast.text}</span>
+          <button className="sd-linkbtn" style={{ height: 44, padding: '0 14px', fontSize: 14 }} onClick={undoDates}>Undo</button>
+        </div>
+      )}
+
       {finishOpen && <FinishCardSheet show={show} allShows={state.shows} onClose={() => setFinishOpen(false)} />}
 
       {finishToast && (
@@ -923,7 +980,7 @@ export default function ShowDetail({ id, onBack }) {
         </div>
       )}
 
-      {resumed && !finishToast && (
+      {resumed && !finishToast && !datesToast && (
         <div className="sd-toast" role="status">
           <span className="sd-ell" style={{ flex: 1 }}>Resumed · {show.name}</span>
           <button className="sd-linkbtn" style={{ height: 44, padding: '0 14px', fontSize: 14 }} onClick={undoResume}>
