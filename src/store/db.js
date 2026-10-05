@@ -427,7 +427,13 @@ export function markEpisode(id, season, episode, runtimeMin, watched = true) {
   markShowDirty(id);
 }
 
-export function markSeason(id, season, episodes, watched = true) {
+// `at` (optional ISO string) is when the NEWLY marked episodes were really watched;
+// without it they are stamped "now". A chosen date is also remembered as a hand-set
+// date (`fixedAt`) so it beats a plain "now" stamp from another device when synced.
+const validIso = (s) => typeof s === 'string' && s !== '' && !isNaN(Date.parse(s));
+
+export function markSeason(id, season, episodes, watched = true, at) {
+  const when = watched && validIso(at) ? at : null;
   update((s) => {
     const show = s.shows[id];
     if (!show) return;
@@ -436,15 +442,61 @@ export function markSeason(id, season, episodes, watched = true) {
       const k = epKey(season, ep.episode_number);
       if (watched) {
         map[k] = map[k] || {
-          at: new Date().toISOString(),
+          at: when || new Date().toISOString(),
           min: ep.runtime || show.runtimeMin || null,
           n: 1,
+          ...(when ? { fixedAt: new Date().toISOString() } : {}),
         };
       } else {
         delete map[k];
       }
     }
     s.shows[id] = { ...show, watched: map, ...(watched && episodes.length ? resumePatch(show) : {}) };
+  });
+  markShowDirty(id);
+}
+
+// Correct WHEN episodes were watched (e.g. a show logged today that you really saw in
+// 2023). Only the date changes: the rewatch count, minutes and notes are untouched.
+// Returns { key: previous values } for the entries it changed so the caller can offer
+// Undo. Every corrected entry is stamped `fixedAt`, which makes the correction win
+// over an older copy of the same episode on another device (see watchedMerge.js).
+export function setWatchDates(id, keys, at) {
+  const prev = {};
+  if (!validIso(at)) return prev;
+  update((s) => {
+    const show = s.shows[id];
+    if (!show) return;
+    const map = { ...(show.watched || {}) };
+    const stamp = new Date().toISOString();
+    for (const k of keys) {
+      const w = map[k];
+      if (!w || typeof w !== 'object') continue;
+      prev[k] = { at: typeof w.at === 'string' ? w.at : null, fixedAt: typeof w.fixedAt === 'string' ? w.fixedAt : null };
+      map[k] = { ...w, at, fixedAt: stamp };
+    }
+    s.shows[id] = { ...show, watched: map };
+  });
+  if (Object.keys(prev).length) markShowDirty(id);
+  return prev;
+}
+
+// Undo for setWatchDates. Counts as a newer correction (fresh `fixedAt`), so the undo
+// also wins over the corrected copy on a device that was offline at the time.
+export function restoreWatchDates(id, prev) {
+  update((s) => {
+    const show = s.shows[id];
+    if (!show || !prev || typeof prev !== 'object') return;
+    const map = { ...(show.watched || {}) };
+    const stamp = new Date().toISOString();
+    for (const [k, p] of Object.entries(prev)) {
+      const w = map[k];
+      if (!w || !p || typeof p !== 'object') continue;
+      const e = { ...w, fixedAt: stamp };
+      if (typeof p.at === 'string' && p.at) e.at = p.at; else delete e.at;
+      map[k] = e;
+    }
+    s.shows[id] = { ...show, watched: map };
   });
   markShowDirty(id);
 }

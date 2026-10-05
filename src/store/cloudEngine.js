@@ -33,6 +33,7 @@ import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
 import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markShowDeleted, isTombstoned, resetAll, wipeLibrary, addTombstones } from './db.js';
 import { mergeNotes } from './notes.js';
 import { runWipe, wipeDecision, readMeta, writeMeta } from './wipeLogic.js';
+import { mergeWatched } from './watchedMerge.js';
 
 // --- sync engine state ---
 let uid = null;
@@ -184,7 +185,7 @@ async function pullAndMerge(forUid) {
         return;
       }
       // Union watched maps so an episode marked on either device stays marked.
-      const watched = { ...(remote.watched || {}), ...(local.watched || {}) };
+      const watched = mergeWatched(remote.watched, local.watched);
       const merged = { ...remote, ...local, watched };
       // Episode notes are a union too, so a note written on another device isn't
       // lost when this device already has some of its own (yours win per episode).
