@@ -4,6 +4,9 @@ import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow
 import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
 import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud, wipeEverywhere } from '../store/cloud.js';
 import { wipeDoneText, wipeFailText } from '../store/wipeLogic.js';
+import {
+  loadMeta, saveMeta, libraryCount, withSince, nudgeStatus, nudgeCopy, afterBackup, afterSnooze, lastBackupLine,
+} from '../components/backupNudgeLogic.js';
 import { localISODate } from '../components/showLogic.js';
 import { buildCsv, csvDoneText } from '../components/csvExport.js';
 import {
@@ -23,6 +26,7 @@ import {
   ImportCard,
   CleanupCard,
   BackupCard,
+  BackupNudge,
   CsvCard,
   WipeDialog,
   DangerCard,
@@ -54,6 +58,17 @@ export default function Settings() {
   const cloudOn = isCloudAvailable();
 
   const say = (text, kind = 'ok') => setMsg({ text, kind });
+
+  // Backup reminder: when this device last downloaded a backup (kept per device, outside the library).
+  const [bk, setBk] = useState(() => loadMeta(localStorage));
+  const total = libraryCount(state);
+  useEffect(() => {
+    // the first time this device sees a non-empty library, remember it (so a brand-new library isn't nagged)
+    const next = withSince(bk, total, new Date());
+    if (next !== bk) { saveMeta(localStorage, next); setBk(next); }
+  }, [total]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nudge = nudgeStatus(bk, total, new Date());
+  const remindLater = () => { const next = afterSnooze(bk, new Date()); saveMeta(localStorage, next); setBk(next); };
   // The banner sits at the top; bring it into view when a message appears so an
   // import result or error is never missed on a long phone page.
   useEffect(() => {
@@ -143,6 +158,9 @@ export default function Settings() {
     a.download = backupFileName(localISODate());
     a.click();
     URL.revokeObjectURL(a.href);
+    const next = afterBackup(loadMeta(localStorage), libraryCount(getState()), new Date());
+    saveMeta(localStorage, next);
+    setBk(next);
     say('Backup downloaded. Your TMDB key is not included in the file.');
   }
 
@@ -199,6 +217,7 @@ export default function Settings() {
     <div className="sd-page sd-setpage">
       <h1 className="sd-title">Settings</h1>
       <Banner msg={msg} onClose={() => setMsg(null)} bannerRef={bannerRef} />
+      {nudge.show && <BackupNudge copy={nudgeCopy(nudge)} onBackup={exportBackup} onLater={remindLater} />}
 
       <div className="sd-set">
         <SyncCard available={cloudOn} user={cloudUser} busy={cloudBusy} onSignIn={handleSignIn} onSignOut={() => signOutCloud()} />
@@ -212,7 +231,7 @@ export default function Settings() {
           onFile={onImportFile}
         />
         <CleanupCard rows={orphans} onAskDelete={(id) => setConfirm({ type: 'show', id })} />
-        <BackupCard onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} />
+        <BackupCard lastLine={lastBackupLine(bk, new Date())} onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} />
         <CsvCard onExport={exportCsv} />
         <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} onAskEverywhere={() => setConfirm({ type: 'everywhere' })} />
       </div>

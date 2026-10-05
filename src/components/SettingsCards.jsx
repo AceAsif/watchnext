@@ -220,13 +220,31 @@ export function CleanupCard({ rows, onAskDelete }) {
 }
 
 // ---------------------------------------------------------------- Backup + danger zone
-export function BackupCard({ onDownload, onRestore, restoreRef, onRestoreFile }) {
+// The gentle reminder at the top of Settings (see backupNudgeLogic.js for when it shows).
+export function BackupNudge({ copy, onBackup, onLater }) {
+  return (
+    <section className="sd-nudge" role="region" aria-label="Backup reminder">
+      <span className="ico" aria-hidden="true">{I.drive}</span>
+      <div className="txt">
+        <h2>{copy.title}</h2>
+        <p>{copy.body}</p>
+        <div className="acts">
+          <button type="button" className="sd-btn primary" onClick={onBackup}>Download backup</button>
+          <button type="button" className="sd-btn" onClick={onLater}>Remind me later</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function BackupCard({ onDownload, onRestore, restoreRef, onRestoreFile, lastLine }) {
   return (
     <SetCard icon={I.drive} label="Your data" title="Backup">
       <p className="sd-setp">
         Everything lives in this browser’s storage. Download a backup now and then, especially after marking a lot
         of episodes. A backup file can be restored here, on any device.
       </p>
+      {lastLine ? <p className="sd-lastbk sd-mono" data-testid="last-backup">{lastLine}</p> : null}
       <div className="sd-setacts">
         <button type="button" className="sd-setbtn" onClick={onDownload}>{I.download} Download backup</button>
         <input ref={restoreRef} type="file" accept="application/json" onChange={onRestoreFile} style={{ display: 'none' }} aria-label="Backup file to restore" />
