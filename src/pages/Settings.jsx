@@ -4,6 +4,7 @@ import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow
 import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
 import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud, wipeEverywhere } from '../store/cloud.js';
 import { wipeDoneText, wipeFailText } from '../store/wipeLogic.js';
+import { useServicesPrefs, toggleMyService } from '../store/servicesPrefs.js';
 import {
   loadMeta, saveMeta, libraryCount, withSince, nudgeStatus, nudgeCopy, afterBackup, afterSnooze, lastBackupLine,
 } from '../components/backupNudgeLogic.js';
@@ -27,6 +28,7 @@ import {
   CleanupCard,
   BackupCard,
   BackupNudge,
+  ServicesCard,
   CsvCard,
   WipeDialog,
   DangerCard,
@@ -58,6 +60,8 @@ export default function Settings() {
   const cloudOn = isCloudAvailable();
 
   const say = (text, kind = 'ok') => setMsg({ text, kind });
+
+  const svc = useServicesPrefs();
 
   // Backup reminder: when this device last downloaded a backup (kept per device, outside the library).
   const [bk, setBk] = useState(() => loadMeta(localStorage));
@@ -222,6 +226,7 @@ export default function Settings() {
       <div className="sd-set">
         <SyncCard available={cloudOn} user={cloudUser} busy={cloudBusy} onSignIn={handleSignIn} onSignOut={() => signOutCloud()} />
         <KeyCard status={keyStatus(savedKey, key)} value={key} onChange={setKey} onSave={saveKey} />
+        <ServicesCard mine={svc.mine} onToggle={toggleMyService} />
         <ImportCard
           command={IMPORT_COMMAND}
           copied={copied}

@@ -321,22 +321,41 @@ export function setShowUpcoming(id, upcoming) {
   markShowDirty(id);
 }
 
-export function setShowProviders(id, providers, link) {
-  // providers: cached AU streaming list [{ name, logo }] for the show detail
-  //   "streaming in Australia" display; link: the TMDB/JustWatch URL. Filled by
-  //   the Detect platforms action (see Shows.jsx). Rides the per-show sync doc.
+export function setShowProviders(id, providers, link, free) {
+  // providers: cached AU subscription list [{ name, logo }] for the show detail
+  //   "streaming in Australia" display; free: the free + ad-supported list (same shape),
+  //   used by the "On my services" filter; link: the TMDB/JustWatch URL. Filled by the
+  //   show page's Check, the Detect platforms action and the filter's background
+  //   checks. Rides the per-show sync doc.
   update((s) => {
     const show = s.shows[id];
     if (show) {
       s.shows[id] = {
         ...show,
         providers: providers || [],
+        providersFree: Array.isArray(free) ? free : [],
         providersLink: link || '',
         providersSynced: new Date().toISOString(),
       };
     }
   });
   markShowDirty(id);
+}
+
+// The same availability cache for a PLANNED (watchlist) movie, so the Watchlist's "On my
+// services" filter can use it. Only planned entries with this TMDB id are touched.
+export function setMovieProviders(tmdbId, providers, link, free) {
+  if (tmdbId == null) return;
+  let changed = false;
+  const now = new Date().toISOString();
+  update((s) => {
+    s.movies = (s.movies || []).map((m) => {
+      if (!m || m.tmdbId !== tmdbId || movieStatus(m) !== 'planned') return m;
+      changed = true;
+      return { ...m, providers: providers || [], providersFree: Array.isArray(free) ? free : [], providersLink: link || '', providersSynced: now };
+    });
+  });
+  if (changed) markMoviesDirty();
 }
 
 export function setShowAnime(id, anime) {

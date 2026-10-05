@@ -3,6 +3,7 @@ import { Sheet } from './ui.jsx';
 import { img } from '../api/tmdb.js';
 import { posterTint, initialOf } from './libraryLogic.js';
 import { orphanIntro, orphanMeta, deleteAllIntro } from './settingsLogic.js';
+import { ServicesPicker, FREE_NOTE } from './ServicesUI.jsx';
 import { WIPE_WORD, confirmOk, wipeIntro, wipeEffects, wipeBackupLine } from '../store/wipeLogic.js';
 
 // The Settings cards (Claude Design, Direction A). Purely presentational: the
@@ -220,6 +221,21 @@ export function CleanupCard({ rows, onAskDelete }) {
 }
 
 // ---------------------------------------------------------------- Backup + danger zone
+// Which subscriptions you pay for, for the "On my services" filter (kept on this device).
+export function ServicesCard({ mine, onToggle }) {
+  return (
+    <SetCard icon={I.cloud} label="Streaming" title="My services">
+      <p className="sd-setp">
+        Tick the subscriptions you pay for. “On my services” on the Watchlist and the Shows tab then shows only what you
+        can stream right now.
+      </p>
+      <div style={{ marginTop: 14 }}><ServicesPicker mine={mine} onToggle={onToggle} /></div>
+      <div className="sd-setinfo">{I.info}<span>{FREE_NOTE}</span></div>
+      <div className="sd-setnote">{I.lock}Kept on this device only.</div>
+    </SetCard>
+  );
+}
+
 // The gentle reminder at the top of Settings (see backupNudgeLogic.js for when it shows).
 export function BackupNudge({ copy, onBackup, onLater }) {
   return (

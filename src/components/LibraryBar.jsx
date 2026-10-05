@@ -457,7 +457,7 @@ function Art({ path, name, children, initialPos = 'top' }) {
 
 // A show in the library grid: poster, progress bar while watching, a teal tick
 // when finished, then title, "27 / 49 eps" and your star rating.
-export function ShowTile({ show, seen, onOpen }) {
+export function ShowTile({ show, seen, onOpen, sub }) {
   const total = show.totalEpisodes || 0;
   const done = total > 0 && seen >= total;
   const pct = total ? Math.min(100, Math.round((seen / total) * 100)) : 0;
@@ -478,6 +478,7 @@ export function ShowTile({ show, seen, onOpen }) {
           <span className="rate"><StarIcon size={10} />{show.rating}</span>
         ) : null}
       </span>
+      {sub ? <span className="sd-ltile-sub">{sub}</span> : null}
     </button>
   );
 }

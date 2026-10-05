@@ -38,6 +38,7 @@ import AnimeSheet from '../components/AnimeSheet.jsx';
 import FinishCardSheet from '../components/FinishCardSheet.jsx';
 import { WhenSheet, FixDatesSheet } from '../components/WatchDateSheets.jsx';
 import { stampForDay, fixedToast, watchedList } from '../components/watchDatesLogic.js';
+import { normalizeProviders } from '../components/servicesLogic.js';
 import { isFinishedShow, becomesFinished } from '../components/finishCardLogic.js';
 import { looksLikeAnime, altTitles, summaryLine } from '../components/animeLogic.js';
 import { Bar, Chevron, Sheet } from '../components/ui.jsx';
@@ -380,12 +381,8 @@ export default function ShowDetail({ id, onBack }) {
     setStreamLoading(true);
     try {
       const au = await watchProviders('tv', show.tmdbId);
-      const flatrate = (au && au.flatrate) || [];
-      setShowProviders(
-        id,
-        flatrate.map((p) => ({ name: p.provider_name, logo: p.logo_path })),
-        au && au.link
-      );
+      const { providers: subs, free, link } = normalizeProviders(au);
+      setShowProviders(id, subs, link, free);
     } catch (err) {
       alert('Could not load streaming info: ' + err.message);
     } finally {
@@ -483,8 +480,10 @@ export default function ShowDetail({ id, onBack }) {
   let streamSub;
   if (!show.tmdbId) streamSub = 'Link to TMDB to check availability';
   else if (!hasKey()) streamSub = 'Add a TMDB API key in Settings';
-  else if (providers.length) streamSub = providers.map((p) => p.name).join(' · ');
-  else if (show.providersSynced) streamSub = 'Not streaming in Australia';
+  else if (providers.length || (show.providersFree || []).length) {
+    const free = (show.providersFree || []).map((p) => p.name);
+    streamSub = [providers.map((p) => p.name).join(' · '), free.length ? `Free: ${free.slice(0, 2).join(', ')}` : ''].filter(Boolean).join(' · ');
+  } else if (show.providersSynced) streamSub = 'Not streaming in Australia';
   else streamSub = 'Tap to check availability';
 
   const rating = show.rating || 0;
@@ -824,10 +823,25 @@ export default function ShowDetail({ id, onBack }) {
           </div>
         ) : (
           <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-            {show.providersSynced
+            {show.providersSynced && !(show.providersFree || []).length
               ? 'Not currently streaming anywhere in Australia, per TMDB/JustWatch.'
+              : show.providersSynced
+              ? 'No subscription service has it right now.'
               : 'Tap “Check” to see where this is streaming.'}
           </p>
+        )}
+        {(show.providersFree || []).length > 0 && (
+          <div className="sd-card" style={{ marginTop: 12 }} aria-label="Free to watch">
+            {show.providersFree.map((p, i) => (
+              <div key={p.name} className={'sd-row' + (i > 0 ? ' sd-sep' : '')} style={{ cursor: 'default' }}>
+                <span style={{ width: 32, height: 32, borderRadius: 8, overflow: 'hidden', flex: 'none', background: 'var(--line)', display: 'block' }}>
+                  {p.logo && <img src={img(p.logo, 'w92')} alt="" style={{ width: 32, height: 32, display: 'block' }} />}
+                </span>
+                <span style={{ flexGrow: 1 }}>{p.name}</span>
+                <span className="sd-mono" style={{ fontSize: 11, color: 'var(--amber)' }}>FREE</span>
+              </div>
+            ))}
+          </div>
         )}
         <button
           className="sd-btn"

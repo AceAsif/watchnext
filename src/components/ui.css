@@ -1445,3 +1445,12 @@ button.sd-nitem:focus-visible { outline: 2px solid var(--amber); outline-offset:
 .sd-nudge .acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .sd-nudge .acts .sd-btn { flex: 1 1 140px; }
 .sd-lastbk { margin: 10px 0 0; font-size: 12px; color: var(--text-dim); }
+
+/* "On my services" filter */
+.sd-svcbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 14px; }
+.sd-svcbar--lbar { margin-top: 10px; }
+.sd-svcbar .sd-svctoggle { flex: 0 0 auto; width: auto; min-width: 0; padding-left: 16px; padding-right: 16px; }
+.sd-svc-status { flex: 1 1 100%; margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.sd-svctoggle.active { border-color: var(--teal); color: var(--teal); background: rgba(86, 200, 181, 0.1); }
+.sd-svc-meta { color: var(--teal); }
+.sd-ltile-sub { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: 11px; color: var(--teal); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }

@@ -11,11 +11,16 @@ import {
 } from '../store/db.js';
 import { searchShows, showDetails, resolveShow, hasKey, watchProviders } from '../api/tmdb.js';
 import { platformFromProviders, platformById, PLATFORMS } from '../components/PlatformPicker.jsx';
+import { normalizeProviders, isOnMyServices, servicesLabel, statusLine } from '../components/servicesLogic.js';
+import { useServicesPrefs, setServicesPrefs } from '../store/servicesPrefs.js';
+import useAvailability from '../components/useAvailability.js';
+import { ServicesToggle, ServicesStatus, ServicesSheet } from '../components/ServicesUI.jsx';
 import {
   SHOW_STATUSES,
   SHOW_SORTS,
   DEFAULT_SHOW_FILTERS,
   filterShows,
+  showStatus,
   sortShows,
   statusCounts,
   platformCounts,
@@ -72,12 +77,32 @@ export default function Shows({ openShow }) {
 
   const entries = useMemo(() => Object.entries(state.shows), [state.shows]);
   const followed = useMemo(() => entries.filter(([, s]) => s.followed), [entries]);
+  // "On my services": when on, the whole page (list, status tabs, platform counts) works on the
+  // titles confirmed to be on a service you pay for or free to watch. Titles whose availability
+  // isn't known yet are checked in the background (those the current filters would show).
+  const svc = useServicesPrefs();
+  const mine = useMemo(() => new Set(svc.mine), [svc.mine]);
+  const servicesOn = svc.showsOnly;
+  const [pickServices, setPickServices] = useState(false);
+  const base = useMemo(() => (servicesOn ? entries.filter(([, s]) => isOnMyServices(s, mine)) : entries), [entries, servicesOn, mine]);
   const list = useMemo(
-    () => sortShows(filterShows(entries, filters, H), sortBy, sortDir, H),
-    [entries, filters, sortBy, sortDir]
+    () => sortShows(filterShows(base, filters, H), sortBy, sortDir, H),
+    [base, filters, sortBy, sortDir]
   );
-  const counts = useMemo(() => statusCounts(entries, filters, H), [entries, filters]);
-  const pcounts = useMemo(() => platformCounts(entries, filters, H), [entries, filters]);
+  const counts = useMemo(() => statusCounts(base, filters, H), [base, filters]);
+  const pcounts = useMemo(() => platformCounts(base, filters, H), [base, filters]);
+  const checkItems = useMemo(() => {
+    const prio = (s) => { const st = showStatus(s, H); return st === 'Watching' || st === 'Not started' ? 0 : 1; }; // active shows first
+    return filterShows(entries, filters, H)
+      .map(([id, s]) => ({ key: 's:' + id, kind: 'tv', id, tmdbId: s.tmdbId, rec: s, p: prio(s) }))
+      .sort((a, b) => a.p - b.p);
+  }, [entries, filters]);
+  const av = useAvailability(checkItems, servicesOn);
+  const svcStatus = servicesOn ? statusLine({ remaining: av.remaining, failed: av.failed, noKey: av.noKey, noServices: svc.mine.length === 0, unknownIds: av.noId }) : null;
+  const toggleServices = () => {
+    setServicesPrefs({ showsOnly: !servicesOn });
+    if (!servicesOn && svc.mine.length === 0) setPickServices(true);
+  };
   const platforms = useMemo(() => platformsInUse(entries, PLATFORMS), [entries]);
 
   const unsynced = useMemo(() => followed.filter(([, s]) => !s.lastSynced), [followed]);
@@ -121,11 +146,8 @@ export default function Shows({ openShow }) {
       try {
         const au = await watchProviders('tv', show.tmdbId);
         const flatrate = (au && au.flatrate) || [];
-        setShowProviders(
-          id,
-          flatrate.map((p) => ({ name: p.provider_name, logo: p.logo_path })),
-          au && au.link
-        );
+        const { providers: subs, free, link } = normalizeProviders(au);
+        setShowProviders(id, subs, link, free);
         const pid = platformFromProviders(flatrate);
         if (pid) setShowPlatform(id, pid);
       } catch (err) {
@@ -216,7 +238,8 @@ export default function Shows({ openShow }) {
   };
 
   // ---- toolbar pieces
-  const filtered = isFiltered(filters);
+  const filtered = isFiltered(filters) || servicesOn;
+  const clearAll = () => { clearFilters(); setServicesPrefs({ showsOnly: false }); };
   const platformLabel = (id) => (platformById(id) ? platformById(id).label : id);
   const platformOptions = [
     { id: 'All', label: 'Any platform', count: pcounts.total },
@@ -268,7 +291,14 @@ export default function Shows({ openShow }) {
               />
               <SortDirButton dir={sortDir} onToggle={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))} />
             </div>
-            {filtered && <ToolbarClear onClear={clearFilters} />}
+            {filtered && <ToolbarClear onClear={clearAll} />}
+          </div>
+          <div className="sd-svcbar sd-svcbar--lbar">
+            <ServicesToggle on={servicesOn} onToggle={toggleServices} />
+            <button type="button" className="sd-linkbtn" onClick={() => setPickServices(true)}>
+              {svc.mine.length ? `My services (${svc.mine.length})` : 'Choose my services'}
+            </button>
+            {servicesOn && <ServicesStatus text={svcStatus} canRetry={av.failed > 0} onRetry={av.retry} />}
           </div>
           <CountLine
             shown={list.length}
@@ -276,15 +306,26 @@ export default function Shows({ openShow }) {
             noun="shows"
             summary={sortSummary(sortBy, sortDir)}
             filtered={filtered}
-            onClear={clearFilters}
+            onClear={clearAll}
           />
         </>
       )}
+      {pickServices && <ServicesSheet onClose={() => setPickServices(false)} />}
 
-      {list.length > 0 ? (
+      {list.length === 0 && servicesOn && followed.length > 0 ? (
+        <LibEmpty
+          icon={<TvIcon size={28} />}
+          title="Nothing here is on your services"
+          actions={<ResBtn onClick={() => setServicesPrefs({ showsOnly: false })}>Show everything</ResBtn>}
+        >
+          {av.remaining > 0
+            ? 'Still checking: shows appear here as soon as they’re confirmed.'
+            : 'Free-to-watch services count too. You can change which services you pay for in Settings.'}
+        </LibEmpty>
+      ) : list.length > 0 ? (
         <div className="sd-lgrid">
           {list.map(([id, show]) => (
-            <ShowTile key={id} show={show} seen={watchedCount(show)} onOpen={() => openShow(id)} />
+            <ShowTile key={id} show={show} seen={watchedCount(show)} onOpen={() => openShow(id)} sub={servicesOn ? servicesLabel(show, mine) : ''} />
           ))}
         </div>
       ) : kind === 'library' ? (
