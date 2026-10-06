@@ -358,6 +358,21 @@ export function setMovieProviders(tmdbId, providers, link, free) {
   if (changed) markMoviesDirty();
 }
 
+// Genres for a PLANNED movie that was queued before genres were stored, so "What should I
+// watch tonight?" can match it to a mood. Only planned entries with that TMDB id change.
+export function setMovieGenres(tmdbId, genres) {
+  if (tmdbId == null || !Array.isArray(genres)) return;
+  let changed = false;
+  update((s) => {
+    s.movies = (s.movies || []).map((m) => {
+      if (!m || m.tmdbId !== tmdbId || movieStatus(m) !== 'planned') return m;
+      changed = true;
+      return { ...m, genres: genres.filter((g) => typeof g === 'string') };
+    });
+  });
+  if (changed) markMoviesDirty();
+}
+
 export function setShowAnime(id, anime) {
   // anime: the AniList snapshot from animeLogic.normalizeMedia(), or null to
   //   unlink. Display-only — never touches watched/seasons/episode counts.
@@ -725,6 +740,7 @@ export function addMovieWatched(details, force = false) {
         runtimeMin: details.runtime || null,
         poster: details.poster_path || null,
         year: (details.release_date || '').slice(0, 4) || null,
+        genres: (details.genres || []).map((g) => g.name),
       },
     ];
   });
@@ -746,6 +762,7 @@ export function addMovieToWatchlist(details) {
         runtimeMin: details.runtime || null,
         poster: details.poster_path || null,
         year: (details.release_date || '').slice(0, 4) || null,
+        genres: (details.genres || []).map((g) => g.name),
       },
     ];
   });

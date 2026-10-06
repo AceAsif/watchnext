@@ -12,6 +12,8 @@ import {
 } from '../store/db.js';
 import { hasKey, fetchUpcomingEpisodes } from '../api/tmdb.js';
 import CalendarGrid from '../components/CalendarGrid.jsx';
+import TonightSheet from '../components/TonightSheet.jsx';
+import { Chevron } from '../components/ui.jsx';
 import { Poster, EpisodeRow } from '../components/AgendaEpisode.jsx';
 import { localISODate } from '../components/showLogic.js';
 import {
@@ -135,6 +137,7 @@ export default function UpNext({ openShow }) {
   const [refresh, setRefresh] = useState(null); // {done, total} while refreshing
   const [view, setView] = useState('list'); // 'list' | 'calendar'
   const [showAll, setShowAll] = useState(false);
+  const [tonightOpen, setTonightOpen] = useState(false); // "What should I watch tonight?"
   const [toast, setToast] = useState(null); // last mark, for Undo
 
   const today = localISODate();
@@ -211,6 +214,17 @@ export default function UpNext({ openShow }) {
         <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800 }}>Up Next</h1>
         <span className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>{headerDate(today)}</span>
       </div>
+
+      {!empty && (
+        <button type="button" className="sd-tonight" onClick={() => setTonightOpen(true)}>
+          <span className="txt">
+            <strong>What should I watch tonight?</strong>
+            <small>Pick your time and mood</small>
+          </span>
+          <Chevron />
+        </button>
+      )}
+      {tonightOpen && <TonightSheet openShow={openShow} onClose={() => setTonightOpen(false)} />}
 
       {empty && (
         <Notice accent>
