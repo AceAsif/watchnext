@@ -88,7 +88,7 @@ let checks = 0; const ok = (name, fn) => { fn(); checks++; console.log('  PASS',
 console.log('1. STRUCTURE (phone 390px)');
 let p = await open();
 const heads = await p.evaluate(() => [...document.querySelectorAll('.sd-setcard h2')].map((h) => h.textContent));
-ok('cards in the designed order: Sync, TMDB key, Import, Clean up, Backup, then the Danger zone', () => assert.deepEqual(heads, ['Sync across devices', 'TMDB API key', 'Import TV Time history', 'Clean up shows', 'Backup', 'Delete all data']));
+ok('cards in the designed order: Sync, TMDB key, Import, Clean up, Backup, then the Danger zone', () => assert.deepEqual(heads, ['Sync across devices', 'TMDB API key', 'My services', 'Import TV Time history', 'Clean up shows', 'Backup', 'Export for Power BI', 'Delete all data']));
 assert.equal(await p.evaluate(() => { const c = [...document.querySelectorAll('.sd-setcard')]; return c[c.length - 1].classList.contains('danger') && c.filter((x) => x.classList.contains('danger')).length; }), 1); checks++; console.log('  PASS exactly one danger card, and it is last');
 const sync = await p.evaluate(() => document.querySelector('.sd-setcard').textContent);
 ok('Sync (signed out, cloud configured in this build): offers "Sign in with Google" and shows no invented "Syncing"/"Local only" label', () => { assert.match(sync, /Sign in with Google/); assert.doesNotMatch(sync, /Syncing|Local only/); });

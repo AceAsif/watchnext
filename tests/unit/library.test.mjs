@@ -56,7 +56,8 @@ for (let i = 0; i < 320; i++) {
   shows[`tmdb:${i}`] = { name, followed: rnd() < 0.85, totalEpisodes: total, watched, platform: pick(PLATS), rating: pick([0, 0, 1, 2, 3, 4, 5, undefined]), addedAt: rnd() < 0.4 ? `2026-0${1 + Math.floor(rnd() * 9)}-1${Math.floor(rnd() * 9)}` : undefined };
 }
 const entries = Object.entries(shows);
-const STATUSES = L.SHOW_STATUSES, PLATFORMS = ['All', 'netflix', 'prime', 'disney', 'max', 'crunchyroll', 'stan', 'hulu'];
+const STATUSES = ['All', 'Watching', 'Finished', 'Not started'], // parity with the OLD code: Dropped is new and has its own tests below
+   PLATFORMS = ['All', 'netflix', 'prime', 'disney', 'max', 'crunchyroll', 'stan', 'hulu'];
 const QUERIES = ['', 'a', 'The', '  bleach ', 'ZED', 'café', 'nomatchxyz', 'o'];
 const SORTS = L.SHOW_SORTS.map((s) => s.id);
 

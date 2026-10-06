@@ -112,6 +112,31 @@ let p = await open(stateWith(shows, [mv(10, 'Movie A', '2026-05-05T10:00:00.000Z
 const onscreen = await p.evaluate(() => { const el = document.querySelector('.sd-yir'); return el ? { bg: getComputedStyle(el).backgroundImage, txt: el.innerText } : null; });
 ok('on-screen card exists and has the warm->teal radial gradient', () => { assert.ok(onscreen); assert.match(onscreen.bg, /radial-gradient/); assert.match(onscreen.bg, /242, 163, 60/); assert.match(onscreen.bg, /86, 200, 181/); });
 await p.screenshot({ path: `${OUT}/A_screen.png`, fullPage: true });
+const geo = await p.evaluate(() => {
+  const card = document.querySelector('.sd-yir'); const cr = card.getBoundingClientRect();
+  const arts = [...card.querySelectorAll('.sd-yir-art')].map((a) => { const r = a.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, right: r.right }; });
+  const names = [...card.querySelectorAll('.sd-yir-name')].map((n) => ({ t: n.textContent, top: n.getBoundingClientRect().top }));
+  return { card: { l: cr.left, r: cr.right }, arts, names, overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+});
+ok('on-screen: three posters side by side, same size, 2:3, inside the card', () => {
+  assert.equal(geo.arts.length, 3);
+  assert.ok(geo.arts.every((a) => Math.abs(a.w - geo.arts[0].w) < 1 && Math.abs(a.y - geo.arts[0].y) < 1));
+  assert.ok(geo.arts.every((a) => Math.abs(a.h / a.w - 1.5) < 0.02), JSON.stringify(geo.arts));
+  assert.ok(geo.arts[0].x >= geo.card.l && geo.arts[2].right <= geo.card.r);
+  assert.ok(geo.arts[0].w >= 90, 'posters are big on a 390px phone: ' + geo.arts[0].w);
+  assert.ok(geo.names.every((n) => n.top > geo.arts[0].y + geo.arts[0].h - 2), 'names sit under the posters');
+  assert.equal(geo.overflowX, false);
+});
+{ const el = await p.$('.sd-yir'); await el.scrollIntoView(); await wait(200); await el.screenshot({ path: `${OUT}/A_screen_phone.png` }); }
+const small = await p.evaluate(() => { const c = document.querySelector('.sd-yir'); c.scrollIntoView(); return true; });
+await p.setViewport({ width: 320, height: 800, deviceScaleFactor: 2 }); await wait(300);
+const g320 = await p.evaluate(() => ({ ox: document.documentElement.scrollWidth > document.documentElement.clientWidth, w: document.querySelector('.sd-yir-art').getBoundingClientRect().width }));
+ok('on-screen at 320px: no sideways scroll, posters still >= 70px', () => { assert.equal(g320.ox, false); assert.ok(g320.w >= 70, String(g320.w)); });
+await p.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 }); await wait(400);
+{ const el = await p.$('.sd-yir'); await el.scrollIntoView(); await wait(200); await el.screenshot({ path: `${OUT}/A_screen_desktop.png` }); }
+const gd = await p.evaluate(() => { const a = [...document.querySelectorAll('.sd-yir-art')].map((x) => x.getBoundingClientRect()); return { w: a[0].width, h: a[0].height, ox: document.documentElement.scrollWidth > document.documentElement.clientWidth }; });
+ok('on-screen desktop: no sideways scroll; poster height is reasonable (< 420px)', () => { assert.equal(gd.ox, false); assert.ok(gd.h < 420, JSON.stringify(gd)); });
+await p.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 }); await wait(300);
 let a = await exportPng(p, 'A_full');
 const dataA = Y.planYearImage({ year: 2026, prevYear: 2025, epDelta: 1, topShows: [{}, {}, {}], busiestMonth: { name: 'x' }, topGenre: 'g' });
 ok('PNG is exactly 1080x1350', () => assert.deepEqual(a.dim, [1080, 1350]));
@@ -123,7 +148,8 @@ ok('gradient is faint: corners stay close to the card colour (no loud wash)', ()
 ok('the on-screen card text lists top shows in order', () => { const t = onscreen.txt; assert.ok(t.indexOf('Naruto') < t.indexOf('Bleach') && t.indexOf('Bleach') < t.indexOf('One Piece')); });
 const pl = Y.planYearImage({ year: 2026, prevYear: 2025, epDelta: 1, topShows: [{}, {}, {}], busiestMonth: { name: 'x' }, topGenre: 'g' });
 for (const [i, key] of ['/p1.jpg', '/p2.jpg', '/p3.jpg'].entries()) {
-  const c = await a.px(Y.IMG_PAD + 52 + Y.ROW.posterW / 2, pl.rowsTop + i * Y.ROW.pitch + Y.ROW.posterH / 2);
+  const bx = Y.posterBox(pl, i);
+  const c = await a.px(Math.round(bx.x + bx.w / 2), Math.round(bx.y + bx.h / 2));
   ok(`poster ${i + 1} is drawn in its slot with the right pixels ${JSON.stringify(POSTER_RGB[key])}`, () => assert.ok(near(c, POSTER_RGB[key], 25), JSON.stringify(c)));
 }
 const foot = await p.evaluate(() => { const d = window.__cx.getImageData(64, 1226, 400, 60).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 150) n++; return n; });
@@ -138,7 +164,8 @@ p = await open(stateWith(shows, [mv(10, 'Movie A', '2026-05-05T10:00:00.000Z')])
 let b = await exportPng(p, 'B_poster_fail');
 ok('export still succeeds at 1080x1350', () => assert.deepEqual(b.dim, [1080, 1350]));
 for (let i = 0; i < 3; i++) {
-  const c = await b.px(Y.IMG_PAD + 52 + 6, pl.rowsTop + i * Y.ROW.pitch + 10);
+  const bx = Y.posterBox(pl, i);
+  const c = await b.px(Math.round(bx.x + 12), Math.round(bx.y + 12));
   ok(`slot ${i + 1} shows the neutral placeholder, not a poster colour`, () => assert.ok(near(c, [20, 25, 34], 14), JSON.stringify(c)));
 }
 await p.close();

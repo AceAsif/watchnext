@@ -122,14 +122,14 @@ await ok('"Log another watch" (a rewatch) resumes + toast, and counts the rewatc
 });
 await clickText(p, 'Undo', '.sd-toast button'); await wait(300);
 await ok('Undo after a rewatch re-drops with the original date (the rewatch stays logged)', async () => { const s4 = await show(p, 'tmdb:4'); assert.equal(s4.dropped, true); assert.equal(s4.droppedAt, DROPPED_AT); assert.equal(s4.watched['1x2'].n, 2); });
-await clickText(p, 'Mark season watched'); await wait(350);
+await clickText(p, 'Mark season watched'); await wait(350); await clickText(p, 'Just now', '[role=dialog] button'); await wait(350);
 await ok('"Mark season watched" resumes + toast', async () => { assert.strictEqual((await show(p, 'tmdb:4')).dropped, false); assert.ok(await toast(p)); });
 await clickText(p, 'Unmark season'); await wait(350);
 await ok('"Unmark season" never resumes a dropped show (re-drop it first to prove it)', async () => {
   await p.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === 'More actions').click()); await wait(300);
   await clickText(p, 'Drop this show'); await wait(350);
   assert.strictEqual((await show(p, 'tmdb:4')).dropped, true);
-  await clickText(p, 'Mark season watched'); await wait(300); // resumes again…
+  await clickText(p, 'Mark season watched'); await wait(350); await clickText(p, 'Just now', '[role=dialog] button'); await wait(300); // resumes again…
   await p.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === 'More actions').click()); await wait(300);
   await clickText(p, 'Drop this show'); await wait(350);
   await clickText(p, 'Unmark season'); await wait(350);
@@ -138,7 +138,8 @@ await ok('"Unmark season" never resumes a dropped show (re-drop it first to prov
 await p.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === 'More actions').click()); await wait(300);
 await ok('the menu says "Resume watching" for a dropped show; using it resumes WITHOUT a toast', async () => {
   await clickText(p, 'Resume watching'); await wait(350);
-  assert.strictEqual((await show(p, 'tmdb:4')).dropped, false); assert.equal(await toast(p), null);
+  // (an earlier "Mark season watched" finished this ended show, so the separate "You finished" prompt may still be showing)
+  assert.strictEqual((await show(p, 'tmdb:4')).dropped, false); const tt = await toast(p); assert.ok(!tt || !/Resumed/.test(tt), 'no Resumed toast: ' + tt);
 });
 await p.close();
 
@@ -202,6 +203,10 @@ await ok('BUSY: button says "Deleting…" and is disabled; Cancel + the field ar
 await wait(2600);
 await ok('SUCCESS: backup is downloaded BEFORE the wipe starts, in that order', async () => {
   const ev = await p.evaluate(() => window.__events); assert.deepEqual(ev, ['download:watchnext-backup-2026-10-02.json', 'wipe-start', 'wipe-done']);
+});
+await ok('the automatic backup before Delete everywhere counts as a backup (the reminder record is stamped)', async () => {
+  const m = await p.evaluate(() => JSON.parse(localStorage.getItem('watchnext-backup-v1') || 'null')); assert.ok(m && m.lastAt && Math.abs(Date.parse(m.lastAt) - Date.parse('2026-10-01T22:00:00.000Z')) < 60000, JSON.stringify(m)); const dl = (await p.evaluate(() => window.__dl)).find((x) => x.name.endsWith('.json')); const j = JSON.parse(Buffer.from(dl.bytes).toString('utf8'));
+  const inFile = Object.keys(j.shows).length + Object.values(j.shows).reduce((a, s) => a + Object.keys(s.watched || {}).length, 0) + j.movies.length; assert.equal(m.lastCount, inFile, 'library size recorded = what the backup file actually holds');
 });
 await ok('the downloaded backup really contains the data (5 shows, the movie) and no TMDB key', async () => {
   const d = (await p.evaluate(() => window.__dl)).find((x) => x.name.endsWith('.json')); const j = JSON.parse(Buffer.from(d.bytes).toString('utf8'));

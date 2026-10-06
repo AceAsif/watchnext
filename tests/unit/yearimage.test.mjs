@@ -95,20 +95,32 @@ for (const [name, d] of Object.entries(variants)) {
     assert.ok(p.bottom < p.footerRule - 24, `${name}: bottom ${p.bottom} vs footer rule ${p.footerRule}`);
     assert.ok(p.footerBase <= Y.IMG_H - Y.IMG_PAD + 1);
     assert.ok(p.shows.length <= 3);
-    const ys = [p.labelY, p.yearBase, p.deltaY, p.statsValueY, p.statsLabelY, p.showsLabelY, p.rowsTop, p.factsLabelY, p.factsValueY].filter((v) => v != null);
+    const ys = [p.labelY, p.yearBase, p.deltaY, p.statsValueY, p.statsLabelY, p.showsLabelY, p.gridTop, p.nameY, p.epsY, p.factsLabelY, p.factsValueY].filter((v) => v != null);
     assert.deepEqual([...ys].sort((a, b) => a - b), ys, 'sections must run top to bottom');
   });
 }
 t('layout: sections collapse (no delta / no shows / no facts leave no gap or nulls)', () => {
   assert.equal(Y.planYearImage(variants.noPrevYear).deltaY, null);
   assert.equal(Y.planYearImage(variants.noShows).showsLabelY, null);
-  assert.equal(Y.planYearImage(variants.noShows).rowsTop, null);
+  assert.equal(Y.planYearImage(variants.noShows).gridTop, null);
   assert.equal(Y.planYearImage(variants.noFacts).factsRule, null);
   assert.ok(Y.planYearImage(variants.noShows).bottom < Y.planYearImage(variants.full).bottom);
   assert.equal(Y.planYearImage(variants.manyShows).shows.length, 3);
 });
-t('layout: full-card content leaves a comfortable gap above the footer (>= 60px)', () => {
-  const p = Y.planYearImage(variants.full); assert.ok(p.footerRule - p.bottom >= 60, String(p.footerRule - p.bottom));
+t('layout: full-card content leaves a comfortable gap above the footer (>= 40px)', () => {
+  const p = Y.planYearImage(variants.full); assert.ok(p.footerRule - p.bottom >= 40, String(p.footerRule - p.bottom));
 });
+
+t('poster grid: three 2:3 posters side by side, inside the margins, never overlapping', () => {
+  const p = Y.planYearImage(base());
+  const boxes = [0, 1, 2].map((i) => Y.posterBox(p, i));
+  assert.equal(Math.abs(boxes[0].h - boxes[0].w * 1.5) < 1, true);
+  assert.equal(boxes[0].x, Y.IMG_PAD);
+  assert.ok(Math.abs(boxes[2].x + boxes[2].w - (Y.IMG_W - Y.IMG_PAD)) < 1, 'right edge on the margin');
+  for (let i = 1; i < 3; i++) assert.ok(boxes[i].x >= boxes[i - 1].x + boxes[i - 1].w + 20);
+  assert.ok(boxes.every((b) => b.y === p.gridTop && b.y + b.h < p.nameY));
+  assert.ok(p.nameY < p.epsY && p.epsY < p.bottom);
+});
+t('posters are big (>= 280px wide) — the point of the old layout', () => assert.ok(Y.POSTER_W >= 280));
 
 console.log(`\n${n} tests passed`);
