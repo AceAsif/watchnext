@@ -28,13 +28,13 @@ t('file detection: backup (shows is an object) vs TV Time export (shows is an ar
 t('ROUND TRIP: restoring a backup into an EMPTY state reproduces every show and movie exactly (the key stays out)', () => {
   const r = mergeBackup(EMPTY(), backup);
   assert.deepEqual(r.shows, ORIGINAL.shows); assert.deepEqual(r.movies, ORIGINAL.movies);
-  assert.deepEqual(r.summary, { showsAdded: 3, showsUpdated: 0, watchesAdded: 35, moviesAdded: 3, skipped: 0, notesAdded: 0 });
+  assert.deepEqual(r.summary, { showsAdded: 3, showsUpdated: 0, watchesAdded: 35, moviesAdded: 3, skipped: 0, notesAdded: 0, goalsAdded: 0 });
   assert.deepEqual(r.touchedIds.sort(), ['tmdb:1', 'tmdb:2', 'tvdb:77']); assert.equal(r.moviesChanged, true);
   assert.ok(!JSON.stringify(r).includes('SECRET'));
 });
 t('IDEMPOTENT: restoring the same backup twice changes nothing the second time', () => {
   const first = mergeBackup(EMPTY(), backup); const second = mergeBackup({ shows: first.shows, movies: first.movies }, backup);
-  assert.deepEqual(second.summary, { showsAdded: 0, showsUpdated: 0, watchesAdded: 0, moviesAdded: 0, skipped: 0, notesAdded: 0 });
+  assert.deepEqual(second.summary, { showsAdded: 0, showsUpdated: 0, watchesAdded: 0, moviesAdded: 0, skipped: 0, notesAdded: 0, goalsAdded: 0 });
   assert.deepEqual(second.touchedIds, []); assert.equal(second.moviesChanged, false); assert.deepEqual(second.shows, first.shows); assert.deepEqual(second.movies, first.movies);
 });
 t('NEVER modifies its inputs (local state or the parsed file)', () => {
@@ -87,7 +87,7 @@ t('MALFORMED entries are skipped, not fatal: non-object shows, junk movies, watc
 t('a file that is not a WatchNext backup throws a clear error (TV Time export, junk, wrong shapes)', () => {
   for (const j of [{ shows: [] }, { hello: 1 }, null, 'x', []]) assert.throws(() => mergeBackup(EMPTY(), j), /does not look like a WatchNext backup/);
 });
-t('an EMPTY backup is valid and changes nothing', () => { const r = mergeBackup({ shows: { a: { name: 'A', watched: {} } }, movies: [] }, { shows: {}, movies: [] }); assert.deepEqual(r.summary, { showsAdded: 0, showsUpdated: 0, watchesAdded: 0, moviesAdded: 0, skipped: 0, notesAdded: 0 }); assert.equal(r.moviesChanged, false); });
+t('an EMPTY backup is valid and changes nothing', () => { const r = mergeBackup({ shows: { a: { name: 'A', watched: {} } }, movies: [] }, { shows: {}, movies: [] }); assert.deepEqual(r.summary, { showsAdded: 0, showsUpdated: 0, watchesAdded: 0, moviesAdded: 0, skipped: 0, notesAdded: 0, goalsAdded: 0 }); assert.equal(r.moviesChanged, false); });
 t('OLD backups that still contain the TMDB key: the key is ignored on restore (never copied into state)', () => {
   const old = JSON.parse(JSON.stringify(ORIGINAL)); const r = mergeBackup(EMPTY(), old); assert.ok(!('settings' in r)); assert.ok(!JSON.stringify(r).includes('SECRET'));
 });

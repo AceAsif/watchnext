@@ -78,9 +78,16 @@ export const GRID = { cols: 3, gap: 28 };
 export const POSTER_W = (IMG_W - 2 * IMG_PAD - (GRID.cols - 1) * GRID.gap) / GRID.cols; // ~298.7
 export const POSTER_H = Math.round(POSTER_W * 1.5); // 448
 
-// Box of poster `i` (0-based) given the plan's gridTop.
+// Posters shrink a little when the card also carries goal progress, to make room for it.
+export const GOAL_POSTER_SCALE = 0.86;
+// Which stat cell shows which goal (Days has no goal).
+export const GOAL_FOR_STAT = { EPISODES: 'episodes', HOURS: 'hours', MOVIES: 'movies' };
+export const hasCardGoals = (data) => !!(data && data.goals && Object.keys(data.goals).length);
+
+// Box of poster `i` (0-based) given the plan's gridTop (and, with goals, its smaller poster size).
 export function posterBox(plan, i) {
-  return { x: IMG_PAD + i * (POSTER_W + GRID.gap), y: plan.gridTop, w: POSTER_W, h: POSTER_H };
+  const w = plan.pw || POSTER_W, h = plan.ph || POSTER_H, gap = plan.pgap == null ? GRID.gap : plan.pgap;
+  return { x: IMG_PAD + i * (w + gap), y: plan.gridTop, w, h };
 }
 
 // Vertical plan. Sections that have no data are skipped and everything below
@@ -105,11 +112,19 @@ export function planYearImage(data) {
   const statsLabelY = statsTop + 96;
   y = statsTop + 110;
 
+  // goal progress: a thin bar and "89% of 400" under each stat that has a goal
+  const goals = hasCardGoals(data);
+  let goalBarY = null, goalTextY = null;
+  if (goals) { goalBarY = statsLabelY + 22; goalTextY = goalBarY + 8 + 26; y = goalTextY + 14; }
+  const pw = goals ? POSTER_W * GOAL_POSTER_SCALE : POSTER_W;
+  const ph = Math.round(pw * 1.5);
+  const pgap = goals ? (IMG_W - 2 * P - GRID.cols * pw) / (GRID.cols - 1) : GRID.gap; // spread the smaller posters across the width
+
   let showsLabelY = null, gridTop = null, nameY = null, epsY = null;
   if (shows.length) {
     showsLabelY = y + 48;
     gridTop = showsLabelY + 24;
-    nameY = gridTop + POSTER_H + 40;
+    nameY = gridTop + ph + 40;
     epsY = nameY + 32;
     y = epsY + 8;
   }
@@ -125,7 +140,7 @@ export function planYearImage(data) {
   const footerBase = IMG_H - P;
   const footerRule = footerBase - 52;
   return {
-    labelY, yearBase, deltaY, statsTop, statsValueY, statsLabelY,
+    labelY, yearBase, deltaY, statsTop, statsValueY, statsLabelY, goalBarY, goalTextY, goals, pw, ph, pgap,
     showsLabelY, gridTop, nameY, epsY, shows, factsRule, factsLabelY, factsValueY, facts,
     delta, footerBase, footerRule, bottom: y,
   };

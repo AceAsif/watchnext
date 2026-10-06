@@ -15,6 +15,7 @@
 // Ids / keys that must never be copied from a file: assigning to one of these on
 // a plain object can rewrite its prototype.
 import { mergeNotes, withMovieNote, movieNoteOf } from './notes.js';
+import { fillGoals } from '../components/goalsLogic.js';
 
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -106,7 +107,7 @@ export function mergeBackup(local, backup) {
 
   const shows = { ...local.shows };
   const touchedIds = [];
-  const summary = { showsAdded: 0, showsUpdated: 0, watchesAdded: 0, moviesAdded: 0, notesAdded: 0, skipped: 0 };
+  const summary = { showsAdded: 0, showsUpdated: 0, watchesAdded: 0, moviesAdded: 0, notesAdded: 0, goalsAdded: 0, skipped: 0 };
 
   for (const [id, back] of Object.entries(backup.shows)) {
     if (BAD_KEYS.has(id) || !isObj(back)) {
@@ -188,5 +189,9 @@ export function mergeBackup(local, backup) {
   }
   const moviesChanged = summary.moviesAdded > 0 || removedPlanned > 0 || movies.length !== startLen || filled > 0;
 
-  return { shows, movies, touchedIds, moviesChanged, summary };
+  // yearly goals: add the years you don't have a goal for; a goal you already set is never overwritten
+  const g = fillGoals(local.goals, backup.goals);
+  summary.goalsAdded = g.added;
+
+  return { shows, movies, goals: g.goals, goalsChanged: g.added > 0, touchedIds, moviesChanged, summary };
 }

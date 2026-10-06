@@ -1479,3 +1479,31 @@ button.sd-nitem:focus-visible { outline: 2px solid var(--amber); outline-offset:
 .sd-tn-q .sd-nchip { height: 36px; min-width: 0; padding: 0 12px; font-size: 14px; }
 .sd-tn-q { gap: 8px; }
 .sd-tn-count { margin: 12px 0 8px; }
+
+/* Yearly goals */
+.sd-goals { display: flex; flex-direction: column; gap: 18px; padding: 18px 18px 16px; }
+.sd-goals-empty { margin: 0; font-size: 14px; line-height: 1.5; color: #c3cad5; }
+.sd-goal { display: flex; flex-direction: column; gap: 8px; }
+.sd-goal-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.sd-goal-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; }
+.sd-goal-num { font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+.sd-goal-pace { font-size: 13px; color: var(--text-dim); }
+.sd-goal-pace.ahead, .sd-goal-pace.on, .sd-goal-pace.met { color: var(--teal); }
+.sd-goal-pace.behind, .sd-goal-pace.missed { color: var(--amber); }
+.sd-goal-streak { padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; letter-spacing: 0.02em; color: var(--text-dim); }
+.sd-goalfield { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.sd-goalfield label { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+.sd-goalfield input {
+  height: 44px; padding: 0 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-sizing: border-box;
+  color: var(--text); font: inherit; font-size: 16px; width: 100%;
+}
+.sd-goalfield input:focus { outline: none; border-color: var(--amber); }
+.sd-goalfield input[aria-invalid='true'] { border-color: var(--red); }
+.sd-goalfield .presets { gap: 6px; }
+.sd-goalfield .presets .sd-nchip { height: 34px; min-width: 0; padding: 0 12px; font-size: 14px; }
+.sd-goalhint { margin: 0; min-height: 18px; font-size: 12px; color: var(--text-dim); }
+.sd-goalhint.err { color: var(--red); }
+/* goal progress on the Year in review card */
+.sd-yir-goal { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.sd-yir-goal .sd-mono { font-size: 10px; letter-spacing: 0.02em; color: var(--text-dim); white-space: nowrap; }
+.sd-yir-goal .sd-mono.met { color: var(--amber); }

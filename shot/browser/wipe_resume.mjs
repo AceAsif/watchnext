@@ -26,6 +26,7 @@ const STATE = {
   },
   movies: [{ tmdbId: 90, name: 'Film One', status: 'watched', watchedAt: '2026-05-06T10:00:00.000Z', runtimeMin: 100, poster: null, year: 2026 }],
   settings: { tmdbKey: 'TESTKEY' },
+  goals: { 2026: { episodes: 400, hours: 300, at: '2026-09-01T00:00:00.000Z' } },
 };
 const SEASON = { episodes: Array.from({ length: 10 }, (_, i) => ({ episode_number: i + 1, name: 'Ep ' + (i + 1), runtime: 40, air_date: '2020-01-0' + ((i % 9) + 1) })) };
 
@@ -213,7 +214,7 @@ await ok('the downloaded backup really contains the data (5 shows, the movie) an
   assert.equal(Object.keys(j.shows).length, 5); assert.equal(j.movies.length, 1); assert.ok(j.shows['tmdb:2'].dropped === true || j.shows['tmdb:2'].dropped === false); assert.equal(j.settings.tmdbKey, undefined);
 });
 await ok('device is empty afterwards: no shows, no movies, TMDB key removed, tombstones remembered, dialog closed', async () => {
-  const st = await stored(p); assert.deepEqual(st.shows, {}); assert.deepEqual(st.movies, []); assert.equal(st.settings.tmdbKey, '');
+  const st = await stored(p); assert.deepEqual(st.shows, {}); assert.deepEqual(st.movies, []); assert.deepEqual(st.goals, {}, 'yearly goals are wiped too'); assert.equal(st.settings.tmdbKey, '');
   const tomb = await p.evaluate(() => JSON.parse(localStorage.getItem('watchnext-tombstones-v1') || '[]')); for (const id of ['tmdb:1', 'tmdb:2', 'tmdb:3', 'tmdb:4', 'tmdb:5']) assert.ok(tomb.includes(id), id);
   assert.equal(await has(p, '[role=alertdialog]'), false);
 });

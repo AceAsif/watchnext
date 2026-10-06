@@ -1,4 +1,4 @@
-import { IMG_W, IMG_PAD, COLORS as C, initialOf, statCells, planYearImage, posterBox } from './yearImageLogic.js';
+import { IMG_W, IMG_PAD, COLORS as C, initialOf, statCells, planYearImage, posterBox, GOAL_FOR_STAT } from './yearImageLogic.js';
 import { DISPLAY, BODY, MONO, rr, newCard, kit, drawCover, drawFooter } from './cardKit.js';
 
 // Largest font size (stepping down from `start`) at which the text fits `maxW`.
@@ -43,6 +43,19 @@ export async function renderPeriodImage(data, { loadImg, posterUrl }, { label: c
     ctx.fillStyle = C.text;
     ctx.fillText(fit(v, `800 72px ${DISPLAY}`, cw - 16), x, plan.statsValueY);
     label(l, x, plan.statsLabelY);
+
+    // goal progress under this stat: bar (capped at 100%) + "89% of 400"
+    const g = plan.goals && data.goals[GOAL_FOR_STAT[l]];
+    if (g) {
+      const bw = cw - 32;
+      const fill = Math.max(0, Math.min(1, g.pct / 100));
+      ctx.fillStyle = C.line;
+      rr(ctx, x, plan.goalBarY, bw, 8, 4); ctx.fill();
+      if (fill > 0) { ctx.fillStyle = g.met ? C.amber : C.teal; rr(ctx, x, plan.goalBarY, Math.max(8, bw * fill), 8, 4); ctx.fill(); }
+      ctx.font = `500 21px ${MONO}`;
+      ctx.fillStyle = g.met ? C.amber : C.dim;
+      ctx.fillText(fit(`${g.pct}% of ${g.target.toLocaleString()}`, `500 21px ${MONO}`, bw), x, plan.goalTextY);
+    }
   });
 
   // top shows: three big posters across, name + "N eps" underneath

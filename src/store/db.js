@@ -1,5 +1,6 @@
 import { mergeBackup } from './backupMerge.js';
 import { setNoteIn, withNotes, withMovieNote } from './notes.js';
+import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
 
 // Simple localStorage-backed store with a subscribe API.
 // Single-user app, so no backend needed: everything lives in the browser.
@@ -9,6 +10,7 @@ const KEY = 'watchnext-state-v1';
 const empty = () => ({
   shows: {},   // id -> show record (id is "tvdb:123" or "tmdb:456")
   movies: [],  // { name, watchedAt, runtimeMin }
+  goals: {},   // yearly watch goals: { '2026': { episodes, movies, hours, at } } (see components/goalsLogic.js)
   settings: { tmdbKey: '' },
 });
 
@@ -71,6 +73,7 @@ export function update(mutator) {
 
 let dirtyShows = new Set();
 let dirtyMovies = false;
+let dirtyGoals = false;
 let deletedShows = new Set();
 
 // Persistent tombstones: ids the user has deleted for good. Kept in
@@ -121,6 +124,10 @@ export function markMoviesDirty() {
   dirtyMovies = true;
 }
 
+export function markGoalsDirty() {
+  dirtyGoals = true;
+}
+
 export function markShowDeleted(id) {
   deletedShows.add(id);
   dirtyShows.delete(id); // a deleted show must not also be pushed as an update
@@ -131,11 +138,13 @@ export function markShowDeleted(id) {
 export function takeDirty() {
   const showIds = dirtyShows;
   const movies = dirtyMovies;
+  const goals = dirtyGoals;
   const deletedIds = deletedShows;
   dirtyShows = new Set();
   dirtyMovies = false;
+  dirtyGoals = false;
   deletedShows = new Set();
-  return { showIds, movies, deletedIds };
+  return { showIds, movies, goals, deletedIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -626,12 +635,34 @@ export function applyTmdbDetails(id, details) {
 // brings back what's missing and never deletes or overwrites what you have (see
 // backupMerge.js). Restored shows are marked for cloud sync and any delete
 // tombstone for them is lifted — like re-importing, restoring is deliberate.
+// Set (or clear) this year's targets. patch: { episodes?, movies?, hours? }: a number sets one,
+// null/0 removes it. Stamped with the time so the newest edit wins between devices.
+export function setYearGoal(year, patch) {
+  update((s) => {
+    s.goals = setGoal(s.goals, year, patch, new Date().toISOString());
+  });
+  markGoalsDirty();
+}
+
+// Goals that arrived from the cloud (at sign-in, or live from another device). The most recently
+// changed copy of each year wins. Returns true when THIS device holds something the cloud copy
+// doesn't (so the caller should push it up).
+export function applyRemoteGoals(remote) {
+  const merged = mergeGoals(remote, state.goals);
+  if (!sameGoals(merged, state.goals)) update((s) => { s.goals = merged; });
+  const push = !sameGoals(merged, remote);
+  if (push) markGoalsDirty();
+  return push;
+}
+
 export function restoreBackup(json) {
   const r = mergeBackup(state, json); // throws if the file isn't a backup
   update((s) => {
     s.shows = r.shows;
     s.movies = r.movies;
+    s.goals = r.goals;
   });
+  if (r.goalsChanged) markGoalsDirty();
   r.touchedIds.forEach(markShowDirty);
   r.touchedIds.forEach(clearTombstone);
   if (r.moviesChanged) markMoviesDirty();
@@ -698,6 +729,7 @@ export function wipeLibrary() {
   commit();
   dirtyShows = new Set();
   dirtyMovies = false;
+  dirtyGoals = false;
   deletedShows = new Set();
 }
 

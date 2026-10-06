@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { img } from '../api/tmdb.js';
 import { Section, YearSelect } from './StatsUI.jsx';
 import { renderPeriodImage } from './yearImageRender.js';
-import { initialOf, deltaLine, factCells } from './yearImageLogic.js';
+import { initialOf, deltaLine, factCells, GOAL_FOR_STAT } from './yearImageLogic.js';
+import { Bar } from './ui.jsx';
 import { loadImg, canvasToBlob, downloadBlob, shareText } from './shareImage.js';
 
 // One shareable "period" card: the on-screen card, a period picker, and the Share /
@@ -69,12 +70,21 @@ export default function RecapSection({ title, className, select, data, big, sub,
             [data.hours, 'Hours'],
             [data.movies, 'Movies'],
             [data.activeDays, 'Days'],
-          ].map(([v, l]) => (
-            <div key={l} data-stat={'yir-' + l.toLowerCase()}>
-              <span className="sd-yir-v">{v.toLocaleString()}</span>
-              <span className="sd-tile-l sd-tile-l--s">{l}</span>
-            </div>
-          ))}
+          ].map(([v, l]) => {
+            const g = data.goals && data.goals[GOAL_FOR_STAT[l.toUpperCase()]];
+            return (
+              <div key={l} data-stat={'yir-' + l.toLowerCase()}>
+                <span className="sd-yir-v">{v.toLocaleString()}</span>
+                <span className="sd-tile-l sd-tile-l--s">{l}</span>
+                {g ? (
+                  <span className="sd-yir-goal" data-goal-stat={l.toLowerCase()}>
+                    <Bar value={g.pct} color={g.met ? 'var(--amber)' : 'var(--teal)'} height={6} />
+                    <span className={'sd-mono' + (g.met ? ' met' : '')}>{g.pct}% of {g.target.toLocaleString()}</span>
+                  </span>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
 
         {data.topShows.length > 0 && (

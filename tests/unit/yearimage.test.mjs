@@ -123,4 +123,24 @@ t('poster grid: three 2:3 posters side by side, inside the margins, never overla
 });
 t('posters are big (>= 280px wide) — the point of the old layout', () => assert.ok(Y.POSTER_W >= 280));
 
+// ---- goal progress on the saved image
+const FULL = { year: 2026, prevYear: 2025, epDelta: 12, episodes: 355, hours: 280, movies: 9, activeDays: 120, topShows: [{ name: 'A', count: 5 }, { name: 'B', count: 4 }, { name: 'C', count: 3 }], busiestMonth: { name: 'Jul' }, topGenre: 'Drama' };
+const GOALS = { episodes: { target: 400, done: 355, pct: 89, met: false }, hours: { target: 500, done: 280, pct: 56, met: false }, movies: { target: 24, done: 30, pct: 125, met: true } };
+t('goals: with a goal the plan gains a bar + text row under the stats, and the posters shrink and spread across the width', () => {
+  const a = Y.planYearImage(FULL), b = Y.planYearImage({ ...FULL, goals: GOALS });
+  assert.equal(a.goals, false); assert.equal(a.goalBarY, null); assert.equal(a.ph, Y.POSTER_H); assert.equal(b.goals, true);
+  assert.ok(b.goalBarY > b.statsLabelY && b.goalTextY > b.goalBarY && b.gridTop > b.goalTextY, 'bar sits under the label, text under the bar, posters below');
+  assert.ok(b.pw < Y.POSTER_W && b.ph < Y.POSTER_H && Math.abs(b.ph / b.pw - 1.5) < 0.01);
+  const last = Y.posterBox(b, 2); assert.ok(Math.abs(last.x + last.w - (Y.IMG_W - Y.IMG_PAD)) < 0.5, 'the third poster ends at the right margin'); assert.ok(Y.posterBox(b, 1).x > Y.posterBox(b, 0).x + b.pw, 'a gap between posters');
+});
+t('goals: nothing ever runs into the footer, for every combination of delta / facts / posters', () => {
+  for (const delta of [true, false]) for (const facts of [true, false]) for (const nShows of [0, 1, 2, 3]) {
+    const d = { ...FULL, goals: GOALS, topShows: FULL.topShows.slice(0, nShows), ...(delta ? {} : { epDelta: null, prevYear: null }), ...(facts ? {} : { busiestMonth: null, topGenre: null }) };
+    const p = Y.planYearImage(d); assert.ok(p.bottom < p.footerRule - 24, JSON.stringify({ delta, facts, nShows, bottom: p.bottom, rule: p.footerRule }));
+    for (let i = 0; i < nShows; i++) { const bx = Y.posterBox(p, i); assert.ok(bx.x >= Y.IMG_PAD - 0.5 && bx.x + bx.w <= Y.IMG_W - Y.IMG_PAD + 0.5); }
+  }
+});
+t('goals: a FULL card with goals still leaves at least 40px above the footer (same bar as without goals)', () => { const p = Y.planYearImage({ ...FULL, goals: GOALS }); assert.ok(p.footerRule - p.bottom >= 40, String(p.footerRule - p.bottom)); });
+t('goals: an empty goals object or none means the old layout exactly', () => { for (const g of [undefined, null, {}]) { const p = Y.planYearImage({ ...FULL, goals: g }), q = Y.planYearImage(FULL); assert.deepEqual(p, q); } assert.equal(Y.hasCardGoals({ goals: {} }), false); assert.equal(Y.hasCardGoals({ goals: GOALS }), true); });
+t('goals: each stat maps to its goal (Days has none)', () => { assert.deepEqual(Y.GOAL_FOR_STAT, { EPISODES: 'episodes', HOURS: 'hours', MOVIES: 'movies' }); assert.equal(Y.GOAL_FOR_STAT.DAYS, undefined); });
 console.log(`\n${n} tests passed`);

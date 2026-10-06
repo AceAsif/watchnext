@@ -30,7 +30,8 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
-import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markShowDeleted, isTombstoned, resetAll, wipeLibrary, addTombstones } from './db.js';
+import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markGoalsDirty, markShowDeleted, isTombstoned, resetAll, wipeLibrary, addTombstones, applyRemoteGoals } from './db.js';
+import { sanitizeGoals } from '../components/goalsLogic.js';
 import { mergeNotes } from './notes.js';
 import { runWipe, wipeDecision, readMeta, writeMeta } from './wipeLogic.js';
 import { mergeWatched } from './watchedMerge.js';
@@ -71,6 +72,8 @@ function handleWipeDoc(forUid, data) {
   return verdict;
 }
 let unsubWipe = null;
+let unsubGoals = null;
+const goalsRef = (forUid) => doc(db, 'users', forUid, 'library', 'goals');
 
 // Flush is normally on a 2.5s timer, but that timer is throttled or paused
 // while the tab is in the background — so a change made right before switching
@@ -114,6 +117,17 @@ function startSync(newUid) {
       unsubWipe = onSnapshot(doc(db, 'users', newUid, 'library', 'wipe'), (snap) => {
         if (snap.exists()) handleWipeDoc(newUid, snap.data());
       });
+      // Yearly goals changed on another device. Check for a wipe first, so a goals update that
+      // races a "Delete everywhere" can't push this device's old goals back up.
+      unsubGoals = onSnapshot(goalsRef(newUid), async (snap) => {
+        if (snap.metadata.hasPendingWrites) return; // our own write, not news
+        try {
+          const w = await getDoc(doc(db, 'users', newUid, 'library', 'wipe'));
+          if (w.exists()) handleWipeDoc(newUid, w.data());
+        } catch (e) { /* offline: the cached answer is still good enough */ }
+        if (uid !== newUid) return;
+        if (applyRemoteGoals(snap.exists() ? snap.data().goals : {})) flush();
+      });
     });
 
   unsubShows = onSnapshot(collection(db, 'users', uid, 'shows'), (snap) => {
@@ -150,6 +164,8 @@ function stopSync() {
   unsubShows = null;
   if (unsubWipe) unsubWipe();
   unsubWipe = null;
+  if (unsubGoals) unsubGoals();
+  unsubGoals = null;
   pulledOnce = false;
   uid = null;
   clearInterval(flushTimer);
@@ -165,9 +181,10 @@ async function pullAndMerge(forUid) {
   const wipeSnap = await getDoc(doc(db, 'users', forUid, 'library', 'wipe'));
   if (wipeSnap.exists()) handleWipeDoc(forUid, wipeSnap.data());
 
-  const [showsSnap, moviesSnap] = await Promise.all([
+  const [showsSnap, moviesSnap, goalsSnap] = await Promise.all([
     getDocs(collection(db, 'users', forUid, 'shows')),
     getDoc(doc(db, 'users', forUid, 'library', 'movies')),
+    getDoc(goalsRef(forUid)),
   ]);
 
   update((s) => {
@@ -208,6 +225,10 @@ async function pullAndMerge(forUid) {
     }
   });
 
+  // Yearly goals: the most recently changed copy of each year wins (and this device's newer
+  // ones are queued to go up).
+  applyRemoteGoals(goalsSnap.exists() ? goalsSnap.data().goals : {});
+
   // Push the merged result back up once, so both sides converge.
   Object.keys(getState().shows).forEach(markShowDirty);
   markMoviesDirty();
@@ -218,9 +239,9 @@ async function pullAndMerge(forUid) {
 
 async function flush() {
   if (!uid || applyingRemote || wiping) return;
-  const { showIds, movies, deletedIds } = takeDirty();
+  const { showIds, movies, goals, deletedIds } = takeDirty();
   const hasDeletes = deletedIds && deletedIds.size > 0;
-  if (showIds.size === 0 && !movies && !hasDeletes) return;
+  if (showIds.size === 0 && !movies && !goals && !hasDeletes) return;
 
   const state = getState();
   const batch = writeBatch(db);
@@ -237,6 +258,9 @@ async function flush() {
   if (movies) {
     batch.set(doc(db, 'users', uid, 'library', 'movies'), { movies: state.movies });
   }
+  if (goals) {
+    batch.set(goalsRef(uid), { goals: sanitizeGoals(state.goals) });
+  }
 
   try {
     await batch.commit();
@@ -247,6 +271,7 @@ async function flush() {
     showIds.forEach(markShowDirty);
     if (hasDeletes) deletedIds.forEach(markShowDeleted);
     if (movies) markMoviesDirty();
+    if (goals) markGoalsDirty();
   }
 }
 
@@ -277,6 +302,7 @@ export async function wipeEverywhere() {
         const b = writeBatch(db);
         ids.forEach((id) => b.delete(showDoc(id)));
         b.set(doc(db, 'users', forUid, 'library', 'movies'), { movies: [] });
+        b.set(goalsRef(forUid), { goals: {} });
         b.set(doc(db, 'users', forUid, 'library', 'wipe'), marker);
         await b.commit();
       },

@@ -5,6 +5,8 @@ import { movieStatus } from '../store/db.js';
 import Stars from '../components/Stars.jsx';
 import YearInReview from '../components/YearInReview.jsx';
 import MonthInReview from '../components/MonthInReview.jsx';
+import GoalsCard from '../components/GoalsCard.jsx';
+import { cardGoals } from '../components/goalsLogic.js';
 import { platformById } from '../components/PlatformPicker.jsx';
 import Heatmap from '../components/Heatmap.jsx';
 import { StatTile, TabBar, YearSelect, BarList, Section, Note } from '../components/StatsUI.jsx';
@@ -302,6 +304,11 @@ export default function Stats({ onOpenNotes }) {
   const habits = useMemo(() => computeHabits(base.events, year), [base.events, year]);
 
   const activeReviewYear = reviewYear ?? base.years[0] ?? null;
+  // What you watched in a year, counted exactly as the Year in review card counts it.
+  const actualsOf = (y) => ({ episodes: base.perYearEpisodes[y] || 0, movies: base.moviesPerYear[y] || 0, hours: Math.round((base.perYearMin[y] || 0) / 60) });
+  const todayIso = localISODate();
+  const goalYear = todayIso.slice(0, 4);
+
   const review = useMemo(() => {
     const y = activeReviewYear;
     if (!y) return null;
@@ -319,8 +326,9 @@ export default function Stats({ onOpenNotes }) {
       busiestMonth: busiestMonthOf(base.events, y),
       prevYear: epPrev ? prev : null,
       epDelta: epPrev ? Math.round(((ep - epPrev) / epPrev) * 100) : null,
+      goals: cardGoals(state.goals, y, { episodes: ep, movies: base.moviesPerYear[y] || 0, hours: Math.round((base.perYearMin[y] || 0) / 60) }, localISODate()),
     };
-  }, [base, activeReviewYear]);
+  }, [base, activeReviewYear, state.goals]);
 
   if (base.episodes === 0 && base.movieCount === 0) {
     return (
@@ -365,6 +373,7 @@ export default function Stats({ onOpenNotes }) {
         </Section>
       </div>
       <div className="sd-stack">
+        <GoalsCard year={goalYear} goals={state.goals} actualsOf={actualsOf} today={todayIso} streak={{ current: base.currentStreak, longest: base.longestStreak }} />
         {review && <YearInReview data={review} years={base.years} onYear={setReviewYear} />}
         <MonthInReview shows={state.shows} movies={state.movies} />
       </div>

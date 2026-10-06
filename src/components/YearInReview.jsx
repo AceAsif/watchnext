@@ -1,5 +1,6 @@
 import React from 'react';
 import RecapSection from './RecapSection.jsx';
+import { goalShareText } from './goalsLogic.js';
 
 // Year in review: the shared RecapSection with the year's words. (The card and the
 // saved image are drawn by RecapSection / yearImageRender.js.)
@@ -10,6 +11,7 @@ export default function YearInReview({ data, years, onYear }) {
     `${data.episodes.toLocaleString()} episodes (${data.hours.toLocaleString()} hrs) + ${data.movies} movie${data.movies === 1 ? '' : 's'}.`,
     data.topShows[0] ? `Top show: ${data.topShows[0].name}.` : '',
     data.busiestMonth ? `Busiest month: ${data.busiestMonth.name}.` : '',
+    goalShareText(data.goals),
   ].filter(Boolean).join(' ');
   return (
     <RecapSection

@@ -8,8 +8,8 @@ will not run as-is on a normal computer: the scripts hard-code the sandbox paths
 
 | In this repo | In the Claude sandbox | What it is |
 |---|---|---|
-| `tests/unit/*.test.mjs` | `/home/claude/tests/unit/` (the old `*_test.mjs` names also work) | 24 plain-Node unit suites. They import `/home/claude/wl/src/...` |
-| `shot/browser/*.mjs`, `fakecloud.js`, `fonts.css` | `/home/claude/shot/` (all in ONE folder) | 19 headless-Chromium suites (puppeteer). They serve `/home/claude/wl/dist` |
+| `tests/unit/*.test.mjs` | `/home/claude/tests/unit/` (the old `*_test.mjs` names also work) | 26 plain-Node unit suites. They import `/home/claude/wl/src/...` |
+| `shot/browser/*.mjs`, `fakecloud.js`, `fonts.css` | `/home/claude/shot/` (all in ONE folder) | 20 headless-Chromium suites (puppeteer). They serve `/home/claude/wl/dist` |
 | `docs/WatchNext-Handover-v5.md` | (attached to the chat) | the handover document |
 | `docs/screenshots/` | (not needed) | sample screenshots from each feature |
 
@@ -38,13 +38,13 @@ Delete it after building. Never commit it.
 
 ## Last known results (all passing)
 Unit: library 19 · settings 11 · upnext 24 · stats 25 · backup 14 · notes 16 · logic 44 · anime 34 ·
-settings_render 14 · yearimage 24 · dropped_csv 28 · wipe 23 · resume_db 11 · rewatch 14 · notes_search 19 ·
+settings_render 14 · yearimage 29 · dropped_csv 28 · wipe 23 · resume_db 11 · rewatch 14 · notes_search 19 ·
 month_recap 14 · finish_card 21 · watchdates 22 · backup_nudge 14 · services 16 · providers_db 7 ·
-tonight 23 · movie_genres_db 6 · movie_night 21.
+tonight 23 · movie_genres_db 6 · movie_night 21 · goals 22 · goals_db 14.
 
 Browser: settings 47 · desktop 56 · notes 35 · restore 24 · anime 35 · yearimage 25 · dropped_csv 25 ·
 rewatch 8 · recaps 20 · watchdates 21 · notes_search 22 · backup_nudge 21 · services 34 · tonight 27 ·
-movie_night 26 · wipe_resume 33.
+movie_night 26 · goals 25 · wipe_resume 33.
 
 ## Suites that cannot run on their own
 - `library.mjs` compares the Library tab against an OLD build kept in `/home/claude/wl-base-dist`
