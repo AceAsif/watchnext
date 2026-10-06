@@ -12,6 +12,8 @@ import {
   movieSimilar,
 } from '../api/tmdb.js';
 import { Empty } from './LibraryUI.jsx';
+import MovieNightSheet from './MovieNightSheet.jsx';
+import { Chevron } from './ui.jsx';
 
 const MAX_SEEDS = 6; // per type, highest-rated first
 const MAX_RESULTS = 18;
@@ -67,6 +69,7 @@ export default function Discover() {
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(null); // id currently being added
   const [added, setAdded] = useState({}); // id -> true, once queued
+  const [nightOpen, setNightOpen] = useState(false); // "Movie night"
 
   const { shows: showSeeds, movies: movieSeeds } = pickSeeds(state);
   const noSeeds = showSeeds.length === 0 && movieSeeds.length === 0;
@@ -157,17 +160,36 @@ export default function Discover() {
     return <Empty>Add a TMDB API key in Settings to get recommendations.</Empty>;
   }
 
+  // Movie night works even when you've rated nothing (popular movies on your services fill in),
+  // so its button sits above the "no ratings yet" message.
+  const movieNight = (
+    <>
+      <button type="button" className="sd-tonight" style={{ marginTop: 0 }} onClick={() => setNightOpen(true)}>
+        <span className="txt">
+          <strong>Movie night</strong>
+          <small>Find a new movie for tonight: pick your time and mood</small>
+        </span>
+        <Chevron />
+      </button>
+      {nightOpen && <MovieNightSheet onClose={() => setNightOpen(false)} />}
+    </>
+  );
+
   if (noSeeds) {
     return (
-      <Empty>
-        Rate a few shows or movies you enjoyed (on their detail page, or on the Movies tab), and
-        Discover will use them to find what to watch next.
-      </Empty>
+      <div className="sd-gap10">
+        {movieNight}
+        <Empty>
+          Rate a few shows or movies you enjoyed (on their detail page, or on the Movies tab), and
+          Discover will use them to find what to watch next.
+        </Empty>
+      </div>
     );
   }
 
   return (
     <div className="sd-gap10">
+      {movieNight}
       {items === null ? (
         <div className="sd-card sd-pad sd-discover-intro">
           <strong>Find something new</strong>

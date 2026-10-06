@@ -99,6 +99,18 @@ export function watchProviders(kind, tmdbId) {
 // Discover: "because you liked X" recommendations, with a similar-titles
 // fallback for shows/movies too niche to have recommendation data. page lets
 // callers vary the results on refresh; not required otherwise.
+// Movie night: TMDB's own "discover" search. TMDB filters server-side by region, streaming
+// provider, runtime and genre, so what comes back is already on the services asked for.
+export function discoverMovies(params) {
+  return get('/discover/movie', params);
+}
+
+// The streaming providers TMDB knows in a region ({ results: [{ provider_id, provider_name }] }),
+// so our service names (Netflix, Stan…) can be turned into TMDB's provider ids.
+export function movieProviderList(region = 'AU') {
+  return get('/watch/providers/movie', { watch_region: region });
+}
+
 export function tvRecommendations(tmdbId, page = 1) {
   return get(`/tv/${tmdbId}/recommendations`, { page });
 }
