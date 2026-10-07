@@ -1,15 +1,16 @@
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { repoPath, workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
 
-const OUT = '/home/claude/shot/out7';
+const OUT = workPath('out7');
 fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
-const DIST = '/home/claude/wl/dist';
+const DIST = APP_DIST;
 const server = http.createServer((req, r) => {
   let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
   const f = path.join(DIST, p);
@@ -36,8 +37,8 @@ const STATE = () => ({
 });
 const SECRET = 'abcDEF1234567890secretkey';
 
-fs.mkdirSync('/home/claude/shot/tmp', { recursive: true });
-const wf = (name, obj) => { const p = `/home/claude/shot/tmp/${name}`; fs.writeFileSync(p, typeof obj === 'string' ? obj : JSON.stringify(obj)); return p; };
+fs.mkdirSync(workPath('tmp'), { recursive: true });
+const wf = (name, obj) => { const p = path.join(workPath('tmp'), name); fs.writeFileSync(p, typeof obj === 'string' ? obj : JSON.stringify(obj)); return p; };
 const GOOD = wf('good.json', { source: 'tvtime', shows: [
   { tvdbId: 777001, name: 'Imported One', followed: true, watches: [{ season: 1, episode: 1, watchedAt: '2020-01-01T10:00:00Z', runtimeMin: 40, rewatch: false }, { season: 1, episode: 2, watchedAt: '2020-01-02T10:00:00Z', runtimeMin: 40, rewatch: false }, { season: 1, episode: 3, watchedAt: '2020-01-03T10:00:00Z', runtimeMin: 40, rewatch: false }] },
   { tvdbId: 777002, name: 'Imported Two', followed: true, watches: [{ season: 1, episode: 1, watchedAt: '2021-01-01T10:00:00Z', runtimeMin: 40, rewatch: false }, { season: 1, episode: 2, watchedAt: '2021-01-02T10:00:00Z', runtimeMin: 40, rewatch: false }] },
@@ -45,7 +46,7 @@ const GOOD = wf('good.json', { source: 'tvtime', shows: [
 const BADJSON = wf('bad.json', '{ this is not json');
 const WRONG = wf('wrong.json', { hello: 'world' });
 
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = [];
 const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 async function open({ w = 390, h = 844, state = STATE() } = {}) {
@@ -95,7 +96,7 @@ ok('Sync (signed out, cloud configured in this build): offers "Sign in with Goog
 assert.ok(await noOverflow(p)); checks++; console.log('  PASS no horizontal overflow');
 const small = await p.evaluate(() => [...document.querySelectorAll('.sd-setbtn, .sd-setlink, .cp')].filter((e) => e.getBoundingClientRect().height < 43.5).map((e) => e.textContent.trim()));
 ok('every button and link is at least 44px tall (touch targets)', () => assert.deepEqual(small, []));
-const src = fs.readFileSync('/home/claude/wl/src/pages/Settings.jsx', 'utf8') + fs.readFileSync('/home/claude/wl/src/components/SettingsCards.jsx', 'utf8');
+const src = fs.readFileSync(repoPath('src/pages/Settings.jsx'), 'utf8') + fs.readFileSync(repoPath('src/components/SettingsCards.jsx'), 'utf8');
 ok('the Settings code no longer calls the browser popups confirm() or alert()', () => assert.doesNotMatch(src, /(^|[^.\w])(confirm|alert)\(/m));
 await shot(p, '01_settings_phone');
 await p.close();

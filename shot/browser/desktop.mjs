@@ -1,14 +1,15 @@
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
 
-const DIST = '/home/claude/wl/dist';
-const OUT = '/home/claude/shot/out4';
+const DIST = APP_DIST;
+const OUT = workPath('out4');
 fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
@@ -41,7 +42,7 @@ const movies = [{ name: 'Some Film', tmdbId: 88, watchedAt: '2020-01-01', runtim
 const cast = ['Dylan Minnette', 'Christian Navarro', 'Alisha Boe', 'Brandon Flynn', 'Justin Prentice', 'Miles Heizer', 'Ross Butler', 'Devin Druid'];
 const details = { id: 1, created_by: [{ id: 900, name: 'Brian Yorkey' }], aggregate_credits: { cast: cast.map((name, i) => ({ id: 100 + i, name, profile_path: null, roles: [{ character: 'Role ' + i, episode_count: 30 }] })), crew: [{ id: 300, name: 'Tommy Lohmann', profile_path: null, jobs: [{ job: 'Director', episode_count: 3 }] }] } };
 
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = [];
 const wait = (ms = 400) => new Promise((r) => setTimeout(r, ms));
 async function open(w, h) {

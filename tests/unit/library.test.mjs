@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import * as L from '/home/claude/wl/src/components/libraryLogic.js';
+import * as L from '../../src/components/libraryLogic.js';
 
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 

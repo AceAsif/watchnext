@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { mergeBackup, isBackupFile, isTvTimeFile } from '/home/claude/wl/src/store/backupMerge.js';
-import { backupState } from '/home/claude/wl/src/components/settingsLogic.js';
+import { mergeBackup, isBackupFile, isTvTimeFile } from '../../src/store/backupMerge.js';
+import { backupState } from '../../src/components/settingsLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const W = (k, at = '2026-03-01T10:00:00.000Z', cnt = 1) => Object.fromEntries(Array.from({ length: k }, (_, i) => [`1x${i + 1}`, { at, min: 40, n: cnt }]));
 const ORIGINAL = {

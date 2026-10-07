@@ -1,15 +1,16 @@
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { repoPath, workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
 
-const OUT = '/home/claude/shot/out9';
+const OUT = workPath('out9');
 fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
-const DIST = '/home/claude/wl/dist';
+const DIST = APP_DIST;
 const server = http.createServer((req, r) => {
   let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
   const f = path.join(DIST, p);
@@ -36,8 +37,8 @@ const STATE = () => ({
 });
 const SECRET = 'abcDEF1234567890secretkey';
 
-fs.mkdirSync('/home/claude/shot/tmp', { recursive: true });
-const wf = (name, obj) => { const p = `/home/claude/shot/tmp/${name}`; fs.writeFileSync(p, typeof obj === 'string' ? obj : JSON.stringify(obj)); return p; };
+fs.mkdirSync(workPath('tmp'), { recursive: true });
+const wf = (name, obj) => { const p = path.join(workPath('tmp'), name); fs.writeFileSync(p, typeof obj === 'string' ? obj : JSON.stringify(obj)); return p; };
 const GOOD = wf('good.json', { source: 'tvtime', shows: [
   { tvdbId: 777001, name: 'Imported One', followed: true, watches: [{ season: 1, episode: 1, watchedAt: '2020-01-01T10:00:00Z', runtimeMin: 40, rewatch: false }, { season: 1, episode: 2, watchedAt: '2020-01-02T10:00:00Z', runtimeMin: 40, rewatch: false }, { season: 1, episode: 3, watchedAt: '2020-01-03T10:00:00Z', runtimeMin: 40, rewatch: false }] },
   { tvdbId: 777002, name: 'Imported Two', followed: true, watches: [{ season: 1, episode: 1, watchedAt: '2021-01-01T10:00:00Z', runtimeMin: 40, rewatch: false }, { season: 1, episode: 2, watchedAt: '2021-01-02T10:00:00Z', runtimeMin: 40, rewatch: false }] },
@@ -53,7 +54,7 @@ function tmdb(r) {
   if ((m = p.match(/^\/movie\/(\d+)$/))) return j({ id: +m[1], title: 'Akira', runtime: 124, overview: 'Overview.', genres: [], release_date: '1988-07-16' });
   return j({ results: [], episodes: [], cast: [], crew: [] });
 }
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = [];
 const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 async function open({ w = 390, h = 844, state = STATE(), tab = 'Settings', tombs = null } = {}) {
@@ -220,7 +221,7 @@ const dk = await p.evaluate(() => { const d = document.querySelector('[role=dial
 ok('desktop: a centred dialog (not a bottom sheet)', () => { assert.ok(dk.centred); assert.ok(dk.floating); });
 assert.ok(await noOverflow(p)); checks++; console.log('  PASS no horizontal overflow');
 await shot(p, '05_note_dialog_desktop', false); await p.keyboard.press('Escape'); await p.close();
-const eng = fs.readFileSync('/home/claude/wl/src/store/cloudEngine.js', 'utf8');
+const eng = fs.readFileSync(repoPath('src/store/cloudEngine.js'), 'utf8');
 ok('cloud sync merges notes as a union (source check: mergeNotes(local.notes, remote.notes) wired into the pull-merge)', () => { assert.match(eng, /import \{ mergeNotes \} from '\.\/notes\.js'/); assert.match(eng, /mergeNotes\(local\.notes, remote\.notes\)/); assert.match(eng, /else delete merged\.notes/); });
 
 await browser.close(); server.close();

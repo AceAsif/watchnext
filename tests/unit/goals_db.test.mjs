@@ -3,9 +3,9 @@ const store = new Map();
 globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
 // an OLD saved state: written before goals existed
 store.set('watchnext-state-v1', JSON.stringify({ shows: { 'tmdb:1': { name: 'A', watched: {} } }, movies: [], settings: { tmdbKey: 'K' } }));
-const D = await import('/home/claude/wl/src/store/db.js');
-const S = await import('/home/claude/wl/src/components/settingsLogic.js');
-const BM = await import('/home/claude/wl/src/store/backupMerge.js');
+const D = await import('../../src/store/db.js');
+const S = await import('../../src/components/settingsLogic.js');
+const BM = await import('../../src/store/backupMerge.js');
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const T0 = '2026-10-05T01:00:00.000Z', T9 = '2099-01-01T00:00:00.000Z';
 const saved = () => JSON.parse(store.get('watchnext-state-v1'));

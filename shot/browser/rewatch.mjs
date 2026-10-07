@@ -1,11 +1,12 @@
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-const DIST = '/home/claude/wl/dist'; const OUT = '/home/claude/shot/out_rw'; fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
+const DIST = APP_DIST; const OUT = workPath('out_rw'); fs.mkdirSync(OUT, { recursive: true });
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const server = http.createServer((req, res) => { let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html'; const f = path.join(DIST, p); if (!f.startsWith(DIST) || !fs.existsSync(f)) { res.writeHead(404); return res.end('nf'); } res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res); });
 await new Promise((r) => server.listen(4181, r));
@@ -18,7 +19,7 @@ const WITH = { shows: {
   'tmdb:4': mkShow(4, 'Brooklyn Nine-Nine', [2]), 'tmdb:5': mkShow(5, '鋼の錬金術師 FULLMETAL ALCHEMIST: BROTHERHOOD — The Complete Extended Edition', [3, 3]),
 }, movies: [mv('Dune', 10, 1), mv('Dune', 10, 2), mv('Dune', 10, 3), mv('Up', 11, 4), mv('Up', 11, 5), mv('Heat', 12, 6), { tmdbId: 13, name: 'Planned Only', status: 'planned' }], settings: { tmdbKey: 'TESTKEY' } };
 const NONE = { shows: { 'tmdb:1': mkShow(1, 'Suits', [1, 1]) }, movies: [mv('Dune', 10, 1)], settings: { tmdbKey: 'TESTKEY' } };
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = []; let checks = 0; const ok = async (n, f) => { await f(); checks++; console.log('  PASS', n); }; const wait = (ms = 400) => new Promise((r) => setTimeout(r, ms));
 async function open(state, w = 390) {
   const page = await browser.newPage(); await page.emulateTimezone('Australia/Hobart'); await page.setViewport({ width: w, height: 900, deviceScaleFactor: 2 });

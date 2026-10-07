@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import * as R from '/home/claude/wl/src/components/rewatchLogic.js';
+import * as R from '../../src/components/rewatchLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const ep = (nn, at = '2026-09-01T10:00:00.000Z') => ({ at, min: 40, n: nn });
 const show = (name, ns) => ({ name, watched: Object.fromEntries(ns.map((v, i) => [`1x${i + 1}`, ep(v)])) });

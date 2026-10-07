@@ -1,15 +1,16 @@
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
 
-const OUT = '/home/claude/shot/out_wr'; fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+const OUT = workPath('out_wr'); fs.mkdirSync(OUT, { recursive: true });
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const serve = (dir, port) => new Promise((res) => { const s = http.createServer((req, rs) => { let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html'; const f = path.join(dir, p); if (!f.startsWith(dir) || !fs.existsSync(f)) { rs.writeHead(404); return rs.end('nf'); } rs.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(rs); }); s.listen(port, () => res(s)); });
-const FAKE = await serve('/home/claude/shot/dist-fake', 4179), REAL = await serve('/home/claude/wl/dist', 4180);
+const FAKE = await serve(workPath('dist-fake'), 4179), REAL = await serve(APP_DIST, 4180);
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const FIXED_ISO = '2026-10-01T22:00:00.000Z'; // Fri 2 Oct 2026, 08:00 in Hobart
 const DROPPED_AT = '2026-09-20T01:00:00.000Z';
@@ -30,7 +31,7 @@ const STATE = {
 };
 const SEASON = { episodes: Array.from({ length: 10 }, (_, i) => ({ episode_number: i + 1, name: 'Ep ' + (i + 1), runtime: 40, air_date: '2020-01-0' + ((i % 9) + 1) })) };
 
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = []; let checks = 0;
 const ok = async (name, fn) => { await fn(); checks++; console.log('  PASS', name); };
 const wait = (ms = 350) => new Promise((r) => setTimeout(r, ms));

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import * as N from '/home/claude/wl/src/components/notesSearchLogic.js';
+import * as N from '../../src/components/notesSearchLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const nt = (react, text, at) => ({ ...(react ? { react } : {}), ...(text ? { text } : {}), ...(at ? { at } : {}) });
 const SHOWS = {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import * as S from '/home/claude/wl/src/components/servicesLogic.js';
-import * as P from '/home/claude/wl/src/components/platformsData.js';
+import * as S from '../../src/components/servicesLogic.js';
+import * as P from '../../src/components/platformsData.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const NOW = new Date('2026-10-05T00:00:00.000Z'); const ago = (d) => new Date(NOW.getTime() - d * 86400000).toISOString();
 const prov = (...names) => names.map((name) => ({ name, logo: '/' + name + '.png' }));

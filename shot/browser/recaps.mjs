@@ -1,16 +1,17 @@
 process.env.TZ = 'Australia/Hobart';
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import * as Y from '/home/claude/wl/src/components/yearImageLogic.js';
-import * as FC from '/home/claude/wl/src/components/finishCardLogic.js';
+import * as Y from '../../src/components/yearImageLogic.js';
+import * as FC from '../../src/components/finishCardLogic.js';
+import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
 
-const DIST = '/home/claude/wl/dist'; const OUT = '/home/claude/shot/out_rc'; fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+const DIST = APP_DIST; const OUT = workPath('out_rc'); fs.mkdirSync(OUT, { recursive: true });
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const server = http.createServer((req, res) => { let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html'; const f = path.join(DIST, p); if (!f.startsWith(DIST) || !fs.existsSync(f)) { res.writeHead(404); return res.end('nf'); } res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res); });
 await new Promise((r) => server.listen(4183, r));
@@ -55,7 +56,7 @@ function expectMonth(ym) {
   return { eps, hours: Math.round(min / 60), mov, days: days.size, per };
 }
 
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = []; let checks = 0; const ok = async (n, f) => { await f(); checks++; console.log('  PASS', n); }; const wait = (ms = 350) => new Promise((r) => setTimeout(r, ms));
 async function open({ w = 390, h = 844 } = {}) {
   const page = await browser.newPage(); await page.emulateTimezone('Australia/Hobart'); await page.setViewport({ width: w, height: h, deviceScaleFactor: 2 });

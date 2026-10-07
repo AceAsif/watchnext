@@ -1,14 +1,16 @@
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
+import { pathToFileURL } from 'node:url';
 
-const DIST = '/home/claude/wl/dist';
-const OUT = '/home/claude/shot/out3';
+const DIST = APP_DIST;
+const OUT = workPath('out3');
 fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
@@ -64,7 +66,7 @@ const AGENDA_COUNT = 12; // 1+1+2+1+2+1+1 (+ Caught Up 2 + Behind 1 = 12 total a
 let seasonCalls = [];
 const seed = (key = true, empty = false) => ({ shows: empty ? {} : SHOWS, movies: [], settings: { tmdbKey: key ? 'TESTKEY' : '' } });
 
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = [];
 const wait = (ms = 400) => new Promise((r) => setTimeout(r, ms));
 
@@ -248,7 +250,7 @@ p = await open({ w: 1280, h: 900 }); await OUTSHOT(p, '07_desktop'); await p.clo
 
 // ============================================================ design reference
 p = await browser.newPage(); await p.setViewport({ width: 390, height: 1420, deviceScaleFactor: 2 });
-await p.goto('file:///home/claude/design/upnext.html', { waitUntil: 'networkidle0' }); await wait(1500);
+await p.goto(pathToFileURL(workPath('design', 'upnext.html')).href, { waitUntil: 'networkidle0' }); await wait(1500);
 await p.screenshot({ path: `${OUT}/00_DESIGN_upnext.png` }); await p.close();
 
 await browser.close(); server.close();

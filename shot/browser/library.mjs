@@ -1,13 +1,14 @@
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
 
-const OUT = '/home/claude/shot/out6';
+const OUT = workPath('out6');
 fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const serve = (dir, port) => new Promise((res) => {
   const s = http.createServer((req, r) => {
@@ -18,7 +19,7 @@ const serve = (dir, port) => new Promise((res) => {
   }); s.listen(port, () => res(s));
 });
 const NEW = 'http://localhost:4181', OLD = 'http://localhost:4182';
-const servers = [await serve('/home/claude/wl/dist', 4181), await serve('/home/claude/wl-base-dist', 4182)];
+const servers = [await serve(APP_DIST, 4181), await serve(workPath('wl-base-dist'), 4182)];
 const FIXED_ISO = '2026-10-01T22:00:00.000Z'; // Fri 2 Oct 2026, 09:00 in Hobart
 
 // ------------------------------------------------------------------ seed
@@ -77,7 +78,7 @@ function tmdb(r) {
   return json(r, { results: [], episodes: [] });
 }
 
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = [];
 const wait = (ms = 300) => new Promise((r) => setTimeout(r, ms));
 async function open(base, { w = 390, h = 844, state = MAIN, tab = 'Shows' } = {}) {

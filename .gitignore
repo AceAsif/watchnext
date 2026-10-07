@@ -15,3 +15,6 @@ watchnext-backup-*.json
 # misc
 .DS_Store
 *.log
+
+# test harness scratch output (builds, screenshots)
+.harness-work/

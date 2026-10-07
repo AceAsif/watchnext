@@ -1,40 +1,44 @@
 # WatchNext test harness
 
-These files are the tests Claude runs in its own sandbox (Linux, Node 22). They are kept in the
-repo as an archive so they survive between chats. **They are not wired into `npm test`** and they
-will not run as-is on a normal computer: the scripts hard-code the sandbox paths below.
+The tests live in the repo and now run on any computer (Windows, macOS, Linux) with Node 20+.
+All paths are worked out from the repo folder (`tests/paths.mjs`), so nothing depends on where you cloned it.
+They are **not** part of the deploy: GitHub Actions only runs `npm run build`.
 
-## Where the files live
+## Layout
 
-| In this repo | In the Claude sandbox | What it is |
-|---|---|---|
-| `tests/unit/*.test.mjs` | `/home/claude/tests/unit/` (the old `*_test.mjs` names also work) | 26 plain-Node unit suites. They import `/home/claude/wl/src/...` |
-| `shot/browser/*.mjs`, `fakecloud.js`, `fonts.css` | `/home/claude/shot/` (all in ONE folder) | 20 headless-Chromium suites (puppeteer). They serve `/home/claude/wl/dist` |
-| `docs/WatchNext-Handover-v5.md` | (attached to the chat) | the handover document |
-| `docs/screenshots/` | (not needed) | sample screenshots from each feature |
+| Folder | What it is |
+|---|---|
+| `tests/unit/*.test.mjs` | 26 plain-Node unit suites (~505 tests). They import `src/...` directly. |
+| `tests/paths.mjs`, `tests/run-unit.mjs` | shared path helpers; runs every unit suite |
+| `shot/browser/*.mjs`, `fakecloud.js`, `fonts.css`, `launch.mjs` | 17 runnable headless-Chrome suites (puppeteer) + helpers |
+| `shot/build-test-dists.mjs`, `shot/run-browser.mjs`, `shot/package.json` | builds the app for the tests, runs the browser suites, browser-test dependency |
+| `.harness-work/` | scratch output (test builds, screenshots). Git-ignored; safe to delete. |
+| `docs/` | handover + sample screenshots |
 
-At the start of a chat: upload the handover plus a zip of `tests/` and `shot/`; Claude recreates the
-sandbox layout above, clones the repo to `/home/claude/wl`, writes a placeholder `.env` and runs `npm run build`.
-
-## Placeholder `.env` for test builds
+## Run the unit tests (nothing extra to install)
 ```
-VITE_FIREBASE_API_KEY=placeholder_key_for_build_test
-VITE_FIREBASE_AUTH_DOMAIN=x.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=x
-VITE_FIREBASE_STORAGE_BUCKET=x.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=1
-VITE_FIREBASE_APP_ID=1:1:web:1
+npm install              # once, in the repo root
+npm run test:unit        # all 26 suites
+node tests/run-unit.mjs goals wipe      # only suites whose name contains these words
+node tests/unit/goals.test.mjs          # one suite directly
 ```
-Delete it after building. Never commit it.
 
-## Running
-- Unit: `node tests/unit/<name>.test.mjs` prints `N tests passed`.
-- Browser: `node shot/browser/<name>.mjs` prints `N checks passed` and `PROBLEMS: none`.
-  Needs `npm i puppeteer-core @sparticuz/chromium` in the folder, plus empty `tmp/` and `out6`..`out9`/`out_*` folders.
-- The browser suites serve `wl/dist`, stub Google Fonts from `fonts.css`, mock TMDB, pin the date to
-  2026-10-01T22:00Z and the timezone to Australia/Hobart, and bypass the service worker.
-- `wipe_resume.mjs` needs a second, test-only build with the cloud module swapped for `fakecloud.js`;
-  see `shot/browser/wipe_resume.README.md`.
+## Run the browser tests
+```
+npm install              # root, once
+cd shot && npm install && cd ..    # once: installs puppeteer-core (no browser download)
+npm run test:browser:build         # builds .harness-work/dist and .harness-work/dist-fake
+npm run test:browser               # all runnable suites (about 10 minutes)
+node shot/run-browser.mjs goals    # only suites matching a word
+node shot/browser/goals.mjs        # one suite directly (build first)
+```
+- **Browser used:** `launch.mjs` uses `CHROME_PATH` if set, otherwise Chrome or Edge in its normal install location.
+  If it can't find one, set it, e.g. PowerShell: `$env:CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"`.
+- **No `.env` needed.** The build script passes placeholder Firebase values as environment variables, so it never
+  touches or needs your real `.env`. Re-run `test:browser:build` after changing anything in `src/`.
+- The suites pin the date to 2026-10-01T22:00Z and the timezone to Australia/Hobart, stub Google Fonts, mock TMDB
+  and bypass the service worker. Ports 4179-4190 must be free.
+- `wipe_resume.mjs` uses the second build (`dist-fake`, with `fakecloud.js` standing in for Firebase); the build script makes it.
 
 ## Last known results (all passing)
 Unit: library 19 · settings 11 · upnext 24 · stats 25 · backup 14 · notes 16 · logic 44 · anime 34 ·
@@ -47,10 +51,10 @@ rewatch 8 · recaps 20 · watchdates 21 · notes_search 22 · backup_nudge 21 ·
 movie_night 26 · goals 25 · wipe_resume 33.
 
 ## Suites that cannot run on their own
-- `library.mjs` compares the Library tab against an OLD build kept in `/home/claude/wl-base-dist`
+- `library.mjs` compares the Library tab against an OLD build kept in `.harness-work/wl-base-dist`
   (the app before the Library redesign). That baseline no longer exists, so it does not run. It is
   kept for reference; delete its old-vs-new section if it is ever revived.
-- `upnext.mjs` and `showpage.mjs` compare against design mock-ups (`/home/claude/design/*.html`) from the
+- `upnext.mjs` and `showpage.mjs` compare against design mock-ups (`.harness-work/design/*.html`) from the
   original design hand-off, which are not part of the harness.
 
 ## Rules

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import * as M from '/home/claude/wl/src/components/movieNightLogic.js';
+import * as M from '../../src/components/movieNightLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const raw = (id, title, o = {}) => ({ id, title, poster_path: '/p' + id + '.jpg', release_date: '2020-05-05', genre_ids: [18], vote_average: 7.2, ...o });
 const rec = (id, title, seed = { name: 'Dune', rating: 5 }, o = {}) => M.recommendedCandidate(raw(id, title, o), seed);

@@ -1,6 +1,6 @@
 process.env.TZ = 'Australia/Hobart';
 import assert from 'node:assert/strict';
-import * as B from '/home/claude/wl/src/components/backupNudgeLogic.js';
+import * as B from '../../src/components/backupNudgeLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const NOW = new Date('2026-10-05T00:00:00.000Z');
 const ago = (days, from = NOW) => new Date(from.getTime() - days * 86400000).toISOString();

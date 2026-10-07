@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import * as S from '/home/claude/wl/src/components/statsLogic.js';
+import * as S from '../../src/components/statsLogic.js';
+import { repoPath } from '../paths.mjs';
 
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 
 // ============================================ guard: the two batch thresholds must match
 t('BATCH_MIN equals PACE_BATCH_MIN in store/db.js (the handover warns these must stay in sync)', () => {
-  const src = fs.readFileSync('/home/claude/wl/src/store/db.js', 'utf8');
+  const src = fs.readFileSync(repoPath('src/store/db.js'), 'utf8');
   const m = /const PACE_BATCH_MIN\s*=\s*(\d+)/.exec(src);
   assert.ok(m, 'PACE_BATCH_MIN not found in db.js'); assert.equal(S.BATCH_MIN, Number(m[1]));
 });

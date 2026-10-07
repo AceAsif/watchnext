@@ -1,17 +1,21 @@
 import assert from 'node:assert/strict';
-import { build } from '/home/claude/wl/node_modules/esbuild/lib/main.js';
+import { build } from 'esbuild';
 import fs from 'node:fs';
-fs.writeFileSync('/home/claude/tests/tmp/entry.jsx', `
+import { createRequire } from 'node:module';
+import { repoPath, workPath } from '../paths.mjs';
+// esbuild accepts forward slashes on every OS, and the generated entry file lives in the scratch folder
+const fwd = (p) => p.replace(/\\/g, '/');
+const ENTRY = workPath('tmp', 'entry.jsx'), OUTFILE = workPath('tmp', 'out.cjs');
+fs.writeFileSync(ENTRY, `
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 export { React, renderToStaticMarkup };
-export * from '/home/claude/wl/src/components/SettingsCards.jsx';
-export { PLATFORMS, platformById, providerToPlatform } from '/home/claude/wl/src/components/PlatformPicker.jsx';
+export * from '${fwd(repoPath('src/components/SettingsCards.jsx'))}';
+export { PLATFORMS, platformById, providerToPlatform } from '${fwd(repoPath('src/components/PlatformPicker.jsx'))}';
 `);
-await build({ entryPoints: ['/home/claude/tests/tmp/entry.jsx'], bundle: true, platform: 'node', format: 'cjs', outfile: '/home/claude/tests/tmp/out.cjs',
-  loader: { '.css': 'empty', '.jsx': 'jsx' }, nodePaths: ['/home/claude/wl/node_modules'], logLevel: 'error' });
-import { createRequire } from 'node:module';
-const M = createRequire(import.meta.url)('/home/claude/tests/tmp/out.cjs');
+await build({ entryPoints: [ENTRY], bundle: true, platform: 'node', format: 'cjs', outfile: OUTFILE,
+  loader: { '.css': 'empty', '.jsx': 'jsx' }, nodePaths: [repoPath('node_modules')], logLevel: 'error' });
+const M = createRequire(import.meta.url)(OUTFILE);
 const h = (el) => M.renderToStaticMarkup(el);
 const R = M.React.createElement;
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };

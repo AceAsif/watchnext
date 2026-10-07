@@ -1,6 +1,6 @@
 // TEST-ONLY stand-in for src/store/cloud.js: a signed-in user and a fake wipeEverywhere
 // that records what happened and clears the device the same way the real engine does.
-import { resetAll, takeDirty, addTombstones, getState } from '/home/claude/wl/src/store/db.js';
+import { resetAll, takeDirty, addTombstones, getState } from '../../src/store/db.js';
 export const isCloudAvailable = () => true;
 const user = { email: 'asif@example.com', uid: 'u1' };
 export const getCloudUser = () => user;

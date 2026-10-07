@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import * as G from '/home/claude/wl/src/components/goalsLogic.js';
+import * as G from '../../src/components/goalsLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const T0 = '2026-10-05T01:00:00.000Z', T1 = '2026-10-05T02:00:00.000Z', T2 = '2026-10-05T03:00:00.000Z';
 

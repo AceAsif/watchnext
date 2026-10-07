@@ -1,8 +1,8 @@
 process.env.TZ = 'Australia/Hobart';
 import assert from 'node:assert/strict';
-import * as F from '/home/claude/wl/src/components/finishCardLogic.js';
-import * as Y from '/home/claude/wl/src/components/yearImageLogic.js';
-import { BATCH_MIN } from '/home/claude/wl/src/components/statsLogic.js';
+import * as F from '../../src/components/finishCardLogic.js';
+import * as Y from '../../src/components/yearImageLogic.js';
+import { BATCH_MIN } from '../../src/components/statsLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const eps = (count, at = (i) => `2026-08-${String(1 + (i % 28)).padStart(2, '0')}T10:00:00.000Z`, min = 40) => Object.fromEntries(Array.from({ length: count }, (_, i) => [`1x${i + 1}`, { at: at(i), min, n: 1 }]));
 const show = (extra = {}) => ({ name: 'Suits', poster: '/s.jpg', totalEpisodes: 10, status: 'Ended', watched: eps(10), ...extra });

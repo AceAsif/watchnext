@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import * as Y from '/home/claude/wl/src/components/yearImageLogic.js';
+import * as Y from '../../src/components/yearImageLogic.js';
+import { repoPath } from '../paths.mjs';
 
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const base = () => ({ year: 2026, prevYear: 2025, episodes: 1234, hours: 800, movies: 12, activeDays: 150, epDelta: 12,
@@ -10,7 +11,7 @@ const base = () => ({ year: 2026, prevYear: 2025, episodes: 1234, hours: 800, mo
 t('canvas is Instagram 4:5', () => { assert.equal(Y.IMG_W, 1080); assert.equal(Y.IMG_H, 1350); assert.equal(Y.IMG_W / Y.IMG_H, 0.8); });
 
 t('GLOWS match the .sd-yir gradient in ui.css (on-screen card == saved image)', () => {
-  const css = fs.readFileSync('/home/claude/wl/src/components/ui.css', 'utf8');
+  const css = fs.readFileSync(repoPath('src/components/ui.css'), 'utf8');
   const block = css.slice(css.indexOf('.sd-yir {'), css.indexOf('}', css.indexOf('.sd-yir {')));
   const re = /radial-gradient\((\d+)% (\d+)% at (\d+)% (\d+)%, rgba\((\d+), (\d+), (\d+), ([\d.]+)\), transparent (\d+)%\)/g;
   const found = [...block.matchAll(re)];
@@ -24,7 +25,7 @@ t('GLOWS match the .sd-yir gradient in ui.css (on-screen card == saved image)', 
 });
 
 t('palette matches the design tokens', () => {
-  const css = fs.readFileSync('/home/claude/wl/src/styles.css', 'utf8');
+  const css = fs.readFileSync(repoPath('src/styles.css'), 'utf8');
   for (const [tok, key] of [['--bg-card', 'card'], ['--bg-raise', 'raise'], ['--line', 'line'], ['--text-dim', 'dim']]) {
     const m = new RegExp(tok + ':\\s*(#[0-9a-fA-F]{6})').exec(css); assert.ok(m, tok);
     assert.equal(m[1].toLowerCase(), Y.COLORS[key]);

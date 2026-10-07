@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import * as N from '/home/claude/wl/src/store/notes.js';
-import { mergeBackup } from '/home/claude/wl/src/store/backupMerge.js';
-import { restoreResultText } from '/home/claude/wl/src/components/settingsLogic.js';
+import * as N from '../../src/store/notes.js';
+import { mergeBackup } from '../../src/store/backupMerge.js';
+import { restoreResultText } from '../../src/components/settingsLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const NOW = '2026-10-03T08:00:00.000Z';
 const noUndef = (v) => { const s = JSON.stringify(v, (k, x) => (x === undefined ? '__UNDEF__' : x)); return !s.includes('__UNDEF__'); };

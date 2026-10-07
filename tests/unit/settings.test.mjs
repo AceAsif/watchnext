@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import * as S from '/home/claude/wl/src/components/settingsLogic.js';
+import * as S from '../../src/components/settingsLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 
 t('keyStatus: empty / saved / unsaved (typed, edited, cleared, whitespace-tolerant)', () => {

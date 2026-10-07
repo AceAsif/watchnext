@@ -8,9 +8,9 @@ store.set('watchnext-state-v1', JSON.stringify({ shows: {
   'tmdb:1': { followed: true, name: 'Dahmer', totalEpisodes: 10, watched: { ...W(1, 10, '2026-07-07T03:00:00.000Z'), '2x1': ep('2026-07-20T10:00:00.000Z', { n: 3 }) }, notes: { '1x1': { react: 'love', at: 'x' } }, rating: 4 },
   'tmdb:2': { followed: true, name: 'Fresh', totalEpisodes: 6, watched: {} },
 }, movies: [], settings: {} }));
-const D = await import('/home/claude/wl/src/store/db.js');
-const M = await import('/home/claude/wl/src/store/watchedMerge.js');
-const L = await import('/home/claude/wl/src/components/watchDatesLogic.js');
+const D = await import('../../src/store/db.js');
+const M = await import('../../src/store/watchedMerge.js');
+const L = await import('../../src/components/watchDatesLogic.js');
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const show = (id) => D.getState().shows[id];
 

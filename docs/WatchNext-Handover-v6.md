@@ -61,7 +61,6 @@ src/
   components/
     ui.jsx, LibraryBar.jsx, LibraryUI.jsx, StatsUI.jsx, Heatmap.jsx, SettingsCards.jsx, NoteEditor.jsx,
     CastCrew.jsx, AnimeSheet.jsx, AgendaEpisode.jsx, CalendarGrid.jsx, Discover.jsx, Stars.jsx, PlatformPicker.jsx
-    PosterCard.jsx            UNUSED (safe to delete)
     share cards:   RecapSection.jsx (period card UI), YearInReview.jsx, MonthInReview.jsx, FinishCardSheet.jsx,
                    yearImageLogic.js / yearImageRender.js (1080x1350 PNG plan + canvas), finishCardLogic.js / finishCardRender.js,
                    cardKit.js (shared canvas bits), shareImage.js (load/save/share helpers)
@@ -153,18 +152,18 @@ tests/unit/*.test.mjs         harness (§9)         shot/browser/*.mjs  harness 
 - Goals: the newest edit of a YEAR wins as a whole (editing different metrics of one year on two offline devices loses one); a bulk-marked backlog counts toward goals (use Fix watch dates).
 - Stats dates: UTC (Year/streaks/heatmap/goals) vs local (Month/CSV) can differ near a boundary.
 - Settings, TMDB key, services prefs and the per-feature prefs are per device by design.
-- The harness runs only in the assistant's sandbox (§9). Three original browser suites can't run any more (§9).
+- The harness runs on his own computer too (§9). Three original browser suites (library, upnext, showpage) can't run any more; they need old baselines/design files.
 
 ## 9. Testing harness (repo: `tests/unit`, `shot/browser`, `docs`)
 
-The files are archived in the repo (and in `watchnext-harness-for-repo.zip`); **they hard-code the assistant sandbox's `/home/claude/...` paths and do not run on his computer.** Full details and results are in `tests/README_HARNESS.md`.
+The harness lives in the repo (`tests/unit`, `shot/browser`) and **runs on any computer** (paths are relative to the repo via `tests/paths.mjs`; scratch output goes to the git-ignored `.harness-work/`). Full details are in `tests/README_HARNESS.md`.
 
-| In the repo | In the sandbox | What |
-|---|---|---|
-| `tests/unit/*.test.mjs` | `/home/claude/tests/unit/` | 26 plain-Node suites (≈505 tests); import `/home/claude/wl/src/...` |
-| `shot/browser/*.mjs`, `fakecloud.js`, `fonts.css` | `/home/claude/shot/` (ONE folder) | 20 headless-Chromium suites (≈480 checks) |
+| Where | What |
+|---|---|
+| `tests/unit/*.test.mjs` | 26 plain-Node suites (≈505 tests). Run: `npm run test:unit` |
+| `shot/browser/*.mjs`, `fakecloud.js`, `fonts.css`, `launch.mjs` | 17 runnable headless-Chrome suites (≈484 checks). Run: `npm run test:browser:build`, then `npm run test:browser` (needs `npm install` in `shot/` once) |
 
-**Setup in a new session:** `git clone --depth 20 https://github.com/AceAsif/watchnext.git /home/claude/wl && cd /home/claude/wl && npm install`; unpack the zip, copy `tests/unit` → `/home/claude/tests/unit`, `shot/browser/*` → `/home/claude/shot/`; `cd /home/claude/shot && npm i puppeteer-core @sparticuz/chromium`; `mkdir -p tmp out6 out7 out8 out9 /home/claude/tests/tmp`. Build with a placeholder `.env` (`VITE_FIREBASE_API_KEY=placeholder_key_for_build_test`, `…AUTH_DOMAIN=x.firebaseapp.com`, `…PROJECT_ID=x`, `…STORAGE_BUCKET=x.appspot.com`, `…MESSAGING_SENDER_ID=1`, `…APP_ID=1:1:web:1`), `npm run build`, delete `.env`. **`wipe_resume.mjs` needs a second test-only build** (cloud module swapped for `fakecloud.js` via a temporary `vite.fake.config.js` alias → `/home/claude/shot/dist-fake`; steps in `shot/browser/wipe_resume.README.md`; delete the temp config afterwards, never commit it).
+**Setup in a new session (Claude's sandbox):** `git clone --depth 20 https://github.com/AceAsif/watchnext.git /home/claude/wl && cd /home/claude/wl && npm install && cd shot && npm install && npm i --no-save @sparticuz/chromium` (the sandbox browser; on his own computer `launch.mjs` uses installed Chrome/Edge or `CHROME_PATH`), then `node shot/build-test-dists.mjs`. No `.env` is needed for tests; the build script passes placeholder Firebase values itself. `wipe_resume.mjs` uses the second build (`dist-fake`) that the same script makes.
 
 **Conventions:** browser tests pin the date to 2026-10-01T22:00Z (= 08:00 Fri 2 Oct in Hobart, local day-of-year 275), `emulateTimezone('Australia/Hobart')`, **bypass the service worker** (`setBypassServiceWorker(true)`), stub fonts, mock TMDB. **Last known results, all passing:** unit — library 19, settings 11, upnext 24, stats 25, backup 14, notes 16, logic 44, anime 34, settings_render 14, yearimage 29, dropped_csv 28, wipe 23, resume_db 11, rewatch 14, notes_search 19, month_recap 14, finish_card 21, watchdates 22, backup_nudge 14, services 16, providers_db 7, tonight 23, movie_genres_db 6, movie_night 21, goals 22, goals_db 14. Browser — settings 47, desktop 56, notes 35, restore 24, anime 35, yearimage 25, dropped_csv 25, rewatch 8, recaps 20, watchdates 21, notes_search 22, backup_nudge 21, services 34, tonight 27, movie_night 26, goals 25, wipe_resume 33. **Cannot run:** `library.mjs` (needs an old baseline build `wl-base-dist`), `upnext.mjs` and `showpage.mjs` (need design mock-up files from the original hand-off); kept for reference.
 
@@ -213,8 +212,7 @@ Complete UI redesign of every tab · AniList · Restore from backup · Cinema pl
 - **Rewatches as dated history** (changes the `watched` shape + cloud merge; would let "Most rewatched" split by year). The biggest data change of the lot.
 - Per-metric goal merging (today the newest edit of a YEAR wins as a whole).
 - "Pick one for me" (random) on the Watchlist; taste-weighted Discover (use reactions/ratings more).
-- Cleanups: delete unused `PosterCard.jsx`; stale comments.
-- Optional: make the test harness runnable on his own computer (relative paths) so he can run it himself.
+- Cleanups: stale comments; the unused `.poster-card` rules in `styles.css` (left over from the deleted `PosterCard.jsx`). (Done Oct 2026: `PosterCard.jsx` deleted; the harness now runs on his own computer, see `tests/README_HARNESS.md`.)
 
 **Bigger (several days, may need a backend)**
 - **New-episode push notifications** (iPhone web apps can; needs Firebase Cloud Messaging + a scheduled job; the heaviest item).

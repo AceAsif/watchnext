@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 const store = new Map();
 globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
 store.set('watchnext-state-v1', JSON.stringify({ shows: {}, movies: [{ tmdbId: 5, name: 'Old planned', status: 'planned', runtimeMin: 90 }, { tmdbId: 5, name: 'Old watched copy', status: 'watched', watchedAt: '2026-01-01T00:00:00.000Z' }, { tmdbId: 6, name: 'Other', status: 'planned' }], settings: {} }));
-const D = await import('/home/claude/wl/src/store/db.js');
+const D = await import('../../src/store/db.js');
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 t('queueing a movie now stores its genre names', () => {
   D.addMovieToWatchlist({ id: 7, title: 'New planned', runtime: 101, poster_path: '/p.jpg', release_date: '2024-03-02', genres: [{ id: 35, name: 'Comedy' }, { id: 18, name: 'Drama' }] });

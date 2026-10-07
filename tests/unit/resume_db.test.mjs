@@ -12,7 +12,7 @@ store.set('watchnext-state-v1', JSON.stringify({ shows: {
   'tmdb:5': mk('Plain'),
   'tmdb:6': mk('Resumed', { dropped: false, droppedAt: null }),
 }, movies: [{ name: 'Film', watchedAt: '2026-05-05T10:00:00.000Z' }], settings: { tmdbKey: 'KEY-123' } }));
-const D = await import('/home/claude/wl/src/store/db.js');
+const D = await import('../../src/store/db.js');
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const show = (id) => D.getState().shows[id];
 const isResumed = (id) => show(id).dropped === false && show(id).droppedAt === null;

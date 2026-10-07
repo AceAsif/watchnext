@@ -1,16 +1,17 @@
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import * as Y from '/home/claude/wl/src/components/yearImageLogic.js';
+import * as Y from '../../src/components/yearImageLogic.js';
+import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
 
-const DIST = '/home/claude/wl/dist';
-const OUT = '/home/claude/shot/out_yir';
+const DIST = APP_DIST;
+const OUT = workPath('out_yir');
 fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
@@ -40,7 +41,7 @@ const mk = (n, name, poster, year, eps, extra = {}) => ({
 const stateWith = (shows, movies = []) => ({ shows: Object.fromEntries(shows.map((s) => [`tmdb:${s.tmdbId}`, s])), movies, settings: { tmdbKey: 'TESTKEY' } });
 const mv = (n, name, date) => ({ tmdbId: n, name, status: 'watched', watchedAt: date, runtimeMin: 100, poster: null, year: 2026 });
 
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = []; let checks = 0;
 const ok = (name, fn) => { fn(); checks++; console.log('  PASS', name); };
 const wait = (ms = 400) => new Promise((r) => setTimeout(r, ms));

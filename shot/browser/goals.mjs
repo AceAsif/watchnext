@@ -1,15 +1,16 @@
 process.env.TZ = 'Australia/Hobart';
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import * as Y from '/home/claude/wl/src/components/yearImageLogic.js';
+import * as Y from '../../src/components/yearImageLogic.js';
+import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
 
-const DIST = '/home/claude/wl/dist'; const OUT = '/home/claude/shot/out_gl'; fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+const DIST = APP_DIST; const OUT = workPath('out_gl'); fs.mkdirSync(OUT, { recursive: true });
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const server = http.createServer((req, res) => { let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html'; const f = path.join(DIST, p); if (!f.startsWith(DIST) || !fs.existsSync(f)) { res.writeHead(404); return res.end('nf'); } res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res); });
 await new Promise((r) => server.listen(4189, r));
@@ -56,7 +57,7 @@ function expectRow(metric, target, done) {
   return { num, pace, pct };
 }
 
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = []; let checks = 0; const ok = async (n, f) => { await f(); checks++; console.log('  PASS', n); }; const wait = (ms = 350) => new Promise((r) => setTimeout(r, ms));
 async function open(state, { w = 390, h = 844, tab = 'Stats' } = {}) {
   const page = await browser.newPage(); await page.emulateTimezone('Australia/Hobart'); await page.setViewport({ width: w, height: h, deviceScaleFactor: 2 });
@@ -201,12 +202,12 @@ p = await open(S6, { tab: 'Settings' });
 await p.evaluate(() => [...document.querySelectorAll('button.sd-setbtn')].find((b) => b.textContent.includes('Download backup')).click()); await wait(900);
 const bk = (await p.evaluate(() => window.__dl)).find((d) => d.name.startsWith('watchnext-backup')); const bkJson = JSON.parse(Buffer.from(bk.bytes).toString('utf8'));
 await ok('the backup file contains the goals (and still no TMDB key)', async () => { assert.deepEqual(bkJson.goals['2026'], { episodes: 400, hours: 500, at: at(2026, 9, 1) }); assert.equal(bkJson.goals['2025'].episodes, 100); assert.equal(bkJson.settings.tmdbKey, undefined); });
-fs.writeFileSync('/home/claude/shot/tmp/goals_backup.json', JSON.stringify(bkJson));
+fs.writeFileSync(workPath('tmp', 'goals_backup.json'), JSON.stringify(bkJson));
 await p.close();
 const S6b = SEED(); S6b.goals = { 2026: { episodes: 111, at: at(2026, 9, 2) } };
 p = await open(S6b, { tab: 'Settings' });
 const fileInput = await p.evaluateHandle(() => { const sec = [...document.querySelectorAll('section')].find((s) => /^\s*BACKUP|Backup/.test(s.querySelector('h2') ? s.querySelector('h2').textContent : '') && s.querySelector('input[type=file]')); return sec.querySelector('input[type=file]'); });
-await fileInput.uploadFile('/home/claude/shot/tmp/goals_backup.json'); await wait(900);
+await fileInput.uploadFile(workPath('tmp', 'goals_backup.json')); await wait(900);
 await ok('restoring adds the 2025 goal you did not have, keeps your own 2026 goal, and says so', async () => {
   const g = (await stored(p)).goals; assert.equal(g['2025'].episodes, 100); assert.equal(g['2026'].episodes, 111, 'your goal is never overwritten'); assert.equal(g['2026'].hours, undefined); assert.match(await p.evaluate(() => document.body.innerText), /1 yearly goal restored/);
 });

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import * as T from '/home/claude/wl/src/components/tonightLogic.js';
+import * as T from '../../src/components/tonightLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const TODAY = '2026-10-05';
 const h = { watchedCount: (s) => Object.keys(s.watched || {}).length, lastWatchDate: (s) => Object.values(s.watched || {}).map((w) => String(w.at).slice(0, 10)).sort().pop() || null };

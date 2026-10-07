@@ -9,7 +9,7 @@ store.set('watchnext-state-v1', JSON.stringify({
     { tmdbId: 11, name: 'Planned B', status: 'planned' },
     { name: 'Legacy watched', watchedAt: '2025-01-01T00:00:00.000Z' }, // no status = watched
   ], settings: {} }));
-const D = await import('/home/claude/wl/src/store/db.js');
+const D = await import('../../src/store/db.js');
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const subs = [{ name: 'Netflix', logo: '/n.png' }], free = [{ name: 'ABC iview', logo: null }];
 

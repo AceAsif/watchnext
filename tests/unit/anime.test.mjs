@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import * as L from '/home/claude/wl/src/components/animeLogic.js';
-import { searchAnime, fetchAnime, AniListError } from '/home/claude/wl/src/api/anilist.js';
+import * as L from '../../src/components/animeLogic.js';
+import { searchAnime, fetchAnime, AniListError } from '../../src/api/anilist.js';
 
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok  -', name); };
 const NOW = '2026-10-01T00:00:00.000Z', NOWMS = Date.parse(NOW);

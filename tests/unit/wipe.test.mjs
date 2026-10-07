@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import * as W from '/home/claude/wl/src/store/wipeLogic.js';
+import * as W from '../../src/store/wipeLogic.js';
 let n = 0; const t = (name, fn) => Promise.resolve().then(fn).then(() => { n++; console.log('ok  -', name); });
 
 await t('confirmOk: DELETE in any case, trimmed; nothing else', () => {

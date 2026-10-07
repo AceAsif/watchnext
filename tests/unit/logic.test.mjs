@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { seasonPremiereDate, seasonInfo, nextToMark, leadingDoneCount, currentSeasonN, leadingWatchedFold } from '/home/claude/wl/src/components/showLogic.js';
-import { summarizeCredits, mergeCredits } from '/home/claude/wl/src/components/creditsLogic.js';
+import { seasonPremiereDate, seasonInfo, nextToMark, leadingDoneCount, currentSeasonN, leadingWatchedFold } from '../../src/components/showLogic.js';
+import { summarizeCredits, mergeCredits } from '../../src/components/creditsLogic.js';
 
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const W = (...ks) => Object.fromEntries(ks.map((k) => [k, { at: '2026-01-01', n: 1 }]));

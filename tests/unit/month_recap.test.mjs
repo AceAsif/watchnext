@@ -1,7 +1,7 @@
 process.env.TZ = 'Australia/Hobart';
 import assert from 'node:assert/strict';
-import * as M from '/home/claude/wl/src/components/monthRecapLogic.js';
-import * as Y from '/home/claude/wl/src/components/yearImageLogic.js';
+import * as M from '../../src/components/monthRecapLogic.js';
+import * as Y from '../../src/components/yearImageLogic.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const w = (at, extra = {}) => ({ at, min: 40, n: 1, ...extra });
 const show = (name, watched, extra = {}) => ({ name, poster: '/' + name + '.jpg', genres: ['Drama'], watched, ...extra });

@@ -1,0 +1,9 @@
+{
+  "name": "watchnext-browser-harness",
+  "private": true,
+  "type": "module",
+  "description": "Dependencies for the headless-browser test suites only. Run `npm install` in this folder.",
+  "devDependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}

@@ -1,7 +1,7 @@
 process.env.TZ = 'Australia/Hobart';   // the user's timezone; set before any Date is used
 import assert from 'node:assert/strict';
-import { localISODate } from '/home/claude/wl/src/components/showLogic.js';
-import * as U from '/home/claude/wl/src/components/upnextLogic.js';
+import { localISODate } from '../../src/components/showLogic.js';
+import * as U from '../../src/components/upnextLogic.js';
 
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 

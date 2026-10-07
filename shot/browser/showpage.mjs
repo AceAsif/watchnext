@@ -1,13 +1,15 @@
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
+import { launchBrowser } from './launch.mjs';
+import { pathToFileURL } from 'node:url';
 
-const DIST = '/home/claude/wl/dist';
-const OUT = '/home/claude/shot/out';
+const DIST = APP_DIST;
+const OUT = workPath('out');
 fs.mkdirSync(OUT, { recursive: true });
-const fontsCss = fs.readFileSync('/home/claude/shot/fonts.css', 'utf8');
+const fontsCss = fs.readFileSync(browserFile('fonts.css'), 'utf8');
 
 // ---------- tiny static server for dist/
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
@@ -52,7 +54,7 @@ const SC = {
 };
 const seed = (key, withKey = true) => ({ shows: { 'tmdb:1': { ...base, ...SC[key] }, 'tmdb:77': { ...base, tmdbId: 77, name: 'Tracked Show', seasons: [], watched: {} } }, movies: [{ name: 'Some Film', tmdbId: 88, watchedAt: '2020-01-01', runtimeMin: 100 }], settings: { tmdbKey: withKey ? 'TESTKEY' : '' } });
 
-const browser = await puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await launchBrowser(puppeteer);
 const problems = [];
 
 async function open(key, { w = 390, h = 844, withKey = true, scale = 2 } = {}) {
@@ -140,7 +142,7 @@ p = await open('rw13', { w: 1280, h: 900, scale: 1 }); await shot(p, '31_rw13_de
 // 4. design frame itself, for side-by-side
 p = await browser.newPage();
 await p.setViewport({ width: 390, height: 1500, deviceScaleFactor: 2 });
-await p.goto('file:///home/claude/design/summary_rows.html', { waitUntil: 'networkidle0' });
+await p.goto(pathToFileURL(workPath('design', 'summary_rows.html')).href, { waitUntil: 'networkidle0' });
 await wait(1500);
 await p.screenshot({ path: `${OUT}/00_DESIGN_summary_rows.png` });
 await p.close();

@@ -1,11 +1,12 @@
 process.env.TZ = 'Australia/Hobart';
 import assert from 'node:assert/strict';
-import * as L from '/home/claude/wl/src/components/libraryLogic.js';
-import * as U from '/home/claude/wl/src/components/upnextLogic.js';
-import * as B from '/home/claude/wl/src/store/backupMerge.js';
-import * as C from '/home/claude/wl/src/components/csvExport.js';
-import * as S from '/home/claude/wl/src/components/statsLogic.js';
+import * as L from '../../src/components/libraryLogic.js';
+import * as U from '../../src/components/upnextLogic.js';
+import * as B from '../../src/store/backupMerge.js';
+import * as C from '../../src/components/csvExport.js';
+import * as S from '../../src/components/statsLogic.js';
 import fs from 'node:fs';
+import { repoPath } from '../paths.mjs';
 
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 const H = { watchedCount: (s) => Object.keys(s.watched || {}).length, lastWatchDate: (s) => Object.values(s.watched || {}).map((w) => w.at).sort().pop() || null };
@@ -201,7 +202,7 @@ t('scale: 9,000 episode watches build in well under a second', () => {
 });
 
 // ====================================================== wiring guards (source-level)
-const src = (p) => fs.readFileSync('/home/claude/wl/src/' + p, 'utf8');
+const src = (p) => fs.readFileSync(repoPath('src', p), 'utf8');
 t('Stats completion keeps dropped shows out of Finished / Watching / Not started', () => {
   const s = src('pages/Stats.jsx');
   assert.match(s, /if \(show\.dropped === true\) dropped\+\+;[^\n]*\n\s*else if \(total && seen >= total\) finished\+\+;/);

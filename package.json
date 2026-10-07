@@ -8,7 +8,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && gh-pages -d dist"
+    "deploy": "npm run build && gh-pages -d dist",
+    "test:unit": "node tests/run-unit.mjs",
+    "test:browser:build": "node shot/build-test-dists.mjs",
+    "test:browser": "node shot/run-browser.mjs"
   },
   "dependencies": {
     "firebase": "^10.14.1",
