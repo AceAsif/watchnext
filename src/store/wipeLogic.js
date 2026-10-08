@@ -30,7 +30,18 @@ export function chunk(list, size) {
 const validTime = (s) => typeof s === 'string' && !isNaN(Date.parse(s));
 export const isValidWipe = (w) => !!w && typeof w === 'object' && typeof w.id === 'string' && w.id.length > 0 && validTime(w.at);
 
-// meta = { lastSync?: ISO, seenWipeId?: string } for THIS account on THIS device.
+// Does a wipe tombstone still block a cloud show doc? `tombAt` = the time of the wipe that
+// created the tombstone; `remoteWipeAt` = the wipe time stamped on the incoming doc by the
+// device that uploaded it (undefined if it had never seen a wipe). A STALE device (it has not
+// seen that wipe) uploads old data with no stamp or an older one: blocked. A device that HAS
+// seen the wipe and then deliberately restores or re-adds the show stamps the doc with that
+// wipe's time: let through.
+export function blockedByWipe(tombAt, remoteWipeAt) {
+  if (!validTime(tombAt)) return false;
+  return !(validTime(remoteWipeAt) && Date.parse(remoteWipeAt) >= Date.parse(tombAt));
+}
+
+// meta = { lastSync?: ISO, seenWipeId?: string, seenWipeAt?: ISO } for THIS account on THIS device.
 // 'apply'  clear this device now
 // 'record' remember the marker, change nothing (never synced before, or already synced after it)
 // 'ignore' nothing to do (no/invalid marker, or already handled)
@@ -47,10 +58,14 @@ export function readMeta(raw, uid) {
   try {
     const m = JSON.parse(raw);
     if (m && typeof m === 'object' && m.uid === uid && uid) {
-      return {
+      const out = {
         lastSync: validTime(m.lastSync) ? m.lastSync : undefined,
         seenWipeId: typeof m.seenWipeId === 'string' ? m.seenWipeId : undefined,
       };
+      // The time of the last wipe this device has seen. Stamped on the show docs it
+      // uploads so the device that ran the wipe can tell a deliberate restore from a stale push.
+      if (validTime(m.seenWipeAt)) out.seenWipeAt = m.seenWipeAt;
+      return out;
     }
   } catch (e) { /* no record yet */ }
   return {};
@@ -65,7 +80,7 @@ export const writeMeta = (prev, uid, patch) => JSON.stringify({ uid, ...prev, ..
 //   commitDeletes(ids)       -> Promise             delete these show docs
 //   commitFinal(ids, marker) -> Promise             delete these show docs AND set
 //                            movies=[] AND write the marker, atomically
-//   clearLocal(ids)          clear this device (only called after the cloud succeeded)
+//   clearLocal(ids, marker)  clear this device (only called after the cloud succeeded)
 //   now()                    -> ISO string
 //   randomId()               -> string
 // Throws (leaving this device untouched) if any cloud step fails.
@@ -79,7 +94,7 @@ export async function runWipe(p) {
   // the wipe finished has lastSync < at and will apply it.
   const marker = { id: markerId, at: p.now() };
   await p.commitFinal(parts.length ? parts[parts.length - 1] : [], marker);
-  p.clearLocal(ids);
+  p.clearLocal(ids, marker);
   return { shows: ids.length, marker };
 }
 

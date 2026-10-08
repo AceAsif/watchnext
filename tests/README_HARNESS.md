@@ -8,7 +8,7 @@ They are **not** part of the deploy: GitHub Actions only runs `npm run build`.
 
 | Folder | What it is |
 |---|---|
-| `tests/unit/*.test.mjs` | 26 plain-Node unit suites (~505 tests). They import `src/...` directly. |
+| `tests/unit/*.test.mjs` | 27 plain-Node unit suites (~524 tests). They import `src/...` directly. |
 | `tests/paths.mjs`, `tests/run-unit.mjs` | shared path helpers; runs every unit suite |
 | `shot/browser/*.mjs`, `fakecloud.js`, `fonts.css`, `launch.mjs` | 17 runnable headless-Chrome suites (puppeteer) + helpers |
 | `shot/build-test-dists.mjs`, `shot/run-browser.mjs`, `shot/package.json` | builds the app for the tests, runs the browser suites, browser-test dependency |
@@ -18,7 +18,7 @@ They are **not** part of the deploy: GitHub Actions only runs `npm run build`.
 ## Run the unit tests (nothing extra to install)
 ```
 npm install              # once, in the repo root
-npm run test:unit        # all 26 suites
+npm run test:unit        # all 27 suites
 node tests/run-unit.mjs goals wipe      # only suites whose name contains these words
 node tests/unit/goals.test.mjs          # one suite directly
 ```

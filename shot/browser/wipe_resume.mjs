@@ -214,9 +214,9 @@ await ok('the downloaded backup really contains the data (5 shows, the movie) an
   const d = (await p.evaluate(() => window.__dl)).find((x) => x.name.endsWith('.json')); const j = JSON.parse(Buffer.from(d.bytes).toString('utf8'));
   assert.equal(Object.keys(j.shows).length, 5); assert.equal(j.movies.length, 1); assert.ok(j.shows['tmdb:2'].dropped === true || j.shows['tmdb:2'].dropped === false); assert.equal(j.settings.tmdbKey, undefined);
 });
-await ok('device is empty afterwards: no shows, no movies, TMDB key removed, tombstones remembered, dialog closed', async () => {
+await ok('device is empty afterwards: no shows, no movies, TMDB key removed, wipe tombstones remembered (with the wipe time), dialog closed', async () => {
   const st = await stored(p); assert.deepEqual(st.shows, {}); assert.deepEqual(st.movies, []); assert.deepEqual(st.goals, {}, 'yearly goals are wiped too'); assert.equal(st.settings.tmdbKey, '');
-  const tomb = await p.evaluate(() => JSON.parse(localStorage.getItem('watchnext-tombstones-v1') || '[]')); for (const id of ['tmdb:1', 'tmdb:2', 'tmdb:3', 'tmdb:4', 'tmdb:5']) assert.ok(tomb.includes(id), id);
+  const tomb = await p.evaluate(() => JSON.parse(localStorage.getItem('watchnext-wipe-tombstones-v1') || '{}')); for (const id of ['tmdb:1', 'tmdb:2', 'tmdb:3', 'tmdb:4', 'tmdb:5']) assert.ok(typeof tomb[id] === 'string' && !isNaN(Date.parse(tomb[id])), id + ' wipe tombstone carries the wipe time');
   assert.equal(await has(p, '[role=alertdialog]'), false);
 });
 await ok('success banner states what happened; the TMDB key box is cleared', async () => {

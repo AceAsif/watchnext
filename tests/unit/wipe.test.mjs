@@ -88,16 +88,21 @@ await t('runWipe: listing the cloud failing stops before anything is written', a
 
 // ---------------------------------------------------------------- two-device simulation (in-memory cloud)
 function world() {
+  // cloud shows are { v, w }: the show and the wipe time stamped on it by the device that uploaded it
   const cloud = { shows: new Map(), movies: [], wipe: null };
-  const mkDevice = (name) => ({ name, shows: new Map(), movies: [], meta: {}, tomb: new Set() });
+  const mkDevice = (name) => ({ name, shows: new Map(), movies: [], meta: {}, tomb: new Map() });
   // a sign-in pull: same rules as cloudEngine.pullAndMerge
   const pull = (d, now) => {
     const decision = W.wipeDecision(cloud.wipe, d.meta);
-    if (decision === 'apply') { d.shows.clear(); d.movies = []; d.meta = { ...d.meta, seenWipeId: cloud.wipe.id }; }
-    else if (decision === 'record') d.meta = { ...d.meta, seenWipeId: cloud.wipe.id };
-    for (const [id, s] of cloud.shows) if (!d.tomb.has(id) && !d.shows.has(id)) d.shows.set(id, s);
+    if (decision === 'apply') { d.shows.clear(); d.movies = []; d.meta = { ...d.meta, seenWipeId: cloud.wipe.id, seenWipeAt: cloud.wipe.at }; }
+    else if (decision === 'record') d.meta = { ...d.meta, seenWipeId: cloud.wipe.id, seenWipeAt: cloud.wipe.at };
+    for (const [id, c] of [...cloud.shows]) {
+      if (d.tomb.has(id) && W.blockedByWipe(d.tomb.get(id), c.w)) { cloud.shows.delete(id); continue; } // stale doc: refused and cleaned up
+      d.tomb.delete(id);                                                                                  // accepted: the tombstone is lifted
+      if (!d.shows.has(id)) d.shows.set(id, c.v);
+    }
     const seen = new Set(d.movies.map((m) => m)); for (const m of cloud.movies) if (!seen.has(m)) d.movies.push(m);
-    for (const [id, s] of d.shows) cloud.shows.set(id, s); cloud.movies = [...new Set([...cloud.movies, ...d.movies])];
+    for (const [id, v] of d.shows) cloud.shows.set(id, { v, w: d.meta.seenWipeAt }); cloud.movies = [...new Set([...cloud.movies, ...d.movies])];
     d.meta = { ...d.meta, lastSync: now };
   };
   const wipeFrom = async (d, now) => {
@@ -106,7 +111,7 @@ function world() {
       markSeen: (id) => { d.meta = { ...d.meta, seenWipeId: id }; },
       commitDeletes: async (ids) => ids.forEach((i) => cloud.shows.delete(i)),
       commitFinal: async (ids, m) => { ids.forEach((i) => cloud.shows.delete(i)); cloud.movies = []; cloud.wipe = m; },
-      clearLocal: (ids) => { d.shows.clear(); d.movies = []; ids.forEach((i) => d.tomb.add(i)); d.meta = { ...d.meta, lastSync: now }; },
+      clearLocal: (ids, m) => { d.shows.clear(); d.movies = []; ids.forEach((i) => d.tomb.set(i, m.at)); d.meta = { ...d.meta, seenWipeAt: m.at, lastSync: now }; },
       now: () => now, randomId: () => 'wipe-' + now,
     });
   };
@@ -148,6 +153,53 @@ await t('SIM: the device that wiped keeps working afterwards (new data syncs; it
   const w = world(); const phone = w.mkDevice('phone'); phone.shows.set('a', 1); w.pull(phone, T0); await w.wipeFrom(phone, T1);
   assert.equal(phone.shows.size, 0); phone.shows.set('fresh', 1); w.pull(phone, T2);
   assert.equal(phone.shows.has('fresh'), true); assert.equal(w.cloud.shows.has('fresh'), true);
+});
+await t('SIM (the bug): wipe on the PHONE, then Restore on the LAPTOP -> the shows stay on phone, laptop and tablet', async () => {
+  const w = world(); const phone = w.mkDevice('phone'), laptop = w.mkDevice('laptop'), tablet = w.mkDevice('tablet');
+  phone.shows.set('a', 1); phone.shows.set('b', 2); phone.movies.push('film1');
+  w.pull(phone, T0); w.pull(laptop, T0); w.pull(tablet, T0);
+  await w.wipeFrom(phone, T1);                                  // phone: Delete everywhere
+  w.pull(laptop, T2); w.pull(tablet, T2);                       // the others hear about it and clear
+  assert.equal(laptop.shows.size, 0); assert.equal(tablet.shows.size, 0);
+  laptop.shows.set('a', 1); laptop.shows.set('b', 2); laptop.movies.push('film1'); // laptop: Restore from backup (deliberate)
+  w.pull(laptop, '2026-10-04T12:30:00.000Z');                   // …and it uploads
+  w.pull(phone, '2026-10-04T13:00:00.000Z'); w.pull(tablet, '2026-10-04T13:00:00.000Z');
+  assert.deepEqual([...phone.shows.keys()].sort(), ['a', 'b'], 'the wiping phone keeps the restored shows');
+  assert.deepEqual([...tablet.shows.keys()].sort(), ['a', 'b']); assert.deepEqual([...w.cloud.shows.keys()].sort(), ['a', 'b'], 'and the cloud still has them');
+  assert.equal(phone.tomb.size, 0, 'the wipe tombstones were lifted');
+});
+await t('SIM: a STALE device that never heard about the wipe still cannot push its old shows back (the tombstone still protects)', async () => {
+  const w = world(); const phone = w.mkDevice('phone'), laptop = w.mkDevice('laptop');
+  phone.shows.set('a', 1); w.pull(phone, T0); w.pull(laptop, T0);
+  await w.wipeFrom(phone, T1);
+  // the laptop was open but offline; its queued upload of 'a' lands after the wipe, with no wipe stamp
+  w.cloud.shows.set('a', { v: 1, w: laptop.meta.seenWipeAt });
+  w.pull(phone, T2);
+  assert.equal(phone.shows.size, 0, 'phone refuses it'); assert.equal(w.cloud.shows.size, 0, 'and cleans the zombie doc out of the cloud');
+});
+await t('SIM: after refusing a stale doc, a later deliberate restore of the SAME show still works (the refusal is not permanent)', async () => {
+  const w = world(); const phone = w.mkDevice('phone'), laptop = w.mkDevice('laptop');
+  phone.shows.set('a', 1); w.pull(phone, T0); w.pull(laptop, T0);
+  await w.wipeFrom(phone, T1);
+  w.cloud.shows.set('a', { v: 1, w: undefined }); w.pull(phone, T2);   // stale push refused
+  w.pull(laptop, T2); laptop.shows.set('a', 1); w.pull(laptop, '2026-10-04T12:30:00.000Z'); // deliberate restore
+  w.pull(phone, '2026-10-04T13:00:00.000Z');
+  assert.equal(phone.shows.has('a'), true); assert.equal(w.cloud.shows.has('a'), true);
+});
+await t('blockedByWipe: no stamp / older stamp is blocked; same or newer stamp is let through; no valid tombstone time never blocks', () => {
+  assert.equal(W.blockedByWipe(T1, undefined), true); assert.equal(W.blockedByWipe(T1, 'junk'), true); assert.equal(W.blockedByWipe(T1, T0), true);
+  assert.equal(W.blockedByWipe(T1, T1), false); assert.equal(W.blockedByWipe(T1, T2), false);
+  assert.equal(W.blockedByWipe(undefined, T2), false); assert.equal(W.blockedByWipe('junk', undefined), false);
+});
+await t('readMeta/writeMeta: seenWipeAt is kept when valid, left out when missing or junk, and survives patching', () => {
+  const raw = W.writeMeta({}, 'u1', { lastSync: T0, seenWipeId: 'w0', seenWipeAt: T1 });
+  assert.deepEqual(W.readMeta(raw, 'u1'), { lastSync: T0, seenWipeId: 'w0', seenWipeAt: T1 });
+  assert.equal('seenWipeAt' in W.readMeta(JSON.stringify({ uid: 'u1', seenWipeAt: 'nope' }), 'u1'), false);
+  assert.equal(W.readMeta(W.writeMeta(W.readMeta(raw, 'u1'), 'u1', { lastSync: T2 }), 'u1').seenWipeAt, T1);
+});
+await t('runWipe: clearLocal also receives the marker (its time tags the wipe tombstones)', async () => {
+  let got; const f = fake({ remote: ['a'] }); f.p.clearLocal = (ids, m) => { got = { ids, m }; };
+  await W.runWipe(f.p); assert.deepEqual(got, { ids: ['a'], m: { id: 'W', at: T1 } });
 });
 await t('SIM: wiping a huge library (1,000 shows) clears everything on both sides', async () => {
   const w = world(); const phone = w.mkDevice('phone'); for (let i = 0; i < 1000; i++) phone.shows.set('s' + i, i);

@@ -66,12 +66,6 @@ t('wipeLibrary: clears shows + movies, KEEPS this device’s TMDB key, drops que
   const d = D.takeDirty(); assert.equal(d.showIds.size, 0); assert.equal(d.movies, false); assert.equal(d.deletedIds.size, 0);
   assert.deepEqual(JSON.parse(store.get('watchnext-state-v1')).shows, {}, 'persisted');
 });
-t('addTombstones: remembers many ids in one write, WITHOUT queueing cloud deletes; idempotent', () => {
-  D.takeDirty(); D.addTombstones(['x:1', 'x:2', 'x:3']);
-  assert.ok(D.isTombstoned('x:1') && D.isTombstoned('x:3')); assert.equal(D.takeDirty().deletedIds.size, 0);
-  assert.deepEqual(JSON.parse(store.get('watchnext-tombstones-v1')).filter((i) => i.startsWith('x:')).sort(), ['x:1', 'x:2', 'x:3']);
-  D.addTombstones(['x:1']); D.addTombstones([]); assert.ok(D.isTombstoned('x:2'));
-});
 t('resetAll (used by Delete everywhere on THIS device) clears the key too, like Delete all data', () => {
   D.resetAll(); assert.equal(D.getState().settings.tmdbKey, ''); assert.deepEqual(D.getState().shows, {});
 });

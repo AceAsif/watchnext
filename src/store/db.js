@@ -1,4 +1,5 @@
 import { mergeBackup } from './backupMerge.js';
+import { blockedByWipe } from './wipeLogic.js';
 import { setNoteIn, withNotes, withMovieNote } from './notes.js';
 import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
 
@@ -101,19 +102,53 @@ function persistTombstones() {
     console.error('Failed to save tombstones', e);
   }
 }
-export function isTombstoned(id) {
-  return tombstones.has(id);
+// Wipe tombstones: "Delete everywhere" remembers the show ids it wiped, with the
+// wipe's time, so a STALE device (one that never heard about the wipe) cannot push
+// them back. Unlike a normal tombstone this one has to let a DELIBERATE restore
+// from another device through: that device has seen the wipe, and stamps the show
+// docs it uploads with that wipe's time (cloudEngine.js), which is how this device
+// tells the two apart. Stored as { id: wipeTimeIso }.
+const WIPE_TOMB_KEY = 'watchnext-wipe-tombstones-v1';
+function loadWipeTombs() {
+  try {
+    const raw = localStorage.getItem(WIPE_TOMB_KEY);
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object' && !Array.isArray(o)) return new Map(Object.entries(o).filter(([, at]) => typeof at === 'string'));
+    }
+  } catch (e) {
+    console.error('Failed to load wipe tombstones', e);
+  }
+  return new Map();
+}
+let wipeTombs = loadWipeTombs();
+function persistWipeTombs() {
+  try {
+    localStorage.setItem(WIPE_TOMB_KEY, JSON.stringify(Object.fromEntries(wipeTombs)));
+  } catch (e) {
+    console.error('Failed to save wipe tombstones', e);
+  }
+}
+// Remember many wiped ids at once, tagged with the wipe's time (ISO).
+export function addWipeTombstones(ids, wipeAt) {
+  if (typeof wipeAt !== 'string' || isNaN(Date.parse(wipeAt))) return;
+  let changed = false;
+  for (const id of ids) { wipeTombs.set(id, wipeAt); changed = true; }
+  if (changed) persistWipeTombs();
+}
+
+// Is this id blocked from being merged in from the cloud? `remoteWipeAt` is the
+// wipe time stamped on the incoming cloud doc by the device that uploaded it (or
+// undefined). A normal tombstone always blocks. A wipe tombstone blocks unless the
+// uploader had already seen that wipe (or a later one).
+export function isTombstoned(id, remoteWipeAt) {
+  if (tombstones.has(id)) return true;
+  const at = wipeTombs.get(id);
+  return at === undefined ? false : blockedByWipe(at, remoteWipeAt);
 }
 export function clearTombstone(id) {
   if (tombstones.delete(id)) persistTombstones();
-}
-
-// Remember many deleted ids at once WITHOUT queueing Firestore deletes (the
-// caller has already deleted them in the cloud). One localStorage write.
-export function addTombstones(ids) {
-  let changed = false;
-  for (const id of ids) if (!tombstones.has(id)) { tombstones.add(id); changed = true; }
-  if (changed) persistTombstones();
+  if (wipeTombs.delete(id)) persistWipeTombs();
 }
 
 export function markShowDirty(id) {
@@ -129,10 +164,17 @@ export function markGoalsDirty() {
 }
 
 export function markShowDeleted(id) {
-  deletedShows.add(id);
-  dirtyShows.delete(id); // a deleted show must not also be pushed as an update
+  queueShowDelete(id);
   tombstones.add(id); // remember it across reloads so it can't be resurrected
   persistTombstones();
+}
+
+// Queue the Firestore delete for a show WITHOUT adding a permanent tombstone: used
+// to clean up a stale doc that a wipe tombstone just refused, and to retry a failed
+// flush. (A permanent tombstone here would also block a later, deliberate restore.)
+export function queueShowDelete(id) {
+  deletedShows.add(id);
+  dirtyShows.delete(id); // a deleted show must not also be pushed as an update
 }
 
 export function takeDirty() {

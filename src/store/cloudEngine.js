@@ -30,10 +30,10 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
-import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markGoalsDirty, markShowDeleted, isTombstoned, resetAll, wipeLibrary, addTombstones, applyRemoteGoals } from './db.js';
+import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markGoalsDirty, queueShowDelete, clearTombstone, isTombstoned, resetAll, wipeLibrary, addWipeTombstones, applyRemoteGoals } from './db.js';
 import { sanitizeGoals } from '../components/goalsLogic.js';
 import { mergeNotes } from './notes.js';
-import { runWipe, wipeDecision, readMeta, writeMeta } from './wipeLogic.js';
+import { runWipe, wipeDecision, isValidWipe, readMeta, writeMeta } from './wipeLogic.js';
 import { mergeWatched } from './watchedMerge.js';
 
 // --- sync engine state ---
@@ -62,17 +62,28 @@ function touchSync(forUid) {
 }
 // Returns wipeDecision's verdict after acting on it.
 function handleWipeDoc(forUid, data) {
-  const verdict = wipeDecision(data, syncMeta(forUid));
+  const meta = syncMeta(forUid);
+  const verdict = wipeDecision(data, meta);
   if (verdict === 'apply') {
     wipeLibrary(); // clear shows + movies here, keep this device's settings, drop queued uploads
-    patchSyncMeta(forUid, { seenWipeId: data.id, lastSync: new Date().toISOString() });
+    patchSyncMeta(forUid, { seenWipeId: data.id, seenWipeAt: data.at, lastSync: new Date().toISOString() });
   } else if (verdict === 'record') {
-    patchSyncMeta(forUid, { seenWipeId: data.id });
+    patchSyncMeta(forUid, { seenWipeId: data.id, seenWipeAt: data.at });
+  } else if (meta.seenWipeId === data.id && !meta.seenWipeAt && isValidWipe(data)) {
+    patchSyncMeta(forUid, { seenWipeAt: data.at }); // handled before this field existed
   }
   return verdict;
 }
 let unsubWipe = null;
 let unsubGoals = null;
+
+// Show docs uploaded by a device that has seen a wipe carry `_wipeAt` (that wipe's
+// time). It only exists in the cloud: strip it before the doc enters local state or
+// a backup file. Returns [cleanDoc, wipeAtOrUndefined].
+function splitCloudShow(data) {
+  const { _wipeAt, ...rest } = data || {};
+  return [rest, typeof _wipeAt === 'string' ? _wipeAt : undefined];
+}
 const goalsRef = (forUid) => doc(db, 'users', forUid, 'library', 'goals');
 
 // Flush is normally on a 2.5s timer, but that timer is throttled or paused
@@ -141,12 +152,14 @@ function startSync(newUid) {
         }
         // A remote add/update for a show we've deleted locally must not
         // resurrect it — drop it and re-queue the Firestore delete.
-        if (isTombstoned(id)) {
+        const [remote, wipeAt] = splitCloudShow(change.doc.data());
+        if (isTombstoned(id, wipeAt)) {
           delete s.shows[id];
-          markShowDeleted(id);
+          queueShowDelete(id);
           return;
         }
-        s.shows[id] = { ...(s.shows[id] || {}), ...change.doc.data() };
+        clearTombstone(id); // accepted: a deliberate restore/add after a wipe lifts that wipe's tombstone
+        s.shows[id] = { ...(s.shows[id] || {}), ...remote };
       });
     });
     applyingRemote = false;
@@ -191,11 +204,12 @@ async function pullAndMerge(forUid) {
     showsSnap.forEach((d) => {
       // Skip shows the user deleted for good: don't merge them back in, and
       // re-queue the Firestore delete so the remote doc gets cleaned up.
-      if (isTombstoned(d.id)) {
-        markShowDeleted(d.id);
+      const [remote, wipeAt] = splitCloudShow(d.data());
+      if (isTombstoned(d.id, wipeAt)) {
+        queueShowDelete(d.id);
         return;
       }
-      const remote = d.data();
+      clearTombstone(d.id);
       const local = s.shows[d.id];
       if (!local) {
         s.shows[d.id] = remote;
@@ -244,11 +258,12 @@ async function flush() {
   if (showIds.size === 0 && !movies && !goals && !hasDeletes) return;
 
   const state = getState();
+  const seenWipeAt = syncMeta(uid).seenWipeAt; // lets the device that ran a wipe tell a restore from a stale push
   const batch = writeBatch(db);
   showIds.forEach((id) => {
     if (hasDeletes && deletedIds.has(id)) return; // a delete wins over an update
     const show = state.shows[id];
-    if (show) batch.set(doc(db, 'users', uid, 'shows', id), show);
+    if (show) batch.set(doc(db, 'users', uid, 'shows', id), seenWipeAt ? { ...show, _wipeAt: seenWipeAt } : show);
   });
   if (hasDeletes) {
     deletedIds.forEach((id) => {
@@ -269,7 +284,7 @@ async function flush() {
     console.error('Cloud sync failed, will retry on next change:', err);
     // put everything back so the next flush retries it
     showIds.forEach(markShowDirty);
-    if (hasDeletes) deletedIds.forEach(markShowDeleted);
+    if (hasDeletes) deletedIds.forEach(queueShowDelete);
     if (movies) markMoviesDirty();
     if (goals) markGoalsDirty();
   }
@@ -306,11 +321,14 @@ export async function wipeEverywhere() {
         b.set(doc(db, 'users', forUid, 'library', 'wipe'), marker);
         await b.commit();
       },
-      clearLocal: (ids) => {
+      clearLocal: (ids, marker) => {
         resetAll(); // same as "Delete all data": shows, movies, settings (TMDB key) on this device
         takeDirty(); // nothing queued may be pushed back up
-        addTombstones(ids); // so a stale device pushing these back can't resurrect them here
-        patchSyncMeta(forUid, { lastSync: new Date().toISOString() });
+        // So a STALE device pushing these back can't resurrect them here. Tagged with the wipe's
+        // time: a device that has seen this wipe stamps its uploads with it, so its deliberate
+        // restore from backup is let through instead of being deleted again.
+        addWipeTombstones(ids, marker.at);
+        patchSyncMeta(forUid, { seenWipeAt: marker.at, lastSync: new Date().toISOString() });
       },
       now: () => new Date().toISOString(),
       randomId: newId,
