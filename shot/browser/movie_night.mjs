@@ -25,6 +25,12 @@ const WORLD = {
   801: MOVIE(801, 'Popular Netflix', 118, [G.Action, G.Adventure], 7.7), 802: MOVIE(802, 'Popular Funny', 99, [G.Comedy], 7.0), 803: MOVIE(803, 'Popular Long', 150, [G.Drama], 7.5),
   811: MOVIE(811, 'Free Gem', 105, [G.Drama], 7.3), 812: MOVIE(812, 'Free Funny', 88, [G.Comedy, G.Animation], 6.8),
 };
+// synopses for every mock movie (except one, to test the "no description" line), a tagline for one, and trailers for one
+for (const w of Object.values(WORLD)) w.overview = `Synopsis of ${w.title}.`;
+delete WORLD[812].overview; WORLD[602].tagline = 'Laugh now.';
+const VIDEOS = { 602: [ // the real trailer is LAST so the test proves the "official YouTube Trailer" rule is used
+  { site: 'YouTube', type: 'Teaser', official: true, key: 'TeaserKey01' }, { site: 'Vimeo', type: 'Trailer', official: true, key: 'VimeoKey001' },
+  { site: 'YouTube', type: 'Trailer', official: false, key: 'FanTrailr01' }, { site: 'YouTube', type: 'Trailer', official: true, key: 'Xk3pQ9aLm2Z' }] };
 const RECS = { 500: [601, 602, 604, 605, 700], 501: [602, 603] };
 const POP_SUBS = [801, 802, 803]; const POP_FREE = [811, 812];
 const AU = { 601: { flatrate: [{ provider_name: 'Netflix' }] }, 602: { flatrate: [{ provider_name: 'Binge' }] }, 603: null, 604: { flatrate: [{ provider_name: 'Stan' }] } };
@@ -72,6 +78,7 @@ async function open(state, { services = ['netflix'], night = null, w = 390, h = 
       return json({ results: ids.map((id) => WORLD[id]).filter((x) => x.runtime <= +q['with_runtime.lte'] && x.runtime >= +q['with_runtime.gte'] && (!genres || x.genre_ids.some((g) => genres.includes(g)))) });
     }
     if ((m = /^\/movie\/(\d+)\/watch\/providers$/.exec(p))) { log.push({ p: 'avail', id: +m[1] }); const b = AU[m[1]]; return json({ id: +m[1], results: b ? { AU: b } : {} }); }
+    if ((m = /^\/movie\/(\d+)\/videos$/.exec(p))) { log.push({ p: 'videos', id: +m[1] }); if (fail.videos) return json({ status_message: 'boom' }, 500); return json({ id: +m[1], results: VIDEOS[m[1]] || [] }); }
     if ((m = /^\/movie\/(\d+)$/.exec(p))) { log.push({ p: 'details', id: +m[1] }); const x = WORLD[m[1]]; return x ? json(x) : json({}, 404); }
     return json({ results: [], episodes: [] });
   });
@@ -80,6 +87,8 @@ async function open(state, { services = ['netflix'], night = null, w = 390, h = 
       localStorage.setItem('watchnext-state-v1', JSON.stringify(s)); localStorage.setItem('watchnext-services-v1', JSON.stringify({ mine: svc, showsOnly: false, watchlistOnly: false }));
       if (nt === null) localStorage.removeItem('watchnext-movienight-v1'); else localStorage.setItem('watchnext-movienight-v1', JSON.stringify(nt)); sessionStorage.setItem('__s', '1');
     }
+    window.__opened = []; // stand-in for window.open: records the tabs the app opens (and lets a test pretend pop-ups are blocked)
+    window.open = (u, t) => { if (window.__blockOpen) return null; const w = { url: u, target: t, location: '', closed: false, opener: {}, close() { this.closed = true; } }; window.__opened.push(w); return w; };
     const RealDate = Date; const start = RealDate.now(); const b = fixed;
     class FakeDate extends RealDate { constructor(...a) { if (a.length === 0) super(b + (RealDate.now() - start)); else super(...a); } static now() { return b + (RealDate.now() - start); } }
     window.Date = FakeDate;
@@ -220,6 +229,87 @@ await ok('when nothing fits you get an explanation instead of a blank sheet (90 
   assert.equal((await picks(p)).length, 0); assert.equal(await count(p), 'Nothing fits yet');
   assert.equal(await p.evaluate(() => document.querySelector('[data-testid=movie-empty]').textContent), 'No new movie found that fits 1 hr 30 min for “Something thoughtful”. Try more time or a different mood.');
   assert.equal(await p.evaluate(() => [...document.querySelectorAll('[role=dialog] button')].find((b) => b.textContent.trim() === 'Show me different ones').disabled), true);
+}); await p.close();
+
+// ============================================================ 6b. details and trailer
+console.log('6b. tap a pick for its synopsis and trailer');
+const card = (p, i = 0) => p.evaluate((i) => { const c = document.querySelectorAll('[data-testid=movie-pick]')[i]; const d = c.querySelector('[data-testid=movie-details]'); const m = c.querySelector('[data-testid=movie-more]'); return { name: c.querySelector('.name').textContent, open: !!d, text: d ? d.innerText : '', label: m.textContent.trim(), expanded: m.getAttribute('aria-expanded'), controls: m.getAttribute('aria-controls'), detId: d ? d.id : null, h: c.getBoundingClientRect().height }; }, i);
+const tap = (p, i, sel) => p.evaluate((i, sel) => document.querySelectorAll('[data-testid=movie-pick]')[i].querySelector(sel).click(), i, sel);
+const opened = (p) => p.evaluate(() => window.__opened.map((w) => ({ location: w.location, closed: w.closed, opener: w.opener, target: w.target })));
+const trailerNote = (p, i = 0) => p.evaluate((i) => { const n = document.querySelectorAll('[data-testid=movie-pick]')[i].querySelector('.sd-tn-note'); return n ? n.textContent : null; }, i);
+({ page: p, log } = await open(STATE(), { night: { minutes: 120, mood: 'any', onlyMine: false } })); await openSheet(p); await settled(p); await wait(500);
+await ok('every pick starts closed with a "Details & trailer" button (aria-expanded false); nothing about trailers has been requested yet', async () => {
+  const n = (await picks(p)).length; assert.equal(n, 3);
+  for (let i = 0; i < n; i++) { const c = await card(p, i); assert.deepEqual([c.open, c.label, c.expanded], [false, 'Details & trailer▾', 'false']); }
+  assert.equal(log.filter((l) => l.p === 'videos').length, 0);
+});
+const detailsBefore = log.filter((l) => l.p === 'details').length;
+const f = (await card(p, 0)).name.replace(/ \(\d{4}\)$/, ''); assert.equal(f, 'Funny Rec');
+await tap(p, 0, '[data-testid=movie-more]'); await wait(250);
+await ok('tapping "Details & trailer" opens that pick only: tagline + synopsis from TMDB, a trailer button, aria-expanded true and aria-controls pointing at the panel', async () => {
+  const c0 = await card(p, 0); assert.equal(c0.open, true); assert.equal(c0.expanded, 'true'); assert.equal(c0.label, 'Hide details▴'); assert.equal(c0.controls, c0.detId);
+  assert.match(c0.text, /Laugh now\./); assert.match(c0.text, /Synopsis of Funny Rec\./); assert.match(c0.text, /▶ Watch trailer/);
+  for (const i of [1, 2]) assert.equal((await card(p, i)).open, false);
+});
+await ok('showing the synopsis costs no extra TMDB request (it came with the runtime lookup)', async () => assert.equal(log.filter((l) => l.p === 'details').length, detailsBefore));
+await tap(p, 0, '[data-testid=movie-more]'); await wait(200);
+await ok('"Hide details" closes it again', async () => { const c0 = await card(p, 0); assert.deepEqual([c0.open, c0.label], [false, 'Details & trailer▾']); });
+await tap(p, 1, '.name'); await wait(200);
+await ok('tapping the movie title opens it too (you can just tap the movie), and tapping the poster closes it', async () => {
+  assert.equal((await card(p, 1)).open, true); await tap(p, 1, '.art'); await wait(200); assert.equal((await card(p, 1)).open, false);
+});
+await tap(p, 0, '[data-testid=movie-more]'); await wait(200);
+await p.screenshot({ path: `${OUT}/details_open_phone.png` });
+await tap(p, 0, '[data-testid=movie-trailer]'); await wait(700);
+await ok('"Watch trailer" opens ONE new tab on the OFFICIAL YouTube trailer (not the teaser, the Vimeo or the fan upload), with no link back to WatchNext', async () => {
+  const o = await opened(p); assert.equal(o.length, 1); assert.deepEqual([o[0].target, o[0].location, o[0].opener, o[0].closed], ['_blank', 'https://www.youtube.com/watch?v=Xk3pQ9aLm2Z', null, false]);
+  assert.deepEqual(log.filter((l) => l.p === 'videos').map((l) => l.id), [602]); assert.equal(await trailerNote(p, 0), null);
+});
+await tap(p, 0, '[data-testid=movie-trailer]'); await wait(500);
+await ok('a second tap reuses the trailer it already found (no second lookup) and opens it again', async () => {
+  const o = await opened(p); assert.equal(o.length, 2); assert.equal(o[1].location, 'https://www.youtube.com/watch?v=Xk3pQ9aLm2Z'); assert.equal(log.filter((l) => l.p === 'videos').length, 1);
+});
+await p.evaluate(() => { window.__blockOpen = true; }); const vBefore = log.filter((l) => l.p === 'videos').length;
+await tap(p, 0, '[data-testid=movie-trailer]'); await wait(400);
+await ok('if the browser blocks the new tab you are told how to fix it, and nothing is looked up', async () => {
+  assert.match(await trailerNote(p, 0), /^Your browser blocked the new tab\. Allow pop-ups for this site and try again\.$/); assert.equal(log.filter((l) => l.p === 'videos').length, vBefore); assert.equal((await opened(p)).length, 2);
+});
+await p.evaluate(() => { window.__blockOpen = false; });
+await p.evaluate(() => { const c = document.querySelectorAll('[data-testid=movie-pick]')[0]; [...c.querySelectorAll('button')].find((b) => b.textContent.trim() === '+ Watchlist').click(); }); await wait(500);
+await ok('"+ Watchlist" still works with the details open, and the panel stays open', async () => {
+  const c0 = await card(p, 0); assert.equal(c0.open, true); assert.deepEqual((await picks(p))[0].btns[0], ['On your Watchlist ✓', true]); assert.equal((await stored(p)).movies.some((m) => m.name === 'Funny Rec' && m.status === 'planned'), true);
+});
+await p.evaluate(() => [...document.querySelectorAll('[role=dialog] button')].find((b) => b.textContent.trim() === 'Show me different ones').click()); await wait(500);
+await ok('"Show me different ones" brings a fresh set, all closed', async () => { const n = (await picks(p)).length; assert.ok(n > 0); for (let i = 0; i < n; i++) assert.equal((await card(p, i)).open, false); });
+await p.close();
+
+({ page: p, log } = await open(STATE(), { night: { minutes: 90, mood: 'any', onlyMine: false } })); await openSheet(p); await settled(p); await wait(500);
+await tap(p, 0, '[data-testid=movie-more]'); await wait(250);
+await ok('a movie TMDB has no description for says so (instead of an empty box)', async () => { const c0 = await card(p, 0); assert.equal(c0.name.replace(/ \(\d{4}\)$/, ''), 'Free Funny'); assert.match(c0.text, /No description available on TMDB\./); assert.ok(!/Laugh now/.test(c0.text)); });
+await tap(p, 0, '[data-testid=movie-trailer]'); await wait(700);
+await ok('a movie with no trailer: the spare tab is closed again and you are told so on the card', async () => {
+  const o = await opened(p); assert.equal(o.length, 1); assert.deepEqual([o[0].closed, o[0].location], [true, '']); assert.equal(await trailerNote(p, 0), 'No trailer found on TMDB for this movie.');
+}); await p.close();
+
+({ page: p, log } = await open(STATE(), { night: { minutes: 120, mood: 'any', onlyMine: false }, fail: { videos: true } })); await openSheet(p); await settled(p); await wait(500);
+await tap(p, 0, '[data-testid=movie-more]'); await wait(250); await tap(p, 0, '[data-testid=movie-trailer]'); await wait(800);
+await ok('if the trailer lookup fails you get a clear message, the spare tab is closed, and you can try again (the failure is not remembered)', async () => {
+  assert.equal(await trailerNote(p, 0), 'Could not load the trailer. Check your connection and try again.'); const o = await opened(p); assert.equal(o.length, 1); assert.equal(o[0].closed, true);
+  const btn = await p.evaluate(() => { const b = document.querySelector('[data-testid=movie-trailer]'); return [b.textContent, b.disabled]; }); assert.deepEqual(btn, ['▶ Watch trailer', false]);
+}); await p.close();
+
+({ page: p } = await open(STATE(), { w: 320, h: 700, night: { minutes: 120, mood: 'any', onlyMine: false } })); await openSheet(p); await settled(p);
+await tap(p, 0, '[data-testid=movie-more]'); await wait(300);
+await ok('320px wide with details open: no sideways scroll, and the panel and its trailer button fit inside the card', async () => {
+  assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
+  assert.equal(await p.evaluate(() => { const d = document.querySelector('[role=dialog]'); const c = document.querySelector('[data-testid=movie-pick]'); const t = c.querySelector('[data-testid=movie-trailer]').getBoundingClientRect(); const cr = c.getBoundingClientRect(); return d.scrollWidth <= d.clientWidth + 1 && t.right <= cr.right && t.left >= cr.left; }), true);
+  assert.equal(await p.evaluate(() => document.querySelector('[data-testid=movie-more]').getBoundingClientRect().height >= 44), true, 'touch target is at least 44px tall');
+}); await p.close();
+
+({ page: p } = await open(STATE(), { w: 1280, h: 900, night: { minutes: 120, mood: 'any', onlyMine: false } })); await openSheet(p); await settled(p); await wait(400);
+const before1 = (await card(p, 1)).h; await tap(p, 0, '[data-testid=movie-more]'); await wait(300); await p.screenshot({ path: `${OUT}/details_open_desktop.png` });
+await ok('desktop (two columns): opening one pick does not stretch its neighbour, and nothing overflows', async () => {
+  assert.equal(Math.round((await card(p, 1)).h), Math.round(before1)); assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
 }); await p.close();
 
 // ============================================================ 7. layout

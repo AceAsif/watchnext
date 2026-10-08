@@ -100,4 +100,20 @@ t('junk and scale: bad entries never throw; 2,000 candidates rank in well under 
   for (const bad of [undefined, null, [], [null, 5, {}, { runtime: 'x' }]]) assert.ok(Array.isArray(M.suggestMovies(bad || [], { minutes: 120 }).picks)); assert.ok(Array.isArray(M.suggestMovies([null, 5, {}, { runtime: 100 }].filter(Boolean).filter((x) => typeof x === 'object'), { minutes: 120 }).picks));
   const pool = Array.from({ length: 2000 }, (_, i) => E(pop(i + 1, 'M' + i, i % 2 ? 'subs' : 'free', { genre_ids: [35] }), 80 + (i % 60))); const t0 = Date.now(); const r = M.suggestMovies(pool, { minutes: 120, mood: 'funny' }); assert.ok(Date.now() - t0 < 800); assert.equal(r.picks.length, 3);
 });
+t('details panel text: tagline and synopsis come from the details already fetched; trimmed; never undefined', () => {
+  const c = M.withDetails(rec(1, 'A'), { runtime: 100, genres: [], overview: '  A thief steals dreams.  ', tagline: ' Dream bigger. ' });
+  assert.deepEqual(M.detailsText(c), { tagline: 'Dream bigger.', overview: 'A thief steals dreams.', hasOverview: true });
+  assert.deepEqual(M.detailsText(M.withDetails(rec(2, 'B'), { runtime: 90, genres: [], overview: 'Plot.' })), { tagline: '', overview: 'Plot.', hasOverview: true });
+});
+t('details panel text: a blank/missing/odd synopsis shows the "no description" line; junk input never throws', () => {
+  for (const d of [{ overview: '' }, { overview: '   ' }, { overview: null }, { overview: 42 }, {}]) {
+    const r = M.detailsText({ details: d }); assert.equal(r.overview, M.NO_OVERVIEW); assert.equal(r.hasOverview, false); assert.equal(r.tagline, '');
+  }
+  for (const bad of [undefined, null, {}, { details: null }, { details: 'x' }, 5]) { const r = M.detailsText(bad); assert.equal(r.overview, M.NO_OVERVIEW); assert.equal(typeof r.tagline, 'string'); }
+  assert.equal(M.NO_OVERVIEW, 'No description available on TMDB.');
+});
+t('trailer link: a real 11-character YouTube key gives the watch URL; anything else gives null (never a bad link)', () => {
+  assert.equal(M.trailerUrl('dQw4w9WgXcQ'), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'); assert.equal(M.trailerUrl('a_b-C1d2E3f'), 'https://www.youtube.com/watch?v=a_b-C1d2E3f');
+  for (const bad of [undefined, null, '', 'short', 'dQw4w9WgXcQ&x=1', 'dQw4w9WgXc ', 'https://evil.example/x', 12345678901, 'dQw4w9WgXcQQ']) assert.equal(M.trailerUrl(bad), null, String(bad));
+});
 console.log(`\n${n} tests passed`);

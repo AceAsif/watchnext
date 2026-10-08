@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/useStore.js';
 import { addMovieToWatchlist } from '../store/db.js';
-import { discoverMovies, movieProviderList, movieRecommendations, movieSimilar, movieDetails, watchProviders, hasKey, img } from '../api/tmdb.js';
+import { discoverMovies, movieProviderList, movieRecommendations, movieSimilar, movieDetails, movieVideos, pickTrailer, watchProviders, hasKey, img } from '../api/tmdb.js';
 import { Sheet } from './ui.jsx';
 import { initialOf } from './yearImageLogic.js';
 import { normalizeProviders } from './servicesLogic.js';
@@ -10,13 +10,14 @@ import { useServicesPrefs } from '../store/servicesPrefs.js';
 import {
   MOODS, MOVIE_TIME_CHOICES, MAX_SEEDS, ENRICH_BATCH, ENRICH_MAX, formatMinutes, loadPrefs, savePrefs,
   recommendedCandidate, popularCandidate, popularQueries, myProviderIds, mergePool, withDetails, withAvail, enrichOrder,
-  suggestMovies, whyLines, sourceNote, emptyText,
+  suggestMovies, whyLines, sourceNote, emptyText, detailsText, trailerUrl,
 } from './movieNightLogic.js';
 import { moodNote } from './tonightLogic.js';
 
 // Session caches, so reopening the sheet (or changing time/mood) doesn't repeat lookups.
 const detailsCache = new Map(); // tmdb id -> movie details
 let providerListCache = null; // TMDB's AU provider list
+const trailerCache = new Map(); // tmdb id -> YouTube key, or null when TMDB has no trailer
 
 const GAP_MS = 150;
 const CONCURRENCY = 3;
@@ -40,8 +41,8 @@ async function recommendationsFor(seed) {
   return results.map((r) => recommendedCandidate(r, seed)).filter(Boolean);
 }
 
-function Art({ c }) {
-  return c.poster ? <img className="art" src={img(c.poster, 'w154')} alt="" loading="lazy" /> : <span className="art blank" aria-hidden="true">{initialOf(c.name)}</span>;
+function Art({ c, onClick }) {
+  return c.poster ? <img className="art" src={img(c.poster, 'w154')} alt="" loading="lazy" onClick={onClick} /> : <span className="art blank" aria-hidden="true" onClick={onClick}>{initialOf(c.name)}</span>;
 }
 
 // "Movie night" (Discover tab): a NEW movie that fits your evening. Candidates are Discover's
@@ -60,6 +61,8 @@ export default function MovieNightSheet({ onClose }) {
   const [shown, setShown] = useState(() => new Set());
   const [hidden, setHidden] = useState(() => new Set());
   const [added, setAdded] = useState(() => new Set());
+  const [expanded, setExpanded] = useState(() => new Set()); // keys of picks whose details panel is open
+  const [trailer, setTrailer] = useState({ id: null, busy: false, msg: '' });
   const [rounds, setRounds] = useState(1); // how many batches of details we're willing to look up
   const [pages, setPages] = useState(1); // pages of "popular" fetched
 
@@ -164,6 +167,26 @@ export default function MovieNightSheet({ onClose }) {
     setSeed((n) => n + 1);
     if (result.fitting - shown.size - result.picks.length < 3) { setRounds((r) => r + 1); setPages((p) => Math.min(p + 1, 4)); } // running low: look further
   };
+  const toggleDetails = (key) => setExpanded((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+
+  // Opens the trailer on YouTube in a new tab (same approach as the Movies tab). The blank tab is opened
+  // synchronously, before any await, so the browser doesn't block it as a pop-up.
+  const watchTrailer = async (c) => {
+    const id = c.tmdbId;
+    const win = window.open('', '_blank');
+    if (!win) { setTrailer({ id, busy: false, msg: 'Your browser blocked the new tab. Allow pop-ups for this site and try again.' }); return; }
+    try { win.opener = null; } catch (e) { /* best effort */ }
+    setTrailer({ id, busy: true, msg: '' });
+    try {
+      let key = trailerCache.get(id);
+      if (key === undefined) { const v = pickTrailer(await movieVideos(id)); key = v ? v.key : null; trailerCache.set(id, key); }
+      const url = trailerUrl(key);
+      if (url) { win.location = url; if (alive.current) setTrailer({ id, busy: false, msg: '' }); }
+      else { win.close(); if (alive.current) setTrailer({ id, busy: false, msg: 'No trailer found on TMDB for this movie.' }); }
+    } catch (e) {
+      win.close(); if (alive.current) setTrailer({ id, busy: false, msg: 'Could not load the trailer. Check your connection and try again.' });
+    }
+  };
   const addIt = (c) => { if (!c.details) return; addMovieToWatchlist(c.details); setAdded((s) => new Set(s).add(c.tmdbId)); };
 
   const waiting = hasKey() && (recs === null || popLoading || want.some((id) => !failed.current.has('d:' + id)));
@@ -203,17 +226,30 @@ export default function MovieNightSheet({ onClose }) {
             !waiting ? <p className="sd-tn-empty" data-testid="movie-empty">{emptyText(prefs.minutes, prefs.mood, prefs.onlyMine)}</p> : null
           ) : (
             <ul className="sd-nlist sd-tn-list">
-              {result.picks.map((p) => (
+              {result.picks.map((p) => {
+                const isOpen = expanded.has(p.key), dt = detailsText(p), busy = trailer.busy && trailer.id === p.tmdbId;
+                return (
                 <li key={p.key}>
                   <div className="sd-nitem static sd-tn-card" data-testid="movie-pick">
-                    <Art c={p} />
+                    <Art c={p} onClick={() => toggleDetails(p.key)} />
                     <span className="body">
                       <span className="sd-tn-kind sd-mono">{p.popular && !p.because.length ? 'Popular' : 'Recommended'}</span>
-                      <span className="name" title={p.name}>{p.name}{p.year ? ` (${p.year})` : ''}</span>
+                      <span className="name" title={p.name} onClick={() => toggleDetails(p.key)}>{p.name}{p.year ? ` (${p.year})` : ''}</span>
                       {whyLines(p).map((l) => <span key={l} className="meta sd-mono">{l}</span>)}
                       {moodNote(p, prefs.mood) ? <span className={'sd-tn-mood' + (p.moodState === 'match' ? ' ok' : '')}>{moodNote(p, prefs.mood)}</span> : null}
                       {p.genres && p.genres.length ? <span className="meta sd-mono">{p.genres.slice(0, 3).join(' · ')}</span> : null}
                       {p.where ? <span className="meta sd-mono sd-svc-meta">{p.where}</span> : null}
+                      <button type="button" className="sd-tn-more" data-testid="movie-more" aria-expanded={isOpen} aria-controls={`mn-det-${p.tmdbId}`} onClick={() => toggleDetails(p.key)}>
+                        {isOpen ? 'Hide details' : 'Details & trailer'}<span aria-hidden="true">{isOpen ? '▴' : '▾'}</span>
+                      </button>
+                      {isOpen ? (
+                        <span className="sd-tn-det" id={`mn-det-${p.tmdbId}`} data-testid="movie-details">
+                          {dt.tagline ? <span className="sd-tn-tag">{dt.tagline}</span> : null}
+                          <span className="sd-tn-over">{dt.overview}</span>
+                          <button type="button" className="sd-btn sm" data-testid="movie-trailer" disabled={busy} onClick={() => watchTrailer(p)}>{busy ? 'Opening…' : '▶ Watch trailer'}</button>
+                          {trailer.id === p.tmdbId && trailer.msg ? <span className="sd-tn-note" role="status">{trailer.msg}</span> : null}
+                        </span>
+                      ) : null}
                       <span className="sd-tn-acts">
                         <button type="button" className="sd-btn sm primary" disabled={added.has(p.tmdbId)} onClick={() => addIt(p)}>{added.has(p.tmdbId) ? 'On your Watchlist ✓' : '+ Watchlist'}</button>
                         <button type="button" className="sd-btn sm" onClick={() => setHidden((h) => new Set(h).add(p.key))}>Not for me</button>
@@ -221,7 +257,8 @@ export default function MovieNightSheet({ onClose }) {
                     </span>
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
 

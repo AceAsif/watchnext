@@ -1507,3 +1507,15 @@ button.sd-nitem:focus-visible { outline: 2px solid var(--amber); outline-offset:
 .sd-yir-goal { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 .sd-yir-goal .sd-mono { font-size: 10px; letter-spacing: 0.02em; color: var(--text-dim); white-space: nowrap; }
 .sd-yir-goal .sd-mono.met { color: var(--amber); }
+
+/* Movie night: tap a pick for its synopsis and trailer */
+.sd-tn-card .art, .sd-tn-card .name { cursor: pointer; }
+.sd-tn-more {
+  align-self: flex-start; display: inline-flex; align-items: center; min-height: 44px; margin: 2px 0 -6px; padding: 0; gap: 6px;
+  border: none; background: transparent; color: var(--amber); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.sd-tn-more:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 6px; }
+.sd-tn-det { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 4px 0 2px; }
+.sd-tn-tag { font-size: 13px; font-style: italic; color: var(--text-dim); }
+.sd-tn-over { font-size: 14px; line-height: 1.5; color: #c3cad5; overflow-wrap: anywhere; }
+.sd-tn-note { font-size: 12px; color: var(--amber); }

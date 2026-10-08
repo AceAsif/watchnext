@@ -107,6 +107,21 @@ export function withDetails(c, d) {
 }
 export const withAvail = (c, a) => (a ? { ...c, avail: a } : c);
 
+// ------------------------------------------------------------------ details panel (synopsis + trailer)
+export const NO_OVERVIEW = 'No description available on TMDB.';
+
+// What the "Details & trailer" panel shows for a pick. The details TMDB already returned for the runtime
+// check carry the tagline and synopsis, so showing them costs no extra request. Always plain strings.
+export function detailsText(c) {
+  const d = c && c.details && typeof c.details === 'object' ? c.details : {};
+  const clean = (v) => (typeof v === 'string' ? v.trim() : '');
+  const tagline = clean(d.tagline), overview = clean(d.overview);
+  return { tagline, overview: overview || NO_OVERVIEW, hasOverview: Boolean(overview) };
+}
+
+// YouTube watch link for a TMDB video key, or null if the key doesn't look like a YouTube id (11 letters, digits, - or _).
+export const trailerUrl = (key) => (typeof key === 'string' && /^[A-Za-z0-9_-]{11}$/.test(key) ? `https://www.youtube.com/watch?v=${key}` : null);
+
 // Which candidates should have their details looked up: the `limit` most promising overall (likely
 // mood matches, movies you have reason to like, then popular ones), minus those already looked up.
 // Raising `limit` (when you ask for more) widens the net; it never re-fetches what is already known.
