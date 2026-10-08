@@ -111,7 +111,7 @@ tests/unit/*.test.mjs         harness (§9)         shot/browser/*.mjs  harness 
 - **Live updates:** a shows listener replaces a show with the cloud doc; a wipe-marker listener and a **goals listener** start only after the first pull (a goals update first re-checks for a wipe marker, so it can't push old goals back after "Delete everywhere"). Movies have no live listener (merged at sign-in only).
 - **Settings and the TMDB key are never synced.** Tombstones persist so deletes can't be resurrected.
 - **"Delete all data"** clears THIS DEVICE only (also the TMDB key). **"Delete everywhere"** (signed in only) wipes the account: backup downloads first, then every show doc is deleted and, in the SAME atomic batch as the last ≤450 deletes, `library/movies = []`, `library/goals = {}` and the wipe marker are written; this device is cleared; other devices clear themselves on their next sync via the marker (a device that never synced with the account is left alone). **Known limits:** a device must have opened a version that records `lastSync` before a wipe; the marker time uses the wiping device's clock.
-- **Everything about the real engine is only tested against fakes** (a fake cloud module for the UI, pure-function tests and in-memory multi-device simulations). See the owner to-do in §12.
+- **Verified against REAL Firebase on 8–9 Oct 2026** (throwaway Google account, three browsers as three devices; see §11 item 1 for what passed). The automated tests still use fakes (a fake cloud module for the UI, pure-function tests and in-memory multi-device simulations). **One real bug found, not yet fixed:** *Delete everywhere* leaves tombstones for the wiped show ids on the device that ran it, so if the backup is then restored on a DIFFERENT device, the wiping device treats the restored shows as stale, drops them and re-queues their cloud delete; the shows then vanish from the cloud and every device (movies are unaffected, they have no tombstones). Restoring on the device that ran the wipe works (a restore lifts that device's tombstones). See §13 item 0.
 
 ## 7. Features (what exists, with the decisions the owner made)
 
@@ -148,10 +148,11 @@ tests/unit/*.test.mjs         harness (§9)         shot/browser/*.mjs  harness 
 
 ## 8. Known limits & what has never been verified
 
-- **Never run against real services (mocks/simulations only):** Google sign-in; **the real Firestore sync engine** (Delete everywhere, goals sync, `dropped`/notes/restored-data sync, `fixedAt` merge, the wipe marker); TMDB's real provider names / discover filters / recommendation quality for Movie night and On my services; the saved/shared cards on iPhone Safari (`ctx.letterSpacing` needs Safari 16.4+, Web Share with files); the CSVs opened in Power BI; colour emoji on every device.
+- **Never run against real services (mocks/simulations only):** the real Firestore behaviour of `dropped`/notes sync and the `fixedAt` merge (shows, movies, goals, Delete everywhere, the wipe marker, Restore and sign-out/in WERE verified on real Firebase, §11 item 1); TMDB's real provider names / discover filters / recommendation quality for Movie night and On my services; the saved/shared cards on iPhone Safari (`ctx.letterSpacing` needs Safari 16.4+, Web Share with files); the CSVs opened in Power BI; colour emoji on every device.
 - Goals: the newest edit of a YEAR wins as a whole (editing different metrics of one year on two offline devices loses one); a bulk-marked backlog counts toward goals (use Fix watch dates).
 - Stats dates: UTC (Year/streaks/heatmap/goals) vs local (Month/CSV) can differ near a boundary.
 - Settings, TMDB key, services prefs and the per-feature prefs are per device by design.
+- Offline, only your own data works: season/episode lists, cast, search and Movie night need TMDB ("Failed to fetch"), but "Mark next episode", ratings and goals work and sync when back online. DevTools "Offline" does not reliably cut an already-open Firestore stream; to test offline, set Offline and then reload, and confirm `ERR_INTERNET_DISCONNECTED` failures before editing.
 - The harness runs on his own computer too (§9). Three original browser suites (library, upnext, showpage) can't run any more; they need old baselines/design files.
 
 ## 9. Testing harness (repo: `tests/unit`, `shot/browser`, `docs`)
@@ -188,20 +189,27 @@ The harness lives in the repo (`tests/unit`, `shot/browser`) and **runs on any c
 ## 11. Owner's own to-do (things only he can do)
 
 0. **Apply the latest delivery:** Fetch/Pull; copy the whole `src/` from the latest delivery; `npm run build`; commit ("Add yearly watch goals…"); apply `watchnext-harness-for-repo.zip` (copy its `tests`, `shot`, `docs` folders over the repo), then delete `watchnext-test-harness/`, `docs/WatchNext-Handover-v4.md` and v5 (once v6 is in `docs/`), and `tests/unit/library_test.mjs`.
-1. **Verify the sync engine against REAL Firebase with a throwaway Google account** (never his real one first): two devices that have each opened the latest version.
-   - **Goals:** set a goal on A → appears on B live and after reload; change on B → A follows; clear all targets on A → B returns to the invitation; edit on both while one is offline → the newer edit wins on both; Firebase console shows `library/goals`.
-   - **Delete everywhere:** add shows + 2 movies on A, confirm on B; on A: Settings → Danger zone → Delete everywhere → type DELETE → a backup downloads first, success banner, A empty; B (open) clears live and nothing pushes back; **offline test** (B in airplane mode adds a movie, A wipes, B back online → B clears and the movie must NOT reappear); console: `shows` empty, `library/movies` = `[]`, `library/goals` = `{}`, `library/wipe` exists; a brand-new third device keeps its own local data; Restore from backup on A brings everything back and syncs; failure path (network off at confirm → error banner, data untouched).
+1. ~~**Verify the sync engine against REAL Firebase with a throwaway Google account**~~ **DONE 8–9 Oct 2026** (account deleted afterwards). Device A = Chrome Incognito, B = Chrome Guest, C = Edge InPrivate (incognito windows share storage, so separate browsers/profiles are needed). Results:
+   - **Sign-in, A→cloud and A↔B sync of shows, movies and goals:** passed (live, and after reload).
+   - **Goals:** clear on A → B follows; edits on both with B really offline → the newer edit wins on both: passed.
+   - **Delete everywhere:** backup downloaded first, A and B empty, console `shows` empty, `library/movies` = `[]`, `library/goals` = `{}`, `library/wipe` = `{ at, id }`: passed.
+   - **Offline wipe:** B offline made an episode and rating change, A wiped, B back online → B cleared and the offline edits did not return anywhere: passed.
+   - **Third device (C) sign-in and Restore from backup on the wiping device:** passed (all three devices got the shows and movies).
+   - **Restore on a DIFFERENT device than the one that wiped:** FAILED, shows vanished everywhere (the tombstone bug, §6 and §13 item 0). Restoring again on the wiping device recovered everything.
+   - **Sign-out keeps local data; an edit made while signed out syncs after signing back in; cancelling the Google popup leaves the app usable:** passed. Cosmetic: the cancelled popup shows the raw text "Sign-in failed: Firebase: Error (auth/popup-closed-by-user)." (§13).
+   - **Cleanup:** every device signed out and the test user deleted from Firebase Authentication. Leftover empty documents under the test user's `users/{uid}` in Firestore are harmless; never delete the other `users/*` entry, that is the real account.
 2. **Real-data pass** of the newer features: Movie night and On my services (spot-check titles against the Netflix/Stan/etc. apps), What should I watch tonight?, Backup reminder (make a backup; check "Last backup: today"), Goals (set real targets and read the pace).
 3. **Fix the real history:** show ⋯ → Fix watch dates… on shows logged in bulk (e.g. DAHMER → 2022/2023, The Mind of Jake Paul → 2018); check July 2026 on Month in review. Look at other months' "Busiest day" for suspiciously big counts.
 4. **iPhone pass:** save/share the Year, Month and "You finished" cards; auto-resume Undo; the three CSV downloads; load the CSVs into Power BI (set date columns to Date type).
 
 ## 12. Done so far (for orientation)
 
-Complete UI redesign of every tab · AniList · Restore from backup · Cinema platform · Notes & reactions · Year-in-Review saved image + poster-grid card · Dropped status · CSV export for Power BI · auto-resume (with Undo) · **Delete everywhere** · Most rewatched · Notes search + Most loved shows · Month in review + "You finished" card · Fix watch dates + "When did you watch it?" · Backup reminder · **On my services** filter · **What should I watch tonight?** · **Movie night** · **Watch goals** · test harness reorganised and documented.
+Complete UI redesign of every tab · AniList · Restore from backup · Cinema platform · Notes & reactions · Year-in-Review saved image + poster-grid card · Dropped status · CSV export for Power BI · auto-resume (with Undo) · **Delete everywhere** · Most rewatched · Notes search + Most loved shows · Month in review + "You finished" card · Fix watch dates + "When did you watch it?" · Backup reminder · **On my services** filter · **What should I watch tonight?** · **Movie night** · **Watch goals** · test harness reorganised and documented · **sync engine verified on real Firebase** (§11 item 1).
 
 ## 13. Features remaining (backlog) — with a suggested order
 
 **Suggested next, in order**
+0. **Fix: restore on a different device than the one that ran Delete everywhere** (bug, §6). A deliberate restore or re-add from another device must not be undone by the wipe tombstones. Add a regression test: wipe on A, restore on B, A, B and C keep the shows. Do this before relying on Delete everywhere plus Restore across devices.
 1. **Power BI starter guide** (not built; offered): the three CSV tables and how to relate them, ready-made DAX measures (hours per month, completion %, binge days), a dashboard layout. A document, not a `.pbix` (can't be produced here). Ties in with his Power BI/freelance goals.
 2. **Calendar export (.ics):** put upcoming episodes in his phone calendar; no server needed (medium).
 3. **More stats:** genre trends year over year, longest binge, time-of-day view (medium).
@@ -211,6 +219,8 @@ Complete UI redesign of every tab · AniList · Restore from backup · Cinema pl
 - A nudge on Month/Year in review when many episodes were marked together on one day ("18 episodes were marked on 7 Jul. Fix their dates?"). The day-cluster scope already exists in the fix sheet.
 - **Rewatches as dated history** (changes the `watched` shape + cloud merge; would let "Most rewatched" split by year). The biggest data change of the lot.
 - Per-metric goal merging (today the newest edit of a YEAR wins as a whole).
+- Cancelling the Google sign-in popup should be silent or friendly (`auth/popup-closed-by-user` is not a failure); today it shows the raw Firebase error.
+- The Delete everywhere success banner says other devices "will clear the next time they open WatchNext", but open devices clear live within seconds; reword.
 - "Pick one for me" (random) on the Watchlist; taste-weighted Discover (use reactions/ratings more).
 - Cleanups: stale comments; the unused `.poster-card` rules in `styles.css` (left over from the deleted `PosterCard.jsx`). (Done Oct 2026: `PosterCard.jsx` deleted; the harness now runs on his own computer, see `tests/README_HARNESS.md`.)
 
@@ -221,7 +231,7 @@ Complete UI redesign of every tab · AniList · Restore from backup · Cinema pl
 ## 14. What to do next (recommended)
 
 1. **Housekeeping first (15 minutes):** apply the latest delivery and the harness zip (§11 item 0), confirm the deploy is green and there is only one deploy workflow.
-2. **Verify the cloud engine on a throwaway account (§11 item 1).** It is the biggest unverified risk: Delete everywhere and goals sync both depend on it, and neither has touched real Firestore. Don't rely on either with the real account until this passes.
+2. **Fix the restore-on-another-device bug (§13 item 0).** The cloud engine has now passed the real-Firebase test (§11 item 1) apart from this one bug, so sync can be used with the real account; until the fix ships, restore a backup on the same device that ran Delete everywhere.
 3. **Use the new features with real data for a few days** (§11 items 2–4) and write down what feels wrong; those fixes are usually worth more than a new feature.
 4. **Then build the next feature:** the Power BI guide, then calendar export, then more stats (§13). Propose the plan and ask 2–3 questions before building, as in §0.
 
