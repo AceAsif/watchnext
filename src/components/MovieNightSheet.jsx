@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/useStore.js';
-import { addMovieToWatchlist } from '../store/db.js';
+import { addMovieToWatchlist, setDiscoverHidden } from '../store/db.js';
+import { hiddenKeySet } from './hiddenLogic.js';
+import { genreKeysFromNames } from './tasteLogic.js';
 import { discoverMovies, movieProviderList, movieRecommendations, movieSimilar, movieDetails, movieVideos, pickTrailer, watchProviders, hasKey, img } from '../api/tmdb.js';
 import { Sheet } from './ui.jsx';
 import { initialOf } from './yearImageLogic.js';
@@ -54,7 +56,11 @@ export default function MovieNightSheet({ onClose }) {
   const mine = useMemo(() => new Set(svc.mine), [svc.mine]);
   const mineKey = [...mine].sort().join(',');
   const seeds = useRef(pickSeeds(state.movies)); // fixed for this sitting
-  const owned = useRef(new Set(state.movies.map((m) => m.tmdbId).filter(Boolean))); // what you had when you opened it
+  // what you had when you opened it, plus movies you marked "Not interested" (on Discover or here)
+  const owned = useRef(new Set([
+    ...state.movies.map((m) => m.tmdbId).filter(Boolean),
+    ...[...hiddenKeySet(state.hidden)].filter((k) => k.startsWith('movie:')).map((k) => Number(k.slice(6))),
+  ]));
 
   const [prefs, setPrefs] = useState(() => loadPrefs(localStorage));
   const [seed, setSeed] = useState(0);
@@ -252,7 +258,7 @@ export default function MovieNightSheet({ onClose }) {
                       ) : null}
                       <span className="sd-tn-acts">
                         <button type="button" className="sd-btn sm primary" disabled={added.has(p.tmdbId)} onClick={() => addIt(p)}>{added.has(p.tmdbId) ? 'On your Watchlist ✓' : '+ Watchlist'}</button>
-                        <button type="button" className="sd-btn sm" onClick={() => setHidden((h) => new Set(h).add(p.key))}>Not for me</button>
+                        <button type="button" className="sd-btn sm" onClick={() => { setHidden((h) => new Set(h).add(p.key)); setDiscoverHidden({ kind: 'movie', id: p.tmdbId, name: p.name, poster: p.poster, year: parseInt(p.year, 10) || null, g: genreKeysFromNames(p.genres) }, true); }}>Not for me</button>
                       </span>
                     </span>
                   </div>

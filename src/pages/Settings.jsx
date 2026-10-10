@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useStore } from '../store/useStore.js';
-import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount } from '../store/db.js';
+import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount, setDiscoverHidden } from '../store/db.js';
+import { hiddenList } from '../components/hiddenLogic.js';
 import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
 import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud, wipeEverywhere } from '../store/cloud.js';
 import { wipeDoneText, wipeFailText } from '../store/wipeLogic.js';
@@ -26,6 +27,7 @@ import {
   KeyCard,
   ImportCard,
   CleanupCard,
+  HiddenCard,
   BackupCard,
   BackupNudge,
   ServicesCard,
@@ -236,6 +238,7 @@ export default function Settings() {
           onFile={onImportFile}
         />
         <CleanupCard rows={orphans} onAskDelete={(id) => setConfirm({ type: 'show', id })} />
+        <HiddenCard rows={hiddenList(state.hidden)} onShowAgain={(e) => setDiscoverHidden(e, false)} />
         <BackupCard lastLine={lastBackupLine(bk, new Date())} onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} />
         <CsvCard onExport={exportCsv} />
         <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} onAskEverywhere={() => setConfirm({ type: 'everywhere' })} />

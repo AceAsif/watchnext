@@ -96,6 +96,10 @@ async function open(state, { services = ['netflix'], night = null, w = 390, h = 
   await page.goto('http://localhost:4188/', { waitUntil: 'networkidle0' }); await wait(500);
   await page.evaluate(() => [...document.querySelectorAll('nav.tabbar button')].find((x) => x.textContent.includes('Watchlist')).click()); await wait(450);
   await page.evaluate(() => [...document.querySelectorAll('[role=tab]')].find((x) => x.textContent.startsWith('Discover')).click()); await wait(450);
+  // Discover builds its own rows when the tab opens (discover.mjs tests that). Let it finish, then
+  // start the request log and the concurrency counters clean, so they only see Movie night.
+  await waitFor(() => page.evaluate(() => !document.querySelector('[data-testid=disc-progress]'))); await wait(200);
+  log.length = 0; st.max = 0; st.d = 0; st.dmax = 0;
   return { page, log, st };
 }
 const openSheet = async (p) => { await p.evaluate(() => [...document.querySelectorAll('button.sd-tonight')].find((b) => /Movie night/.test(b.textContent)).click()); await wait(400); };
@@ -115,8 +119,9 @@ await ok('Discover has a "Movie night" button above the picks', async () => asse
 await p.screenshot({ path: `${OUT}/discover_button_phone.png` });
 await p.close();
 ({ page: p, log } = await open(NORATINGS()));
-await ok('with NOTHING rated the button is still there (above the "rate a few" message), so it works for people who have rated few', async () => {
-  const t = await p.evaluate(() => document.body.innerText); assert.match(t, /Movie night/); assert.match(t, /Rate a few shows or movies you enjoyed/);
+await ok('with NOTHING rated the button is still there (first thing on Discover), so it works for people who have rated few', async () => {
+  const t = await p.evaluate(() => document.body.innerText); assert.match(t, /Movie night\s*Find a new movie for tonight/);
+  assert.equal(await p.evaluate(() => document.querySelector('.sd-disc button.sd-tonight') === document.querySelector('.sd-disc').firstElementChild), true);
 });
 await p.close();
 

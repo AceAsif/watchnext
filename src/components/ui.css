@@ -976,6 +976,38 @@
 .sd-pick-why { font-size: 11px; color: var(--amber); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sd-pick .sd-btn { margin-top: 2px; }
 
+/* Discover rows (Netflix-style): a heading per row and a sideways-scrolling strip of cards */
+.sd-disc-learn { display: flex; flex-direction: column; gap: 8px; }
+.sd-disc-learn strong { font-family: var(--font-display); font-size: 17px; }
+.sd-disc-bar { display: block; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.sd-disc-bar > span { display: block; height: 100%; background: var(--amber); border-radius: inherit; transition: width 0.25s ease; }
+.sd-disc-row { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.sd-disc-rowhead { display: flex; flex-direction: column; gap: 2px; }
+.sd-disc-rowhead h3 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1.25; }
+.sd-disc-strip {
+  display: flex; gap: 12px; overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity; padding-bottom: 6px; scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.sd-disc-card { flex: 0 0 128px; width: 128px; display: flex; flex-direction: column; gap: 5px; min-width: 0; scroll-snap-align: start; }
+.sd-disc-card .sd-tilebtn-art { display: block; }
+.sd-disc-open { display: block; width: 100%; height: 100%; padding: 0; border: none; background: none; cursor: pointer; }
+.sd-disc-open:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.sd-disc-match { top: auto; bottom: 6px; color: var(--teal); }
+.sd-disc-card .sd-btn { margin-top: 2px; }
+.sd-disc-undo {
+  position: sticky; top: 8px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border-radius: 12px; background: var(--bg-raise); border: 1px solid var(--line); font-size: 13px;
+}
+.sd-disc-foot { margin-top: 14px; }
+.sd-disc-detail { display: flex; flex-direction: column; gap: 10px; }
+@media (min-width: 900px) {
+  .sd-disc-card { flex-basis: 150px; width: 150px; }
+}
+@media (hover: hover) {
+  .sd-disc-card:hover .sd-tilebtn-art { border-color: var(--amber); }
+}
+
 /* ======================================================================
    Library: Shows + Movies (Claude Design, Direction A)
    One filter box; adding lives behind a separate "+ Add" button.

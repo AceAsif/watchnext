@@ -2,6 +2,7 @@ import { mergeBackup } from './backupMerge.js';
 import { blockedByWipe } from './wipeLogic.js';
 import { setNoteIn, withNotes, withMovieNote } from './notes.js';
 import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
+import { setHidden, mergeHidden, sameHidden } from '../components/hiddenLogic.js';
 
 // Simple localStorage-backed store with a subscribe API.
 // Single-user app, so no backend needed: everything lives in the browser.
@@ -12,6 +13,7 @@ const empty = () => ({
   shows: {},   // id -> show record (id is "tvdb:123" or "tmdb:456")
   movies: [],  // { name, watchedAt, runtimeMin }
   goals: {},   // yearly watch goals: { '2026': { episodes, movies, hours, at } } (see components/goalsLogic.js)
+  hidden: {},  // Discover's "Not interested": { 'tv:1399': { on, at, name, … } } (see components/hiddenLogic.js)
   settings: { tmdbKey: '' },
 });
 
@@ -75,6 +77,7 @@ export function update(mutator) {
 let dirtyShows = new Set();
 let dirtyMovies = false;
 let dirtyGoals = false;
+let dirtyHidden = false;
 let deletedShows = new Set();
 
 // Persistent tombstones: ids the user has deleted for good. Kept in
@@ -163,6 +166,10 @@ export function markGoalsDirty() {
   dirtyGoals = true;
 }
 
+export function markHiddenDirty() {
+  dirtyHidden = true;
+}
+
 export function markShowDeleted(id) {
   queueShowDelete(id);
   tombstones.add(id); // remember it across reloads so it can't be resurrected
@@ -181,12 +188,14 @@ export function takeDirty() {
   const showIds = dirtyShows;
   const movies = dirtyMovies;
   const goals = dirtyGoals;
+  const hidden = dirtyHidden;
   const deletedIds = deletedShows;
   dirtyShows = new Set();
   dirtyMovies = false;
   dirtyGoals = false;
+  dirtyHidden = false;
   deletedShows = new Set();
-  return { showIds, movies, goals, deletedIds };
+  return { showIds, movies, goals, hidden, deletedIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -697,14 +706,36 @@ export function applyRemoteGoals(remote) {
   return push;
 }
 
+// Discover's "Not interested": hide a suggested title (on=true) or show it again (on=false).
+// item: { kind: 'tv'|'movie', id, name, poster, year, g }. Stamped so the newest choice wins
+// between devices, like goals.
+export function setDiscoverHidden(item, on) {
+  update((s) => {
+    s.hidden = setHidden(s.hidden, item, on, new Date().toISOString());
+  });
+  markHiddenDirty();
+}
+
+// "Not interested" picks that arrived from the cloud. Same rules as applyRemoteGoals: the newer
+// change per title wins; returns true when this device holds something the cloud copy lacks.
+export function applyRemoteHidden(remote) {
+  const merged = mergeHidden(remote, state.hidden);
+  if (!sameHidden(merged, state.hidden)) update((s) => { s.hidden = merged; });
+  const push = !sameHidden(merged, remote);
+  if (push) markHiddenDirty();
+  return push;
+}
+
 export function restoreBackup(json) {
   const r = mergeBackup(state, json); // throws if the file isn't a backup
   update((s) => {
     s.shows = r.shows;
     s.movies = r.movies;
     s.goals = r.goals;
+    s.hidden = r.hidden;
   });
   if (r.goalsChanged) markGoalsDirty();
+  if (r.hiddenChanged) markHiddenDirty();
   r.touchedIds.forEach(markShowDirty);
   r.touchedIds.forEach(clearTombstone);
   if (r.moviesChanged) markMoviesDirty();
@@ -772,6 +803,7 @@ export function wipeLibrary() {
   dirtyShows = new Set();
   dirtyMovies = false;
   dirtyGoals = false;
+  dirtyHidden = false;
   deletedShows = new Set();
 }
 

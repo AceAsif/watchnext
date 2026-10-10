@@ -8,9 +8,9 @@ They are **not** part of the deploy: GitHub Actions only runs `npm run build`.
 
 | Folder | What it is |
 |---|---|
-| `tests/unit/*.test.mjs` | 27 plain-Node unit suites (~524 tests). They import `src/...` directly. |
+| `tests/unit/*.test.mjs` | 30 plain-Node unit suites (~574 tests). They import `src/...` directly. |
 | `tests/paths.mjs`, `tests/run-unit.mjs` | shared path helpers; runs every unit suite |
-| `shot/browser/*.mjs`, `fakecloud.js`, `fonts.css`, `launch.mjs` | 17 runnable headless-Chrome suites (puppeteer) + helpers |
+| `shot/browser/*.mjs`, `fakecloud.js`, `fonts.css`, `launch.mjs` | 18 runnable headless-Chrome suites (puppeteer) + helpers |
 | `shot/build-test-dists.mjs`, `shot/run-browser.mjs`, `shot/package.json` | builds the app for the tests, runs the browser suites, browser-test dependency |
 | `.harness-work/` | scratch output (test builds, screenshots). Git-ignored; safe to delete. |
 | `docs/` | handover + sample screenshots |
@@ -18,7 +18,7 @@ They are **not** part of the deploy: GitHub Actions only runs `npm run build`.
 ## Run the unit tests (nothing extra to install)
 ```
 npm install              # once, in the repo root
-npm run test:unit        # all 27 suites
+npm run test:unit        # all 30 suites
 node tests/run-unit.mjs goals wipe      # only suites whose name contains these words
 node tests/unit/goals.test.mjs          # one suite directly
 ```
@@ -37,18 +37,19 @@ node shot/browser/goals.mjs        # one suite directly (build first)
 - **No `.env` needed.** The build script passes placeholder Firebase values as environment variables, so it never
   touches or needs your real `.env`. Re-run `test:browser:build` after changing anything in `src/`.
 - The suites pin the date to 2026-10-01T22:00Z and the timezone to Australia/Hobart, stub Google Fonts, mock TMDB
-  and bypass the service worker. Ports 4179-4190 must be free.
+  and bypass the service worker. Ports 4179-4191 must be free.
 - `wipe_resume.mjs` uses the second build (`dist-fake`, with `fakecloud.js` standing in for Firebase); the build script makes it.
 
 ## Last known results (all passing)
 Unit: library 19 · settings 11 · upnext 24 · stats 25 · backup 14 · notes 16 · logic 44 · anime 34 ·
-settings_render 14 · yearimage 29 · dropped_csv 28 · wipe 23 · resume_db 11 · rewatch 14 · notes_search 19 ·
+settings_render 14 · yearimage 29 · dropped_csv 28 · wipe 29 · resume_db 10 · rewatch 14 · notes_search 19 ·
 month_recap 14 · finish_card 21 · watchdates 22 · backup_nudge 14 · services 16 · providers_db 7 ·
-tonight 23 · movie_genres_db 6 · movie_night 24 · goals 22 · goals_db 14.
+tonight 23 · movie_genres_db 6 · movie_night 24 · goals 22 · goals_db 14 · wipe_tomb_db 11 · taste 32 ·
+hidden 12 · cloud_hidden 6 (runs the real cloudEngine.js on the in-memory Firestore in `tests/unit/fakes/`).
 
 Browser: settings 47 · desktop 56 · notes 35 · restore 24 · anime 35 · yearimage 25 · dropped_csv 25 ·
 rewatch 8 · recaps 20 · watchdates 21 · notes_search 22 · backup_nudge 21 · services 34 · tonight 27 ·
-movie_night 41 · goals 25 · wipe_resume 33.
+movie_night 41 · goals 25 · wipe_resume 33 · discover 25.
 
 ## Suites that cannot run on their own
 - `library.mjs` compares the Library tab against an OLD build kept in `.harness-work/wl-base-dist`

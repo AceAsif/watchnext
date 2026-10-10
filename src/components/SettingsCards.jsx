@@ -220,6 +220,33 @@ export function CleanupCard({ rows, onAskDelete }) {
   );
 }
 
+// Discover's "Not interested" titles, with a way to bring each back. Hidden when the list is empty.
+export function HiddenCard({ rows, onShowAgain }) {
+  if (!rows.length) return null;
+  return (
+    <SetCard icon={I.broom} label="Discover" title="Hidden from Discover" pill={<Pill tone="amber">{rows.length}</Pill>} id="hidden">
+      <p className="sd-setp">
+        Titles you marked “Not interested”. Discover won’t suggest them, and they count as a small “not for me” in your
+        taste. Synced to your other devices when you’re signed in.
+      </p>
+      <ul className="sd-orphs">
+        {rows.map((e) => (
+          <li key={e.key}>
+            <ShowThumb show={e} />
+            <div className="who">
+              <div className="nm" title={e.name}>{e.name || 'Untitled'}</div>
+              <div className="mt">{[e.year, e.kind === 'tv' ? 'Show' : 'Movie'].filter(Boolean).join(' · ')}</div>
+            </div>
+            <button type="button" className="sd-setbtn" aria-label={`Show ${e.name} again`} onClick={() => onShowAgain(e)}>
+              Show again
+            </button>
+          </li>
+        ))}
+      </ul>
+    </SetCard>
+  );
+}
+
 // ---------------------------------------------------------------- Backup + danger zone
 // Which subscriptions you pay for, for the "On my services" filter (kept on this device).
 export function ServicesCard({ mine, onToggle }) {

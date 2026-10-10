@@ -111,6 +111,18 @@ export function movieProviderList(region = 'AU') {
   return get('/watch/providers/movie', { watch_region: region });
 }
 
+// Discover's taste engine (components/discoverEngine.js): one title's genres, language, year,
+// keywords and makers/cast in ONE request. kind: 'tv' | 'movie'.
+export function tasteDetails(kind, tmdbId) {
+  return get(`/${kind === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, { append_to_response: 'keywords,credits' });
+}
+export function discoverTitles(kind, params) {
+  return get(`/discover/${kind === 'tv' ? 'tv' : 'movie'}`, params);
+}
+export function trendingWeek() {
+  return get('/trending/all/week');
+}
+
 export function tvRecommendations(tmdbId, page = 1) {
   return get(`/tv/${tmdbId}/recommendations`, { page });
 }

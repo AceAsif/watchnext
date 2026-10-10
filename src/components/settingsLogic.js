@@ -50,6 +50,7 @@ export function restoreResultText(sum) {
   if (sum.moviesAdded) parts.push(`${n(sum.moviesAdded, 'movie', 'movies')} added`);
   if (sum.notesAdded) parts.push(`${n(sum.notesAdded, 'note', 'notes')} restored`);
   if (sum.goalsAdded) parts.push(`${n(sum.goalsAdded, 'yearly goal', 'yearly goals')} restored`);
+  if (sum.hiddenAdded) parts.push(`${n(sum.hiddenAdded, '“Not interested” pick', '“Not interested” picks')} restored`);
   if (!parts.length && !sum.skipped) return 'Nothing to restore — this device already has everything in that file.';
   if (sum.skipped) parts.push(`${n(sum.skipped, 'unreadable entry', 'unreadable entries')} skipped`);
   return `Restored from backup: ${parts.join(', ')}.`;
