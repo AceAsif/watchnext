@@ -19,18 +19,19 @@ export default function YourTaste({ state }) {
       </Section>
     );
   }
+  const hasFacts = sum.languages.length > 0 || sum.themes.length > 0 || sum.people.length > 0 || sum.away.length > 0 || Boolean(hits);
   const people = sum.people.map((p) => `${p.name}${p.role === 'c' ? ' (creator/director)' : ''}`);
   return (
     <Section title="Your taste">
       <div data-testid="your-taste">
         <BarList rows={sum.genres.map((g) => ({ label: g.label, value: g.pct }))} unit="%" ariaLabel="Genres you lean to" />
-        <div className="sd-card sd-pad sd-taste-facts">
+        {hasFacts && <div className="sd-card sd-pad sd-taste-facts" data-testid="taste-facts">
           {sum.languages.length > 0 && <p><span className="sd-lbl">Languages</span> {sum.languages.map((l) => `${l.label} ${l.pct}%`).join(' · ')}</p>}
           {sum.themes.length > 0 && <p><span className="sd-lbl">Themes</span> {sum.themes.join(' · ')}</p>}
           {people.length > 0 && <p><span className="sd-lbl">People</span> {people.join(' · ')}</p>}
           {sum.away.length > 0 && <p><span className="sd-lbl">Steering away from</span> {sum.away.join(' · ')}</p>}
           {hits && <p data-testid="taste-hits"><span className="sd-lbl">Discover</span> {hits}</p>}
-        </div>
+        </div>}
         <Note>
           {learned > 0
             ? `Built from ${sum.titles.toLocaleString()} titles: your ratings, how far you got, what you dropped and “Not interested”, with recent watching counting more. Discover, Tonight and Movie night all use it.`
