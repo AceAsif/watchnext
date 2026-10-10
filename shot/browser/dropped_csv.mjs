@@ -85,7 +85,21 @@ const clickText = (p, label, sel = 'button') => p.evaluate((t, s) => { const el 
 const openShow = async (p, name) => { await tab(p, 'Shows'); await clickText(p, name, 'button.sd-ltile'); await wait(500); };
 const menuAction = async (p, label) => { await clickText(p, 'More actions'); await wait(300); await clickText(p, label); await wait(400); };
 const back = async (p) => { await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /back/i.test(x.getAttribute('aria-label') || x.textContent)); if (b) b.click(); }); await wait(400); };
-const tabsText = (p) => p.evaluate(() => [...document.querySelectorAll('.sd-lstatus [role=tab]')].map((t) => t.textContent.replace(/\s+/g, ' ').trim()));
+// The Shows "Status" menu (a chip next to the filter box: a sheet on a phone, a popover on desktop).
+const openStatus = async (p) => { await p.evaluate(() => document.querySelector('.sd-lbar-top .sd-chipbtn').click()); await wait(300); };
+const closeMenu = async (p) => { if (await p.evaluate(() => !!document.querySelector('[role=listbox][aria-label=Status]'))) { await p.keyboard.press('Escape'); await wait(300); } };
+// ["All 5", "Watching 2", …] as listed in the menu
+const tabsText = async (p) => {
+  await openStatus(p);
+  const list = await p.evaluate(() => [...document.querySelectorAll('[role=listbox][aria-label=Status] [role=option]')].map((o) => `${(o.querySelector('.lab') || o.firstElementChild).textContent.trim()} ${o.querySelector('.n').textContent.trim()}`));
+  await closeMenu(p); return list;
+};
+const pickStatus = async (p, label) => {
+  await openStatus(p);
+  await p.evaluate((l) => { const o = [...document.querySelectorAll('[role=listbox][aria-label=Status] [role=option]')].find((x) => (x.querySelector('.lab') || x.firstElementChild).textContent.trim() === l); if (!o) throw new Error('no status ' + l); o.click(); }, label);
+  await wait(250); await closeMenu(p);
+};
+const statusChip = (p) => p.evaluate(() => document.querySelector('.sd-lbar-top .sd-chipbtn').textContent.replace(/\s+/g, ' ').trim());
 
 // RFC 4180 reader for the exported files
 function parseCsv(buf) {
@@ -110,7 +124,7 @@ let p = await open();
 let t = await text(p);
 await ok('Up Next lists Bravo (continue) and Alpha is on the way', () => { assert.match(t, /Bravo Binge/); assert.match(t, /Alpha Airing/); });
 await tab(p, 'Shows');
-await ok('no Dropped tab while nothing is dropped; counts add up', async () => {
+await ok('no Dropped choice while nothing is dropped; counts add up', async () => {
   const tabs = await tabsText(p); assert.equal(tabs.some((x) => x.startsWith('Dropped')), false, tabs.join('|'));
   const n = (l) => +tabs.find((x) => x.startsWith(l)).match(/(\d+)$/)[1];
   assert.equal(n('All'), n('Watching') + n('Finished') + n('Not started'));
@@ -133,27 +147,37 @@ await back(p);
 await tab(p, 'Up Next');
 await ok('Bravo has left Up Next; Alpha is still there', async () => { t = await text(p); assert.doesNotMatch(t, /Bravo Binge/); assert.match(t, /Alpha Airing/); });
 await tab(p, 'Shows');
-await ok('Dropped tab appears with 1; Watching/Finished/Not started shrink so all still add up', async () => {
+await ok('Dropped appears in the Status menu with 1; Watching/Finished/Not started shrink so all still add up', async () => {
   const tabs = await tabsText(p); assert.ok(tabs.some((x) => /^Dropped\s*1$/.test(x)), tabs.join('|'));
   const n = (l) => +tabs.find((x) => x.startsWith(l)).match(/(\d+)$/)[1];
   assert.equal(n('All'), n('Watching') + n('Finished') + n('Not started') + n('Dropped'));
 });
-const tabsFit = (pg) => pg.evaluate(() => {
-  const bar = document.querySelector('.sd-lstatus'); const bs = [...bar.querySelectorAll('[role=tab]')];
-  const rects = bs.map((b) => b.getBoundingClientRect());
-  let overlap = false; for (let i = 1; i < rects.length; i++) if (rects[i].left < rects[i - 1].right - 0.5) overlap = true;
-  const clipped = bs.some((b) => b.scrollWidth > b.clientWidth + 1); // text wider than its own button
-  return { overlap, clipped, scrolls: bar.scrollWidth > bar.clientWidth + 1, n: bs.length };
+// The old row of five status tabs ran out of room once Dropped appeared and hid "All". The Status
+// menu must fit at any phone width, and from Dropped you can always get back to All.
+const barFits = (pg) => pg.evaluate(() => {
+  const chips = [...document.querySelectorAll('.sd-lbar .sd-chipbtn')];
+  const clipped = chips.filter((c) => { const e = c.querySelector('.ell'); return e && e.scrollWidth > e.clientWidth + 1; }).map((c) => c.textContent);
+  const out = chips.filter((c) => c.getBoundingClientRect().right > document.documentElement.clientWidth + 0.5).map((c) => c.textContent);
+  return { clipped, out, pageScrolls: document.documentElement.scrollWidth > document.documentElement.clientWidth };
 });
+await pickStatus(p, 'Dropped');
 for (const w of [390, 360, 320]) {
   await p.setViewport({ width: w, height: 844, deviceScaleFactor: 2 }); await wait(300);
-  const f = await tabsFit(p);
-  await ok(`five status tabs at ${w}px: no overlap, no clipped labels${f.scrolls ? ' (row scrolls sideways)' : ' (all fit)'}`, () => { assert.equal(f.n, 5); assert.equal(f.overlap, false); assert.equal(f.clipped, false); });
-  if (w === 320) await p.screenshot({ path: `${OUT}/tabs_320.png` });
+  const f = await barFits(p);
+  await ok(`${w}px with Dropped chosen: the toolbar fits (no clipped chip labels, nothing off-screen) and the menu still offers All`, async () => {
+    assert.deepEqual(f.clipped, []); assert.deepEqual(f.out, []); assert.equal(f.pageScrolls, false);
+    assert.equal(await statusChip(p), 'Dropped 1');
+    assert.deepEqual((await tabsText(p)).map((x) => x.split(' ')[0]), ['All', 'Watching', 'Finished', 'Not', 'Dropped']);
+  });
+  if (w === 320) await p.screenshot({ path: `${OUT}/status_320.png` });
 }
+await pickStatus(p, 'All');
+await ok('choosing All again from the menu shows everything and the chip goes back to "Status"', async () => {
+  assert.equal(await statusChip(p), 'Status'); assert.ok((await p.evaluate(() => document.querySelectorAll('button.sd-ltile').length)) > 1);
+});
 await p.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 }); await wait(300);
-await clickText(p, 'Dropped', '[role=tab]'); await wait(400);
-await ok('Dropped tab lists only Bravo, tile says "Dropped · 3 eps"', async () => {
+await pickStatus(p, 'Dropped');
+await ok('Dropped lists only Bravo, tile says "Dropped · 3 eps"', async () => {
   const tiles = await p.evaluate(() => [...document.querySelectorAll('button.sd-ltile')].map((b) => b.innerText.replace(/\s+/g, ' ')));
   assert.equal(tiles.length, 1); assert.match(tiles[0], /Bravo Binge/); assert.match(tiles[0], /Dropped · 3 eps/);
 });
@@ -185,7 +209,7 @@ await ok('pill gone; store has dropped:false and droppedAt:null (explicit, so sy
 await back(p); await tab(p, 'Up Next');
 await ok('Bravo is back in Up Next', async () => assert.match(await text(p), /Bravo Binge/));
 await tab(p, 'Shows');
-await ok('Dropped tab disappears again (count 0)', async () => assert.equal((await tabsText(p)).some((x) => x.startsWith('Dropped')), false));
+await ok('Dropped leaves the Status menu again (count 0)', async () => assert.equal((await tabsText(p)).some((x) => x.startsWith('Dropped')), false));
 
 // ===================================================== 5. survives a reload; deleting the only dropped show while on that tab
 console.log('5. persistence');
@@ -193,16 +217,15 @@ await openShow(p, 'Bravo Binge'); await menuAction(p, 'Drop this show'); await b
 await p.reload({ waitUntil: 'networkidle0' }); await wait(500);
 await tab(p, 'Shows');
 await ok('still dropped after a reload', async () => assert.ok((await tabsText(p)).some((x) => /^Dropped\s*1$/.test(x))));
-await clickText(p, 'Dropped', '[role=tab]'); await wait(300);
+await pickStatus(p, 'Dropped');
 await clickText(p, 'Bravo Binge', 'button.sd-ltile'); await wait(500);
 await p.evaluate(() => { if (!document.querySelector('[data-testid=dropped-pill]')) throw new Error('not on the show page'); });
 await menuAction(p, 'Resume watching'); await back(p);
-await ok('resuming the last dropped show from the Dropped tab lands on All, with no empty Dropped tab left', async () => {
+await ok('resuming the last dropped show from Dropped lands on All, with no empty Dropped choice left', async () => {
   const tx = await text(p); assert.doesNotMatch(tx, /Application error|Something went wrong/i);
   const tabs = await tabsText(p); assert.ok(tabs.length >= 4, tabs.join('|'));
-  // leaving the show page resets the list to All, so there is no empty Dropped tab to be stranded on
-  const sel = await p.evaluate(() => (document.querySelector('.sd-lstatus [aria-selected=true]') || {}).textContent || '');
-  assert.match(sel, /^All/); assert.equal(tabs.some((x) => x.startsWith('Dropped')), false);
+  // leaving the show page resets the list to All, so there is no empty Dropped view to be stranded on
+  assert.equal(await statusChip(p), 'Status'); assert.equal(tabs.some((x) => x.startsWith('Dropped')), false);
 });
 // leave Bravo dropped for the export check
 await openShow(p, 'Bravo Binge'); await menuAction(p, 'Drop this show'); await back(p);
@@ -258,7 +281,11 @@ await p.close();
 console.log('7. desktop look');
 p = await open({ w: 1280, h: 900 });
 await openShow(p, 'Alpha Airing'); await menuAction(p, 'Drop this show'); await back(p);
-await tab(p, 'Shows'); await clickText(p, 'Dropped', '[role=tab]'); await wait(400);
+await tab(p, 'Shows'); await pickStatus(p, 'Dropped'); await wait(200);
+await ok('desktop: Status sits next to the filter box and the toolbar is one row', async () => {
+  const r = await p.evaluate(() => ['.sd-lbar-top .sd-lfilter', '.sd-lbar-top .sd-chipbtn', '.sd-lbar-chips .sd-chipbtn'].map((s) => Math.round(document.querySelector(s).getBoundingClientRect().top)));
+  assert.equal(new Set(r).size, 1, JSON.stringify(r)); assert.equal(await statusChip(p), 'Dropped 1');
+});
 await p.screenshot({ path: `${OUT}/shows_dropped_desktop.png` });
 await p.close();
 

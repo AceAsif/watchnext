@@ -210,18 +210,23 @@ await p.close();
 console.log('F. Shows tab');
 ({ page: p, log } = await open(LIB(), { mine: ['netflix', 'stan'], showsOnly: false, watchlistOnly: false }, { tab: 'Shows' }));
 const tiles = (pg) => pg.evaluate(() => [...document.querySelectorAll('button.sd-ltile')].map((t) => [t.querySelector('.sd-ltile-name').textContent, (t.querySelector('.sd-ltile-sub') || {}).textContent || '']));
-const tabsOf = (pg) => pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('.sd-lstatus [role=tab]')].map((t) => [t.firstChild.textContent.trim(), +(t.querySelector('.n') || { textContent: '0' }).textContent])));
+// the Shows "Status" menu: open it, read { label: count }, close it
+const menuOpen = (pg) => pg.evaluate(() => !!document.querySelector('[role=listbox][aria-label=Status]'));
+const openStatus = async (pg) => { await pg.evaluate(() => document.querySelector('.sd-lbar-top .sd-chipbtn').click()); await wait(300); };
+const closeStatus = async (pg) => { if (await menuOpen(pg)) { await pg.keyboard.press('Escape'); await wait(300); } };
+const tabsOf = async (pg) => { await openStatus(pg); const r = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[role=listbox][aria-label=Status] [role=option]')].map((o) => [(o.querySelector('.lab') || o.firstElementChild).textContent.trim(), +o.querySelector('.n').textContent]))); await closeStatus(pg); return r; };
+const pickStatus = async (pg, label) => { await openStatus(pg); await pg.evaluate((l) => [...document.querySelectorAll('[role=listbox][aria-label=Status] [role=option]')].find((o) => (o.querySelector('.lab') || o.firstElementChild).textContent.trim() === l).click(), label); await wait(300); await closeStatus(pg); };
 await ok('off by default: all 5 library shows, no lookups', async () => { assert.equal((await tiles(p)).length, 5); assert.equal(log.length, 0); assert.deepEqual(Object.keys(await tabsOf(p)).sort(), ['All', 'Dropped', 'Finished', 'Not started', 'Watching']); });
 await p.evaluate(() => document.querySelector('.sd-svcbar button.sd-svctoggle').click()); await settled(p); await wait(600);
 await ok('"On my services" switch in the filter bar: only the shows confirmed on Netflix/Stan (or free) remain, each tile says where', async () => {
   const t = Object.fromEntries(await tiles(p)); assert.deepEqual(Object.keys(t).sort(), ['Lib Dropped', 'Lib Netflix', 'Lib Stan Finished', 'Lib Uncached']); assert.equal(t['Lib Netflix'], 'Netflix'); assert.equal(t['Lib Stan Finished'], 'Stan'); assert.equal(t['Lib Uncached'], 'Stan'); assert.equal(t['Lib Dropped'], 'Netflix');
 });
-await ok('the status tabs and their counts follow the filter and still add up (All = Watching + Finished + Not started + Dropped)', async () => { const c = await tabsOf(p); assert.deepEqual(c, { All: 4, Watching: 1, Finished: 1, 'Not started': 1, Dropped: 1 }); assert.equal(c.All, c.Watching + c.Finished + c['Not started'] + c.Dropped); });
+await ok('the Status menu and its counts follow the filter and still add up (All = Watching + Finished + Not started + Dropped)', async () => { const c = await tabsOf(p); assert.deepEqual(c, { All: 4, Watching: 1, Finished: 1, 'Not started': 1, Dropped: 1 }); assert.equal(c.All, c.Watching + c.Finished + c['Not started'] + c.Dropped); });
 await ok('only what was needed was looked up: the stale one (20 days) and the two never-checked; the fresh ones were not', async () => assert.deepEqual([...log].sort(), ['tv/302', 'tv/303', 'tv/304']));
 await p.screenshot({ path: `${OUT}/shows_on_phone.png` });
-await p.evaluate(() => [...document.querySelectorAll('.sd-lstatus [role=tab]')].find((t) => t.textContent.startsWith('Not started')).click()); await wait(350);
-await ok('combines with the status tabs: Not started + on my services = just the uncached-then-checked Stan show', async () => assert.deepEqual((await tiles(p)).map((x) => x[0]), ['Lib Uncached']));
-await p.evaluate(() => [...document.querySelectorAll('.sd-lstatus [role=tab]')].find((t) => t.textContent.startsWith('All')).click()); await wait(300);
+await pickStatus(p, 'Not started');
+await ok('combines with Status: Not started + on my services = just the uncached-then-checked Stan show', async () => assert.deepEqual((await tiles(p)).map((x) => x[0]), ['Lib Uncached']));
+await pickStatus(p, 'All');
 await p.reload({ waitUntil: 'networkidle0' }); await wait(400); await tab(p, 'Shows');
 await ok('the switch is remembered across a reload (and cached answers are reused: no lookups)', async () => { assert.equal(await toggleOn(p), true); assert.equal((await tiles(p)).length, 4); });
 await p.evaluate(() => [...document.querySelectorAll('button')].find((b) => /Clear/.test(b.textContent) && b.closest('.sd-lbar')).click()); await wait(350);

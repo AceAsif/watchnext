@@ -47,7 +47,7 @@ month_recap 14 · finish_card 21 · watchdates 22 · backup_nudge 14 · services
 tonight 23 · movie_genres_db 6 · movie_night 24 · goals 22 · goals_db 14 · wipe_tomb_db 11 · taste 32 ·
 hidden 12 · cloud_hidden 6 (runs the real cloudEngine.js on the in-memory Firestore in `tests/unit/fakes/`).
 
-Browser: settings 47 · desktop 56 · notes 35 · restore 24 · anime 35 · yearimage 25 · dropped_csv 25 ·
+Browser: settings 47 · desktop 56 · notes 35 · restore 24 · anime 35 · yearimage 25 · dropped_csv 27 ·
 rewatch 8 · recaps 20 · watchdates 21 · notes_search 22 · backup_nudge 21 · services 34 · tonight 27 ·
 movie_night 41 · goals 25 · wipe_resume 33 · discover 25.
 

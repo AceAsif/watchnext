@@ -1029,11 +1029,24 @@
   font: inherit; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; flex: none;
 }
 .sd-toolsbtn.running { border-color: var(--teal); }
+/* the narrowest phones (320px): title + Tools + Add must still fit on one line */
+@media (max-width: 359px) {
+  .sd-libhead { gap: 8px; }
+  .sd-libhead h1 { font-size: 24px; gap: 6px; }
+  .sd-libhead-actions { gap: 6px; }
+  .sd-toolsbtn { padding: 0 9px; gap: 5px; }
+  .sd-addbtn { padding: 0 10px; gap: 4px; }
+}
 
 /* ---- the filter bar: three rows on a phone */
 .sd-lbar { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .sd-lbar-chips { display: flex; gap: 8px; }
 .sd-lbar-chips > .sd-pop-wrap { flex: 1; min-width: 0; }
+/* Shows: the filter box and the Status menu share the first row (Status was a row of tabs that
+   ran out of room once "Dropped" appeared) */
+.sd-lbar-top { display: flex; gap: 8px; align-items: stretch; }
+.sd-lbar-top > .sd-lfilter { flex: 1; min-width: 0; }
+.sd-lbar-top > .sd-pop-wrap { flex: none; width: 150px; }
 .sd-lbar-sort { display: flex; align-items: center; gap: 10px; }
 .sd-lbar-sort .sd-lstatus { flex: 1; }
 
@@ -1117,6 +1130,8 @@
   color: var(--text); font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer;
 }
 .sd-sheetrow.on { color: var(--amber); font-weight: 600; }
+.sd-sheetrow .n, .sd-chipbtn .n { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); font-weight: 400; }
+.sd-sheetrow.on .n, .sd-chipbtn.active .n { color: var(--amber); }
 
 /* Tools menu */
 .sd-toollist { display: flex; flex-direction: column; gap: 8px; }
@@ -1219,6 +1234,9 @@
 
   .sd-lbar { flex-direction: row; align-items: center; gap: 12px; margin-top: 12px; height: 44px; }
   .sd-lbar > .sd-lfilter { width: 260px; flex: none; }
+  .sd-lbar-top { gap: 12px; align-items: center; }
+  .sd-lbar-top > .sd-lfilter { width: 260px; flex: none; }
+  .sd-lbar-top > .sd-pop-wrap { width: 170px; }
   .sd-lbar > .sd-lstatus { flex: none; width: 380px; }
   .sd-lbar-chips { gap: 8px; align-items: center; }
   .sd-lbar-chips > .sd-pop-wrap { flex: none; width: 150px; }

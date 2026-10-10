@@ -38,7 +38,6 @@ import {
   ToolsMenu,
   ProgressCard,
   FilterField,
-  StatusTabs,
   ChipSelect,
   SortDirButton,
   CountLine,
@@ -263,12 +262,23 @@ export default function Shows({ openShow }) {
       {followed.length > 0 && (
         <>
           <div className="sd-lbar">
-            <FilterField
-              value={filters.query}
-              onChange={(query) => setFilter({ query })}
-              placeholder={`Filter ${followed.length.toLocaleString()} show${followed.length === 1 ? '' : 's'}`}
-            />
-            <StatusTabs options={SHOW_STATUSES.filter((o) => o !== 'Dropped' || counts.Dropped > 0 || filters.status === 'Dropped')} value={filters.status} onChange={(status) => setFilter({ status })} counts={counts} />
+            <div className="sd-lbar-top">
+              <FilterField
+                value={filters.query}
+                onChange={(query) => setFilter({ query })}
+                placeholder={`Filter ${followed.length.toLocaleString()} show${followed.length === 1 ? '' : 's'}`}
+              />
+              <ChipSelect
+                chip={filters.status === 'All' ? 'Status' : <>{filters.status} <span className="n">{counts[filters.status]}</span></>}
+                active={filters.status !== 'All'}
+                title="Status"
+                subtitle="Where you are with each show"
+                options={SHOW_STATUSES.filter((o) => o !== 'Dropped' || counts.Dropped > 0 || filters.status === 'Dropped').map((o) => ({ id: o, label: o, count: counts[o] }))}
+                value={filters.status}
+                onChange={(status) => setFilter({ status })}
+                popWidth={220}
+              />
+            </div>
             <div className="sd-lbar-chips">
               <ChipSelect
                 chip={filters.platform === 'All' ? 'Platform' : platformLabel(filters.platform)}

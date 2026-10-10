@@ -7,7 +7,7 @@ import './ui.css';
 
 // The pieces of the Shows and Movies pages from the Claude Design round
 // (Direction A): ONE obvious filter box, adding behind a separate "+ Add"
-// button, status tabs with counts, Platform / Sort as dropdown chips (a bottom
+// button, Status / Platform / Sort as dropdown chips with counts (a bottom
 // sheet on a phone, a popover on desktop), a Tools menu, honest empty states,
 // and poster tiles. Styling lives in ui.css (sd-l* / sd-res* classes).
 
@@ -96,7 +96,7 @@ export function FilterField({ value, onChange, placeholder, label }) {
   );
 }
 
-// Status switch with counts. A real ARIA tab list (arrow keys, Home/End).
+// Status switch with counts (the Notes page). A real ARIA tab list (arrow keys, Home/End).
 export function StatusTabs({ options, value, onChange, counts }) {
   const refs = useRef({});
   // With five tabs (the Dropped tab is showing) equal-width buttons are too narrow for
@@ -291,6 +291,7 @@ export function ChipSelect({ chip, active, title, subtitle, options, value, onCh
                   onClick={() => pick(o.id)}
                 >
                   <span style={{ flex: 1 }}>{o.label}</span>
+                  {o.count != null ? <span className="n">{o.count}</span> : null}
                   {value === o.id ? <CheckIcon size={18} /> : <span style={{ width: 18 }} />}
                 </button>
               ))}
