@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/useStore.js';
 import { addMovieToWatchlist, setDiscoverHidden } from '../store/db.js';
 import { hiddenKeySet } from './hiddenLogic.js';
-import { genreKeysFromNames } from './tasteLogic.js';
+import { genreKeysFromNames, tasteLine } from './tasteLogic.js';
+import useTaste from './useTaste.js';
 import { discoverMovies, movieProviderList, movieRecommendations, movieSimilar, movieDetails, movieVideos, pickTrailer, watchProviders, hasKey, img } from '../api/tmdb.js';
 import { Sheet } from './ui.jsx';
 import { initialOf } from './yearImageLogic.js';
@@ -158,8 +159,12 @@ export default function MovieNightSheet({ onClose }) {
     });
   }, [cands, prefs.onlyMine, prefs.minutes, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // your taste (shows AND movies), fixed for this sitting so adding a pick doesn't reshuffle the rest
+  const liveTaste = useTaste(state);
+  const taste = useRef(null);
+  if (!taste.current) taste.current = { prof: liveTaste.prof, cache: liveTaste.cache };
   const result = useMemo(
-    () => suggestMovies(cands, { minutes: prefs.minutes, mood: prefs.mood, seed, exclude: shown, hidden, mine, onlyMine: prefs.onlyMine }),
+    () => suggestMovies(cands, { minutes: prefs.minutes, mood: prefs.mood, seed, exclude: shown, hidden, mine, onlyMine: prefs.onlyMine, taste: taste.current }),
     [cands, prefs, seed, shown, hidden, mine]
   );
 
@@ -243,6 +248,7 @@ export default function MovieNightSheet({ onClose }) {
                       <span className="name" title={p.name} onClick={() => toggleDetails(p.key)}>{p.name}{p.year ? ` (${p.year})` : ''}</span>
                       {whyLines(p).map((l) => <span key={l} className="meta sd-mono">{l}</span>)}
                       {moodNote(p, prefs.mood) ? <span className={'sd-tn-mood' + (p.moodState === 'match' ? ' ok' : '')}>{moodNote(p, prefs.mood)}</span> : null}
+                      {p.taste ? <span className="sd-tn-taste" data-testid="pick-taste">{tasteLine(p.taste)}</span> : null}
                       {p.genres && p.genres.length ? <span className="meta sd-mono">{p.genres.slice(0, 3).join(' · ')}</span> : null}
                       {p.where ? <span className="meta sd-mono sd-svc-meta">{p.where}</span> : null}
                       <button type="button" className="sd-tn-more" data-testid="movie-more" aria-expanded={isOpen} aria-controls={`mn-det-${p.tmdbId}`} onClick={() => toggleDetails(p.key)}>

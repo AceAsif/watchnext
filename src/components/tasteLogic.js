@@ -201,7 +201,8 @@ export function libraryEntries(state, hiddenList = [], now = new Date()) {
     if (!show || typeof show !== 'object') continue;
     const e = showEngagement(show);
     if (e.w === 0) continue;
-    out.push({ key: show.tmdbId ? titleKey('tv', show.tmdbId) : null, kind: 'tv', tmdbId: show.tmdbId || null, name: show.name || '', w: e.w, d: decay(e.at, now), why: e.why, stars: e.stars || 0, rec: featuresFromRecord(show) });
+    const anilistId = show.anime && Number.isInteger(show.anime.id) ? show.anime.id : null;
+    out.push({ key: show.tmdbId ? titleKey('tv', show.tmdbId) : null, kind: 'tv', tmdbId: show.tmdbId || null, anilistId, name: show.name || '', w: e.w, d: decay(e.at, now), why: e.why, stars: e.stars || 0, rec: featuresFromRecord(show) });
   }
   for (const m of Array.isArray(state && state.movies) ? state.movies : []) {
     if (!m || typeof m !== 'object') continue;
@@ -285,6 +286,33 @@ export function pickSeeds(entries, max = MAX_SEEDS) {
     .sort((a, b) => b.w * b.d - a.w * a.d || a.name.localeCompare(b.name))
     .filter((e) => !seen.has(e.key) && seen.add(e.key))
     .slice(0, max);
+}
+
+// The liked anime (linked to AniList on its show page) whose AniList recommendations make the anime row.
+export function pickAnimeSeed(entries) {
+  return entries.filter((e) => e.anilistId && e.w >= 0.4).sort((a, b) => b.w * b.d - a.w * a.d || a.name.localeCompare(b.name))[0] || null;
+}
+// AniList ids of every anime in the library, as 'anime:<id>' keys (never suggested).
+export function ownedAnimeKeys(state) {
+  const out = new Set();
+  for (const s of Object.values((state && state.shows) || {})) if (s && s.anime && Number.isInteger(s.anime.id)) out.add(`anime:${s.anime.id}`);
+  return out;
+}
+// One AniList recommendation (mediaRecommendation) -> candidate. kind 'anime', key 'anime:<AniList id>'.
+// image is AniList's full cover URL (not a TMDB path); vote is the average score /10, votes = popularity.
+export function animeCandidate(m, via) {
+  if (!m || typeof m !== 'object' || !Number.isInteger(m.id) || m.isAdult) return null;
+  const t = m.title || {};
+  const name = (typeof t.english === 'string' && t.english.trim()) || (typeof t.romaji === 'string' && t.romaji.trim()) || '';
+  const image = m.coverImage && typeof m.coverImage.large === 'string' && /^https:\/\//.test(m.coverImage.large) ? m.coverImage.large : null;
+  if (!name || !image) return null;
+  const trailer = m.trailer && m.trailer.site === 'youtube' && typeof m.trailer.id === 'string' ? m.trailer.id : null;
+  return {
+    key: `anime:${m.id}`, kind: 'anime', id: m.id, name, year: Number.isInteger(m.seasonYear) ? m.seasonYear : null,
+    poster: null, image, overview: String(m.description || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
+    vote: Number(m.averageScore) > 0 ? Number(m.averageScore) / 10 : 0, votes: Number(m.popularity) || 0,
+    g: uniq(['animation', ...genreKeysFromNames(m.genres)]), l: 'ja', trailer, via: via ? [via] : [],
+  };
 }
 
 // ------------------------------------------------------------------ candidates
@@ -376,7 +404,7 @@ export function whyLine(prof, c, rowType) {
   }
   if (rowType === 'different') return c.g.length ? `${genreLabel(c.g[0])} · rated ${c.vote.toFixed(1)}` : `Rated ${c.vote.toFixed(1)}`;
   // the row title already says why for seed rows; elsewhere a liked title is the best reason
-  if (rowType !== 'seed' && seed) return `Because you liked ${shortName(seed.name)}`;
+  if (rowType !== 'seed' && rowType !== 'anime' && seed) return `Because you liked ${shortName(seed.name)}`;
   const parts = [];
   if (g) parts.push(genreLabel(g));
   if (c.year) parts.push(String(c.year));
@@ -420,11 +448,16 @@ export function seedRowTitle(seed) {
 // share a title. Top picks — shown first but built last — is the best of everything, so it may
 // repeat a title from a row below (as Netflix does); it leans toward ones not shown elsewhere.
 // Rows with fewer than ROW_MIN titles are left out.
-export function buildRows({ pool, prof, seeds = [], person = null, keyword = null, servicesOn = false, now = new Date() }) {
+// ctx: timeContext() — a small boost for series or films depending on the moment (Phase 2).
+// animeSeed: the liked anime whose AniList recommendations are in the pool (kind 'anime').
+export function buildRows({ pool, prof, seeds = [], person = null, keyword = null, servicesOn = false, now = new Date(), ctx = null, animeSeed = null }) {
   const scored = pool.map((c) => {
     const taste = tasteMatch(prof, c);
-    return { ...c, taste, score: scoreCandidate(prof, c, now), match: matchPercent(taste) };
+    const nudge = ctx && ctx.prefer && (c.kind === ctx.prefer || (ctx.prefer === 'tv' && c.kind === 'anime')) ? CONTEXT_BONUS : 0;
+    return { ...c, taste, score: scoreCandidate(prof, c, now) + nudge, match: matchPercent(taste) };
   });
+  const anime = scored.filter((c) => c.kind === 'anime');
+  const scoredMain = scored.filter((c) => c.kind !== 'anime');
   const used = new Set();
   const rows = [];
   const take = (id, type, title, sub, list, n = ROW_MAX, scoreOf = (c) => c.score) => {
@@ -435,21 +468,22 @@ export function buildRows({ pool, prof, seeds = [], person = null, keyword = nul
     rows.push({ id, type, title, sub, items });
   };
   const top = () => {
-    const list = scored.filter((c) => !(c.via.length === 1 && c.via[0].type === 'trending') && c.taste > -0.2);
+    const list = scoredMain.filter((c) => !(c.via.length === 1 && c.via[0].type === 'trending') && c.taste > -0.2);
     if (list.length < ROW_MIN) return null;
     const items = pickVaried(list, TOP_PICKS, (c) => c.score - (used.has(c.key) ? REPEAT_PENALTY : 0)).map((c) => ({ ...c, why: whyLine(prof, c, 'top') }));
-    return { id: 'top', type: 'top', title: 'Top picks for you', sub: 'Ranked on everything you watch', items };
+    return { id: 'top', type: 'top', title: 'Top picks for you', sub: contextSub(ctx), items };
   };
   for (const s of seeds.slice(0, SEED_ROWS)) {
-    take(`seed:${s.key}`, 'seed', seedRowTitle(s), null, scored.filter((c) => c.via.some((v) => v.type === 'seed' && v.key === s.key)));
+    take(`seed:${s.key}`, 'seed', seedRowTitle(s), null, scoredMain.filter((c) => c.via.some((v) => v.type === 'seed' && v.key === s.key)));
   }
-  if (person) take(`person:${person.id}`, 'person', `More from ${person.name}`, person.role === 'c' ? 'A creator behind titles you liked' : 'In several titles you liked', scored.filter((c) => c.via.some((v) => v.type === 'person')));
-  if (keyword) take(`keyword:${keyword.id}`, 'keyword', `Your kind of story: ${keyword.name}`, 'A theme that keeps coming up in what you like', scored.filter((c) => c.via.some((v) => v.type === 'keyword')));
-  if (servicesOn) take('services', 'services', 'On your services', 'Your kind of thing, streaming on what you pay for', scored.filter((c) => c.via.some((v) => v.type === 'services')));
+  if (animeSeed) take(`anime:${animeSeed.key}`, 'anime', `Anime like ${animeSeed.name}`, 'Recommended by AniList fans of it, ranked on your taste', anime);
+  if (person) take(`person:${person.id}`, 'person', `More from ${person.name}`, person.role === 'c' ? 'A creator behind titles you liked' : 'In several titles you liked', scoredMain.filter((c) => c.via.some((v) => v.type === 'person')));
+  if (keyword) take(`keyword:${keyword.id}`, 'keyword', `Your kind of story: ${keyword.name}`, 'A theme that keeps coming up in what you like', scoredMain.filter((c) => c.via.some((v) => v.type === 'keyword')));
+  if (servicesOn) take('services', 'services', 'On your services', 'Your kind of thing, streaming on what you pay for', scoredMain.filter((c) => c.via.some((v) => v.type === 'services')));
   // Something different: well-rated, trending titles in genres you don't usually watch — but
   // never a genre you've shown you dislike.
   const different = (c) => c.via.some((v) => v.type === 'trending') && !c.g.some((k) => (prof.g[k] || 0) < 0) && genreFit(prof, c) < 0.35 && quality(c) >= 0.4;
-  take('different', 'different', 'Something different', 'Well rated, a little outside your usual', scored.filter(different), 10, (c) => quality(c));
+  take('different', 'different', 'Something different', 'Well rated, a little outside your usual', scoredMain.filter(different), 10, (c) => quality(c));
   const t = top();
   return t ? [t, ...rows] : rows;
 }
@@ -460,4 +494,63 @@ export function progressText(p) {
   if (p.phase === 'learning') return p.total > 0 ? `Learning your taste… ${p.done} of ${p.total}` : 'Learning your taste…';
   if (p.phase === 'finding') return 'Finding picks for you…';
   return '';
+}
+
+// ------------------------------------------------------------------ Phase 2: shared use
+// How well ONE title fits you, for Tonight and Movie night (which have no TMDB list result).
+// t: { kind: 'tv'|'movie', tmdbId, genres?: [names], g?: [keys], year?, lang? }. Cached features
+// for the title (from Discover's lookups) are used when this device has them.
+// -> { taste (-1..1), match (1..99), genre (your favourite of its genres, or null) }
+export function titleTaste(prof, cache, t) {
+  const f = t && t.tmdbId != null && cache && cache.items ? cache.items[titleKey(t.kind, t.tmdbId)] : null;
+  const g = f && f.g.length ? f.g : Array.isArray(t && t.g) ? t.g : genreKeysFromNames(t && t.genres);
+  const year = (f && f.y) || (Number.isInteger(Number(t && t.year)) && Number(t.year) > 1900 ? Number(t.year) : null);
+  const c = { g, l: (f && f.l) || (t && t.lang) || null, year };
+  const taste = tasteMatch(prof, c);
+  return { taste, match: matchPercent(taste), genre: bestGenre(prof, c) };
+}
+// "87% match · you like Mystery" (or just "87% match").
+export const tasteLine = (tt) => (tt ? `${tt.match}% match${tt.genre ? ` · you like ${genreLabel(tt.genre)}` : ''}` : '');
+// A profile with nothing in it (new user, or only unrated titles without genres) says nothing useful.
+export const profileIsEmpty = (prof) => !prof || !(prof.mass > 0) || Object.keys(prof.g).length === 0;
+
+// ------------------------------------------------------------------ Phase 2: time of day
+// A light nudge from when you open the app (local time):
+//   weekend   Fri 17:00 → Sun 23:59   films get a small boost
+//   weeknight Mon–Thu 17:00–21:59      episodes (and short ones in Tonight) get a small boost
+//   late      22:00–04:59 (not weekend) short episodes get a small boost
+//   daytime   otherwise                nothing changes
+export const CONTEXT_BONUS = 0.04; // Discover score (a typical score is 0.3–0.8)
+export function timeContext(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  const day = d.getDay(); // 0 Sun … 6 Sat
+  const h = d.getHours();
+  if ((day === 5 && h >= 17) || day === 6 || day === 0) return { slot: 'weekend', prefer: 'movie', label: 'A film for the weekend', short: false };
+  if (h >= 22 || h < 5) return { slot: 'late', prefer: 'tv', label: 'Short episodes for a late night', short: true };
+  if (h >= 17) return { slot: 'weeknight', prefer: 'tv', label: 'Episodes for a weeknight', short: false };
+  return { slot: 'daytime', prefer: null, label: '', short: false };
+}
+// Discover's Top picks subtitle for the moment.
+export function contextSub(ctx) {
+  if (!ctx || !ctx.prefer) return 'Ranked on everything you watch';
+  return ctx.prefer === 'movie' ? 'Ranked on everything you watch · leaning to films for the weekend' : 'Ranked on everything you watch · leaning to series for tonight';
+}
+
+// ------------------------------------------------------------------ Phase 2: "Your taste" (Stats)
+const LANG = { en: 'English', ko: 'Korean', ja: 'Japanese', es: 'Spanish', de: 'German', fr: 'French', hi: 'Hindi', zh: 'Chinese', it: 'Italian', da: 'Danish', sv: 'Swedish', no: 'Norwegian', tr: 'Turkish', pt: 'Portuguese', th: 'Thai', bn: 'Bengali', ar: 'Arabic', ru: 'Russian', pl: 'Polish', nl: 'Dutch', ta: 'Tamil', te: 'Telugu', ml: 'Malayalam', id: 'Indonesian', tl: 'Tagalog', he: 'Hebrew', fi: 'Finnish', is: 'Icelandic', cn: 'Cantonese' };
+export const languageName = (code) => LANG[code] || (typeof code === 'string' ? code.toUpperCase() : '');
+const pct = (x) => Math.round(x * 100);
+// -> { genres:[{key,label,pct}], away:[label], themes:[name], people:[{name,role}], languages:[{code,label,pct}], titles, learned }
+// pct = share among the genres (or languages) you lean towards.
+export function tasteSummary(prof, { learned = 0 } = {}) {
+  if (profileIsEmpty(prof)) return null;
+  const pos = (b) => Object.entries(b).filter(([, v]) => v > 0).sort((a, c) => c[1] - a[1]);
+  // shares of everything you lean TO (so genres add up to about 100% across the full list)
+  const share = (b) => { const list = pos(b); const tot = list.reduce((n, [, v]) => n + v, 0) || 1; return list.map(([k, v]) => [k, v / tot]); };
+  const genres = share(prof.g).slice(0, 6).map(([k, v]) => ({ key: k, label: genreLabel(k), pct: Math.max(1, pct(v)) }));
+  const away = Object.entries(prof.g).filter(([, v]) => v < -0.01).sort((a, c) => a[1] - c[1]).slice(0, 3).map(([k]) => genreLabel(k));
+  const themes = Object.values(prof.k).filter((x) => x.n >= 2 && x.s > 0).sort((a, c) => c.s - a.s).slice(0, 6).map((x) => x.name);
+  const people = Object.values(prof.p).filter((x) => x.n >= 2 && x.s > 0).sort((a, c) => c.s * (c.role === 'c' ? 2 : 1) - a.s * (a.role === 'c' ? 2 : 1)).slice(0, 4).map((x) => ({ name: x.name, role: x.role }));
+  const languages = share(prof.l).slice(0, 3).map(([code, v]) => ({ code, label: languageName(code), pct: Math.max(1, pct(v)) }));
+  return { genres, away, themes, people, languages, titles: prof.titles, learned };
 }

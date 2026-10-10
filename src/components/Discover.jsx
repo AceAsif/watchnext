@@ -3,11 +3,13 @@ import { useStore } from '../store/useStore.js';
 import { addShowToWatchlist, addMovieToWatchlist, setDiscoverHidden } from '../store/db.js';
 import { useServicesPrefs } from '../store/servicesPrefs.js';
 import {
-  img, hasKey, showDetails, movieDetails, tasteDetails, tvRecommendations, movieRecommendations,
+  img, hasKey, showDetails, movieDetails, tasteDetails, searchShows, tvRecommendations, movieRecommendations,
   tvSimilar, movieSimilar, personCombinedCredits, discoverTitles, movieProviderList, trendingWeek,
   tvVideos, movieVideos, pickTrailer,
 } from '../api/tmdb.js';
 import { runDiscover, ownedKeys } from './discoverEngine.js';
+import { animeRecommendations } from '../api/anilist.js';
+import { loadLog, saveLog, recordShown, relinkShown, hitStats, hitLine } from './hitLogic.js';
 import { loadCache, saveCache, progressText, genreLabel } from './tasteLogic.js';
 import { hiddenKeySet, hiddenList } from './hiddenLogic.js';
 import { trailerUrl } from './movieNightLogic.js';
@@ -27,7 +29,19 @@ const api = {
   discover: (kind, params) => discoverTitles(kind, params),
   providerList: () => movieProviderList('AU'),
   trending: () => trendingWeek(),
+  animeRecs: (anilistId) => animeRecommendations(anilistId),
 };
+const artOf = (c) => c.image || img(c.poster, 'w342');
+
+// An anime pick comes from AniList, but the library needs TMDB's record: find it by title
+// (preferring a Japanese-language match).
+async function tmdbShowForAnime(c) {
+  const res = await searchShows(c.name);
+  const list = (res && res.results) || [];
+  const hit = list.find((r) => r.original_language === 'ja') || list[0];
+  if (!hit) throw new Error('No TMDB match for ' + c.name);
+  return showDetails(hit.id);
+}
 
 // The last result, kept for this session so switching tabs doesn't rebuild everything.
 let lastRun = null; // { rows, at }
@@ -66,6 +80,8 @@ export default function Discover() {
         onProgress: (p) => { if (alive.current) setProgress(p); },
       });
       saveCache(st, cache);
+      // remember what was suggested (first time only), for the hit rate
+      saveLog(st, recordShown(loadLog(st), res.rows.flatMap((r) => r.items), new Date().toISOString()));
       lastRun = { rows: res.rows, at: Date.now() };
       if (alive.current) {
         setRun(lastRun);
@@ -91,11 +107,17 @@ export default function Discover() {
     .map((r) => ({ ...r, items: r.items.filter((c) => !hiddenNow.has(c.key) && (!owned.has(c.key) || added[c.key])) }))
     .filter((r) => r.items.length > 0), [run, hiddenNow, owned, added]);
   const hiddenCount = useMemo(() => hiddenList(state.hidden).length, [state.hidden]);
+  const hits = useMemo(() => (run ? hitLine(hitStats(loadLog(storage()), state)) : ''), [run, state.shows, state.movies]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function addItem(c) {
     setAdding(c.key);
     try {
-      if (c.kind === 'tv') addShowToWatchlist(await showDetails(c.id));
+      if (c.kind === 'anime') {
+        const d = await tmdbShowForAnime(c);
+        addShowToWatchlist(d);
+        const st = storage(); saveLog(st, relinkShown(loadLog(st), c.key, `tv:${d.id}`)); // so it counts as a hit
+      }
+      else if (c.kind === 'tv') addShowToWatchlist(await showDetails(c.id));
       else addMovieToWatchlist(await movieDetails(c.id));
       setAdded((a) => ({ ...a, [c.key]: true }));
     } catch (e) {
@@ -125,7 +147,7 @@ export default function Discover() {
     try { win.opener = null; } catch (e) { /* best effort */ }
     setTrailer({ key: c.key, busy: true, msg: '' });
     try {
-      let k = trailerCache.get(c.key);
+      let k = c.kind === 'anime' ? c.trailer : trailerCache.get(c.key);
       if (k === undefined) { const v = pickTrailer(await (c.kind === 'tv' ? tvVideos(c.id) : movieVideos(c.id))); k = v ? v.key : null; trailerCache.set(c.key, k); }
       const url = trailerUrl(k);
       if (url) { win.location = url; if (alive.current) setTrailer({ key: c.key, busy: false, msg: '' }); }
@@ -222,7 +244,7 @@ export default function Discover() {
                 <span className="sd-tilebtn-art">
                   <button type="button" className="sd-pick-x" onClick={() => notInterested(c)} title="Not interested" aria-label={`Not interested in ${c.name}`}>×</button>
                   <button type="button" className="sd-disc-open" onClick={() => { setOpen(c); setTrailer({ key: null, busy: false, msg: '' }); }} aria-label={`About ${c.name}`}>
-                    <img src={img(c.poster, 'w342')} alt="" loading="lazy" />
+                    <img src={artOf(c)} alt="" loading="lazy" />
                   </button>
                   <span className="sd-tilebtn-badge sd-disc-match">{c.match}% match</span>
                 </span>
@@ -242,18 +264,19 @@ export default function Discover() {
         </section>
       ))}
 
+      {hits && run && !busy && <p className="sd-sub sd-disc-foot" data-testid="disc-hits">{hits}</p>}
       {hiddenCount > 0 && run && !busy && (
-        <p className="sd-sub sd-disc-foot">
+        <p className="sd-sub sd-disc-foot" data-testid="disc-hidden">
           {hiddenCount} {hiddenCount === 1 ? 'title' : 'titles'} hidden with “Not interested”. You can bring them back in Settings.
         </p>
       )}
 
-      <Sheet open={!!open} title={open ? open.name : ''} subtitle={open ? [open.year, open.kind === 'tv' ? 'Show' : 'Movie'].filter(Boolean).join(' · ') : ''} onClose={() => setOpen(null)}>
+      <Sheet open={!!open} title={open ? open.name : ''} subtitle={open ? [open.year, open.kind === 'movie' ? 'Movie' : open.kind === 'anime' ? 'Anime · from AniList' : 'Show'].filter(Boolean).join(' · ') : ''} onClose={() => setOpen(null)}>
         {open && (
           <div className="sd-disc-detail">
             <div className="sd-mdet-facts">
               <span>{open.match}% match</span>
-              {open.vote > 0 && <span>TMDB {open.vote.toFixed(1)}</span>}
+              {open.vote > 0 && <span>{open.kind === 'anime' ? 'AniList' : 'TMDB'} {open.vote.toFixed(1)}</span>}
               {open.g.length > 0 && <span>{open.g.slice(0, 3).map(genreLabel).join(' · ')}</span>}
             </div>
             <p className="sd-pick-why" style={{ whiteSpace: 'normal' }}>{open.why}</p>

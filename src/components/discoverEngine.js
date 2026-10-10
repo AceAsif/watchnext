@@ -5,6 +5,7 @@
 import {
   libraryEntries, needFeatures, featuresFromDetails, buildProfile, pickSeeds, topPerson, topKeyword,
   topGenres, genreIdsFor, candidateFrom, mergeCandidates, buildRows, titleKey, MAX_SEEDS,
+  pickAnimeSeed, ownedAnimeKeys, animeCandidate, timeContext,
 } from './tasteLogic.js';
 import { hiddenList } from './hiddenLogic.js';
 import { myProviderIds } from './movieNightLogic.js';
@@ -40,7 +41,13 @@ const results = (d) => (d && Array.isArray(d.results) ? d.results : []);
 // state: the app state. hidden: the Not interested map. cache: { items } feature cache (updated
 // in place; the caller saves it). mine: ids of the services you ticked. onProgress({ phase, done, total }).
 // -> { rows, profile, seeds, stats: { learned, failed, calls } }
-export async function runDiscover({ state, hidden, cache, api, mine = [], now = new Date(), onProgress = () => {}, gap = GAP_MS }) {
+// Your taste profile from what this device already knows (no network): for Tonight, Movie night
+// and the Stats card. cache: the device's feature cache (loadCache).
+export function localProfile(state, hidden, cache, now = new Date()) {
+  return buildProfile(libraryEntries(state, hiddenList(hidden), now), cache);
+}
+
+export async function runDiscover({ state, hidden, cache, api, mine = [], now = new Date(), onProgress = () => {}, gap = GAP_MS, ctx = timeContext(now) }) {
   const stats = { learned: 0, failed: 0, calls: 0 };
   const call = async (fn) => { stats.calls++; return fn(); };
   const hid = hiddenList(hidden);
@@ -113,6 +120,14 @@ export async function runDiscover({ state, hidden, cache, api, mine = [], now = 
       }));
     });
   }
+  const animeSeed = api.animeRecs ? pickAnimeSeed(entries) : null;
+  if (animeSeed) {
+    jobs.push(async () => {
+      const via = { type: 'seed', key: `anime:${animeSeed.anilistId}`, name: animeSeed.name, w: animeSeed.w * animeSeed.d };
+      const list = await call(() => api.animeRecs(animeSeed.anilistId));
+      lists.push((Array.isArray(list) ? list : []).map((m) => animeCandidate(m, via)));
+    });
+  }
   jobs.push(async () => {
     const r = results(await call(() => api.trending()));
     lists.push(r.map((x) => candidateFrom(x, x.media_type, { type: 'trending' })));
@@ -120,10 +135,11 @@ export async function runDiscover({ state, hidden, cache, api, mine = [], now = 
   await mapLimit(jobs, CONCURRENCY, (job) => job(), gap);
 
   const exclude = ownedKeys(state);
+  for (const k of ownedAnimeKeys(state)) exclude.add(k);
   for (const h of hid) exclude.add(h.key);
   const pool = mergeCandidates(lists, exclude);
 
   // 4) rank into rows
-  const rows = buildRows({ pool, prof, seeds, person, keyword, servicesOn, now });
+  const rows = buildRows({ pool, prof, seeds, person, keyword, servicesOn, now, ctx, animeSeed });
   return { rows, profile: prof, seeds, stats };
 }

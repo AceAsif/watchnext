@@ -9,6 +9,7 @@ import GoalsCard from '../components/GoalsCard.jsx';
 import { cardGoals } from '../components/goalsLogic.js';
 import { platformById } from '../components/PlatformPicker.jsx';
 import Heatmap from '../components/Heatmap.jsx';
+import YourTaste from '../components/YourTaste.jsx';
 import { StatTile, TabBar, YearSelect, BarList, Section, Note } from '../components/StatsUI.jsx';
 import {
   BATCH_MIN,
@@ -509,6 +510,7 @@ export default function Stats({ onOpenNotes }) {
         </Section>
       </div>
       <div className="sd-stack">
+        <YourTaste state={state} />
         {(base.platformRows.length > 0 || base.untaggedTitles > 0) && (
           <Section title="Where you watch">
             {base.platformRows.length > 0 ? (

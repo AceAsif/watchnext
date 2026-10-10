@@ -21,13 +21,13 @@ t('sanitize: only tv:/movie: keys with numeric ids; junk fields cleaned; prototy
   const raw = JSON.parse('{"tv:1":{"on":true,"at":"' + T1 + '","name":"A","poster":"/a.jpg","year":2020,"g":["drama","nope"]},"movie:2":{"on":"yes","at":"bad","poster":"http://evil","year":"2020"},"tv:x":{"on":true},"person:3":{"on":true},"__proto__":{"on":true},"tv:4":null}');
   const h = H.sanitizeHidden(raw);
   assert.deepEqual(Object.keys(h), ['tv:1', 'movie:2']);
-  assert.deepEqual(h['tv:1'], { on: true, at: T1, name: 'A', kind: 'tv', id: 1, poster: '/a.jpg', year: 2020, g: ['drama'] });
-  assert.deepEqual(h['movie:2'], { on: false, at: '', name: '', kind: 'movie', id: 2, poster: null, year: null, g: [] });
+  assert.deepEqual(h['tv:1'], { on: true, at: T1, name: 'A', kind: 'tv', id: 1, poster: '/a.jpg', image: null, year: 2020, g: ['drama'] });
+  assert.deepEqual(h['movie:2'], { on: false, at: '', name: '', kind: 'movie', id: 2, poster: null, image: null, year: null, g: [] });
   for (const bad of [null, undefined, 5, 'x', []]) assert.deepEqual(H.sanitizeHidden(bad), {});
 });
 t('setHidden hides, then "show again" keeps the entry with on:false and a newer time (so the undo syncs)', () => {
   const a = H.setHidden({}, ITEM, true, T1);
-  assert.deepEqual(a['tv:1399'], { on: true, at: T1, name: 'Game of Thrones', kind: 'tv', id: 1399, poster: '/got.jpg', year: 2011, g: ['drama', 'scifi'] });
+  assert.deepEqual(a['tv:1399'], { on: true, at: T1, name: 'Game of Thrones', kind: 'tv', id: 1399, poster: '/got.jpg', image: null, year: 2011, g: ['drama', 'scifi'] });
   const b = H.setHidden(a, { kind: 'tv', id: 1399 }, false, T2);
   assert.equal(b['tv:1399'].on, false); assert.equal(b['tv:1399'].at, T2); assert.equal(b['tv:1399'].name, 'Game of Thrones', 'name kept for the list');
   assert.equal(a['tv:1399'].on, true, 'input untouched');
@@ -41,6 +41,12 @@ t('merge: per title the newer change wins (ties keep this device); titles on one
   assert.equal(m['tv:1'].on, false, 'undo on the other device is newer'); assert.equal(m['tv:2'].on, false, 'tie -> local');
   assert.ok(m['movie:3'].on && m['movie:4'].on);
   assert.ok(H.sameHidden(m, H.mergeHidden(m, m)));
+});
+t('anime picks (AniList ids) can be hidden too, keeping their AniList cover; other image hosts are dropped', () => {
+  const a = H.setHidden({}, { kind: 'anime', id: 21, name: 'One Piece', image: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21.jpg', g: ['animation'] }, true, T1);
+  assert.equal(a['anime:21'].image, 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21.jpg'); assert.equal(a['anime:21'].kind, 'anime');
+  assert.equal(H.sanitizeHidden({ 'anime:22': { on: true, image: 'https://evil.example/x.jpg' } })['anime:22'].image, null);
+  assert.equal(H.sanitizeHidden({ 'anime:x': { on: true } })['anime:x'], undefined);
 });
 t('hiddenList: only hidden ones, newest first; hiddenKeySet for filtering', () => {
   const h = { 'tv:1': { on: true, at: T1, name: 'Old' }, 'tv:2': { on: true, at: T2, name: 'New' }, 'tv:3': { on: false, at: T9, name: 'Shown again' } };

@@ -8,7 +8,7 @@ They are **not** part of the deploy: GitHub Actions only runs `npm run build`.
 
 | Folder | What it is |
 |---|---|
-| `tests/unit/*.test.mjs` | 30 plain-Node unit suites (~574 tests). They import `src/...` directly. |
+| `tests/unit/*.test.mjs` | 31 plain-Node unit suites (~593 tests). They import `src/...` directly. |
 | `tests/paths.mjs`, `tests/run-unit.mjs` | shared path helpers; runs every unit suite |
 | `shot/browser/*.mjs`, `fakecloud.js`, `fonts.css`, `launch.mjs` | 18 runnable headless-Chrome suites (puppeteer) + helpers |
 | `shot/build-test-dists.mjs`, `shot/run-browser.mjs`, `shot/package.json` | builds the app for the tests, runs the browser suites, browser-test dependency |
@@ -18,7 +18,7 @@ They are **not** part of the deploy: GitHub Actions only runs `npm run build`.
 ## Run the unit tests (nothing extra to install)
 ```
 npm install              # once, in the repo root
-npm run test:unit        # all 30 suites
+npm run test:unit        # all 31 suites
 node tests/run-unit.mjs goals wipe      # only suites whose name contains these words
 node tests/unit/goals.test.mjs          # one suite directly
 ```
@@ -44,12 +44,12 @@ node shot/browser/goals.mjs        # one suite directly (build first)
 Unit: library 19 · settings 11 · upnext 24 · stats 25 · backup 14 · notes 16 · logic 44 · anime 34 ·
 settings_render 14 · yearimage 29 · dropped_csv 28 · wipe 29 · resume_db 10 · rewatch 14 · notes_search 19 ·
 month_recap 14 · finish_card 21 · watchdates 22 · backup_nudge 14 · services 16 · providers_db 7 ·
-tonight 23 · movie_genres_db 6 · movie_night 24 · goals 22 · goals_db 14 · wipe_tomb_db 11 · taste 32 ·
-hidden 12 · cloud_hidden 6 (runs the real cloudEngine.js on the in-memory Firestore in `tests/unit/fakes/`).
+tonight 23 · movie_genres_db 6 · movie_night 24 · goals 22 · goals_db 14 · wipe_tomb_db 11 · taste 32 · taste2 18 ·
+hidden 13 · cloud_hidden 6 (runs the real cloudEngine.js on the in-memory Firestore in `tests/unit/fakes/`).
 
 Browser: settings 47 · desktop 56 · notes 35 · restore 24 · anime 35 · yearimage 25 · dropped_csv 27 ·
-rewatch 8 · recaps 20 · watchdates 21 · notes_search 22 · backup_nudge 21 · services 34 · tonight 27 ·
-movie_night 41 · goals 25 · wipe_resume 33 · discover 25.
+rewatch 8 · recaps 20 · watchdates 21 · notes_search 22 · backup_nudge 21 · services 34 · tonight 28 ·
+movie_night 41 · goals 25 · wipe_resume 33 · discover 34.
 
 ## Suites that cannot run on their own
 - `library.mjs` compares the Library tab against an OLD build kept in `.harness-work/wl-base-dist`

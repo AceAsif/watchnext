@@ -12,6 +12,8 @@ import { statusLine } from './servicesLogic.js';
 import { ServicesToggle, ServicesStatus } from './ServicesUI.jsx';
 import { useServicesPrefs } from '../store/servicesPrefs.js';
 import useAvailability from './useAvailability.js';
+import useTaste from './useTaste.js';
+import { tasteLine } from './tasteLogic.js';
 
 const H = { watchedCount, lastWatchDate };
 
@@ -59,9 +61,10 @@ export default function TonightSheet({ openShow, onClose }) {
   );
   const av = useAvailability(checkItems, prefs.onlyMine);
 
+  const { prof, cache, ctx } = useTaste(state);
   const result = useMemo(
-    () => suggest(cands, { minutes: prefs.minutes, mood: prefs.mood, seed, exclude: shown, mine, onlyMine: prefs.onlyMine, today }),
-    [cands, prefs, seed, shown, mine, today]
+    () => suggest(cands, { minutes: prefs.minutes, mood: prefs.mood, seed, exclude: shown, mine, onlyMine: prefs.onlyMine, today, taste: { prof, cache }, ctx }),
+    [cands, prefs, seed, shown, mine, today, prof, cache, ctx]
   );
 
   const choose = (patch) => {
@@ -120,6 +123,8 @@ export default function TonightSheet({ openShow, onClose }) {
                   <span className="name" title={p.name}>{p.name}</span>
                   {whyLines(p, prefs.minutes).map((l) => <span key={l} className="meta sd-mono">{l}</span>)}
                   {moodNote(p, prefs.mood) ? <span className={'sd-tn-mood' + (p.moodState === 'match' ? ' ok' : '')}>{moodNote(p, prefs.mood)}</span> : null}
+                  {p.taste ? <span className="sd-tn-taste" data-testid="pick-taste">{tasteLine(p.taste)}</span> : null}
+                  {p.ctxNote ? <span className="sd-tn-ctx" data-testid="pick-ctx">{p.ctxNote}</span> : null}
                   {p.genres && p.genres.length ? <span className="meta sd-mono">{p.genres.slice(0, 3).join(' · ')}</span> : null}
                   {p.where ? <span className="meta sd-mono sd-svc-meta">{p.where}</span> : null}
                   <span className="sd-tn-acts">

@@ -62,7 +62,7 @@ const waitFor = async (fn, ms = 15000) => { const t0 = Date.now(); while (Date.n
 
 // seed: true = a fresh start (this state, no saved taste); false = the app opening again with what
 // the previous page left in localStorage.
-async function open(state, { services = ['netflix'], w = 390, h = 844, seed = true, slow = 60 } = {}) {
+async function open(state, { services = ['netflix'], w = 390, h = 844, seed = true, slow = 60, at = FIXED, anilist = null } = {}) {
   const page = await browser.newPage(); await page.emulateTimezone('Australia/Hobart'); await page.setViewport({ width: w, height: h, deviceScaleFactor: 2 });
   const log = [];
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message)); page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR|status of 500/.test(m.text())) problems.push('console.error: ' + m.text()); });
@@ -72,6 +72,11 @@ async function open(state, { services = ['netflix'], w = 390, h = 844, seed = tr
     if (u.startsWith('http://localhost:')) return r.continue();
     if (u.includes('fonts.googleapis.com')) return r.respond({ status: 200, contentType: 'text/css', body: fontsCss });
     if (u.includes('image.tmdb.org')) return r.respond({ status: 200, contentType: 'image/png', body: PNG });
+    if (u.startsWith('https://graphql.anilist.co')) { // the anime row: AniList recommendations
+      const body = JSON.parse(r.postData() || '{}'); log.push({ p: 'anilist', id: body.variables && body.variables.id });
+      if (!anilist) return r.respond({ status: 500, contentType: 'application/json', body: '{}' });
+      return r.respond({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ data: { Media: { recommendations: { nodes: anilist.map((m) => ({ rating: 50, mediaRecommendation: m })) } } } }) });
+    }
     if (!u.includes('api.themoviedb.org')) return r.abort();
     const url = new URL(u); const p = url.pathname.replace('/3/', ''); const q = Object.fromEntries(url.searchParams); delete q.api_key;
     await wait(slow);
@@ -80,7 +85,7 @@ async function open(state, { services = ['netflix'], w = 390, h = 844, seed = tr
     if ((m = /^(tv|movie)\/(\d+)$/.exec(p))) {
       const k = `${m[1]}/${m[2]}`;
       if (q.append_to_response === 'keywords,credits') { log.push({ p: 'taste', k }); return json(DET[k] || {}); }
-      log.push({ p: 'details', k }); const x = ALL[k] || {}; return json({ ...x, genres: (x.genre_ids || []).map((id) => ({ id, name: 'G' })), seasons: [], number_of_episodes: 8, status: 'Returning Series' });
+      log.push({ p: 'details', k }); const x = ALL[k] || { name: 'Show ' + m[2] }; return json({ id: +m[2], ...x, genres: (x.genre_ids || []).map((id) => ({ id, name: 'G' })), seasons: [], number_of_episodes: 8, status: 'Returning Series' });
     }
     if ((m = /^(tv|movie)\/(\d+)\/recommendations$/.exec(p))) { log.push({ p: 'rec', k: `${m[1]}/${m[2]}` }); return json({ results: RECS[`${m[1]}/${m[2]}`] || [] }); }
     if ((m = /^(tv|movie)\/(\d+)\/similar$/.exec(p))) { log.push({ p: 'similar', k: `${m[1]}/${m[2]}` }); return json({ results: [] }); }
@@ -89,6 +94,7 @@ async function open(state, { services = ['netflix'], w = 390, h = 844, seed = tr
     if ((m = /^discover\/(tv|movie)$/.exec(p))) { log.push({ p: 'discover', kind: m[1], q }); return json({ results: q.with_keywords ? KW[m[1]] : q.with_watch_providers ? SVC[m[1]] : [] }); }
     if (p === 'watch/providers/movie') { log.push({ p: 'providers' }); return json({ results: [{ provider_id: 8, provider_name: 'Netflix' }, { provider_id: 21, provider_name: 'Stan' }] }); }
     if (p === 'trending/all/week') { log.push({ p: 'trending' }); return json({ results: TREND }); }
+    if (p === 'search/tv') { log.push({ p: 'search', q: q.query }); return json({ results: [{ id: 5100, name: q.query, original_language: 'ja', poster_path: '/a.jpg' }, { id: 5101, name: q.query + ' (US remake)', original_language: 'en' }] }); }
     return json({ results: [] });
   });
   await page.evaluateOnNewDocument((s, svc, fixed, doSeed) => {
@@ -101,7 +107,7 @@ async function open(state, { services = ['netflix'], w = 390, h = 844, seed = tr
     const RealDate = Date; const start = RealDate.now(); const b = fixed;
     class FakeDate extends RealDate { constructor(...a) { if (a.length === 0) super(b + (RealDate.now() - start)); else super(...a); } static now() { return b + (RealDate.now() - start); } }
     window.Date = FakeDate;
-  }, state, services, FIXED, seed);
+  }, state, services, at, seed);
   await page.goto('http://localhost:4191/', { waitUntil: 'networkidle0' }); await wait(300);
   return { page, log };
 }
@@ -190,7 +196,7 @@ await ok('Undo brings it straight back and records the undo (on:false) so other 
 await clickCardBtn(p, victim.key, '.sd-pick-x'); await wait(200);
 const victim2 = (await rowsOf(p)).find((r) => r.type === 'seed').items[0];
 await clickCardBtn(p, victim2.key, '.sd-pick-x'); await wait(200);
-await ok('the footer counts hidden titles and points to Settings', async () => assert.match(await p.evaluate(() => document.querySelector('.sd-disc-foot').textContent), /^2 titles hidden with “Not interested”\. You can bring them back in Settings\.$/));
+await ok('the footer counts hidden titles and points to Settings', async () => assert.match(await p.evaluate(() => document.querySelector('[data-testid=disc-hidden]').textContent), /^2 titles hidden with “Not interested”\. You can bring them back in Settings\.$/));
 
 // ============================================================ 4. details sheet, trailer, + Watchlist
 console.log('4. details, trailer, + Watchlist');
@@ -245,6 +251,11 @@ await ok('Discover respects the list on a fresh build: hidden titles stay out, t
   const all = (await rowsOf(p)).flatMap((r) => r.items.map((c) => c.key)); assert.ok(!all.includes(victim2.key) && !all.includes(film.key)); assert.ok(all.includes(victim.key));
   assert.ok(!all.includes(sev.key), 'the show you added is on your watchlist now, so it is not suggested');
 });
+await ok('hit rate: the footer counts what Discover has suggested and that you added one of them', async () => {
+  const t = await p.evaluate(() => document.querySelector('[data-testid=disc-hits]').textContent);
+  const shown = Object.keys(await p.evaluate(() => JSON.parse(localStorage.getItem('watchnext-discover-log-v1')))).length;
+  assert.ok(shown > 30, String(shown)); assert.equal(t, `Discover has suggested ${shown} titles: you added 1 (${Math.round(100 / shown) < 1 ? '<1' : Math.round(100 / shown)}%) and watched 0.`);
+});
 await p.close();
 
 // ============================================================ 6. edge cases
@@ -258,6 +269,75 @@ await ok('empty library: Movie night is still there, plus a hint, and nothing is
 ({ page: p, log } = await open(LIB(), { services: [] })); await toDiscover(p); await done(p);
 await ok('no services ticked: no "On your services" row and no provider lookups', async () => {
   assert.ok(!(await rowsOf(p)).some((r) => r.type === 'services')); assert.equal(log.filter((l) => l.p === 'providers').length, 0);
+}); await p.close();
+
+// ============================================================ 6b. Phase 2: anime row, time of day, Stats card
+console.log('6b. anime row (AniList), time of day, Your taste');
+const AOT_RECS = [
+  { id: 101922, isAdult: false, title: { english: 'Demon Slayer', romaji: 'Kimetsu no Yaiba' }, seasonYear: 2019, genres: ['Action', 'Drama', 'Fantasy'], averageScore: 84, popularity: 700000, description: 'A boy <i>fights</i> demons.', coverImage: { large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx101922.jpg' }, trailer: { id: 'VQGCKyvzIM4', site: 'youtube' } },
+  { id: 113415, isAdult: false, title: { english: 'Jujutsu Kaisen', romaji: 'Jujutsu Kaisen' }, seasonYear: 2020, genres: ['Action', 'Drama', 'Supernatural'], averageScore: 85, popularity: 650000, description: 'Curses.', coverImage: { large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx113415.jpg' }, trailer: null },
+  { id: 101348, isAdult: false, title: { english: 'Vinland Saga', romaji: 'Vinland Saga' }, seasonYear: 2019, genres: ['Action', 'Adventure', 'Drama'], averageScore: 87, popularity: 400000, description: 'Vikings.', coverImage: { large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx101348.jpg' }, trailer: null },
+  { id: 21507, isAdult: false, title: { english: 'Mob Psycho 100', romaji: 'Mob Psycho 100' }, seasonYear: 2016, genres: ['Action', 'Comedy'], averageScore: 85, popularity: 380000, description: 'Psychic.', coverImage: { large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21507.jpg' }, trailer: null },
+  { id: 16498, isAdult: false, title: { english: 'Attack on Titan', romaji: 'Shingeki no Kyojin' }, seasonYear: 2013, genres: ['Action'], averageScore: 85, popularity: 900000, description: 'Owned.', coverImage: { large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498.jpg' }, trailer: null },
+];
+const ANIME_LIB = () => { const s = LIB(); s.shows['tmdb:104'] = { tmdbId: 104, name: 'Attack on Titan', rating: 5, ratedAt: ago(5), status: 'Ended', totalEpisodes: 87, genres: ['Animation', 'Action & Adventure'], watched: eps(87, ago(5)), followed: true, anime: { id: 16498 } }; return s; };
+// Sat 3 Oct, 20:00 in Hobart: the weekend
+({ page: p, log } = await open(ANIME_LIB(), { anilist: AOT_RECS, at: Date.parse('2026-10-03T10:00:00.000Z') })); await toDiscover(p); await done(p);
+const animeRow = (await rowsOf(p)).find((r) => r.type === 'anime');
+await p.screenshot({ path: `${OUT}/anime_row_phone.png`, fullPage: true });
+await ok('an "Anime like Attack on Titan" row from AniList (one request, for your liked anime), with AniList covers, never the anime you have', async () => {
+  assert.ok(animeRow, (await rowsOf(p)).map((r) => r.title).join(' | ')); assert.equal(animeRow.title, 'Anime like Attack on Titan');
+  assert.deepEqual(animeRow.items.map((c) => c.name).sort(), ['Demon Slayer', 'Jujutsu Kaisen', 'Mob Psycho 100', 'Vinland Saga']);
+  assert.deepEqual(log.filter((l) => l.p === 'anilist').map((l) => l.id), [16498]);
+  const srcs = await p.evaluate(() => [...document.querySelectorAll('.sd-disc-row[data-row=anime] img')].map((i) => i.getAttribute('src')));
+  assert.ok(srcs.every((u) => u.startsWith('https://s4.anilist.co/')), srcs.join(','));
+});
+await ok('weekend evening: Top picks says it leans to films', async () => {
+  assert.equal(await p.evaluate(() => document.querySelector('.sd-disc-row[data-row=top] .sd-sub').textContent), 'Ranked on everything you watch · leaning to films for the weekend');
+});
+await clickCardBtn(p, 'anime:101922', '.sd-disc-open'); await wait(300);
+await ok('an anime card opens with "Anime · from AniList", its AniList score and description (no HTML), and ▶ Trailer goes to its YouTube trailer', async () => {
+  const t = await p.evaluate(() => document.querySelector('[role=dialog]').innerText);
+  assert.match(t, /2019 · Anime · from AniList/); assert.match(t, /AniList 8\.4/); assert.match(t, /A boy fights demons\./);
+  await p.evaluate(() => document.querySelector('[data-testid=disc-trailer]').click()); await wait(300);
+  assert.equal(await p.evaluate(() => window.__opened[0].location), 'https://www.youtube.com/watch?v=VQGCKyvzIM4');
+});
+await p.evaluate(() => [...document.querySelectorAll('[role=dialog] button')].find((b) => b.textContent === '+ Watchlist').click());
+await waitFor(() => p.evaluate(() => [...document.querySelectorAll('[role=dialog] button')].some((b) => b.textContent === 'Added ✓')));
+await ok('+ Watchlist on an anime finds it on TMDB by title (the Japanese match, not the remake) and adds that show', async () => {
+  assert.deepEqual(log.filter((l) => l.p === 'search').map((l) => l.q), ['Demon Slayer']);
+  const show = Object.values((await stored(p)).shows).find((x) => x.tmdbId === 5100); assert.ok(show && show.watchlist);
+});
+await p.keyboard.press('Escape'); await wait(200);
+await clickCardBtn(p, 'anime:113415', '.sd-pick-x'); await wait(200);
+await ok('"Not interested" works on anime too (saved with its AniList cover)', async () => {
+  const h = (await stored(p)).hidden['anime:113415']; assert.equal(h.on, true); assert.equal(h.image, 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx113415.jpg');
+});
+// Stats → Breakdown → Your taste
+await p.evaluate(() => [...document.querySelectorAll('nav.tabbar button')].find((x) => x.textContent.includes('Stats')).click()); await wait(400);
+await p.evaluate(() => [...document.querySelectorAll('[role=tab]')].find((x) => x.textContent === 'Breakdown').click()); await wait(400);
+await p.evaluate(() => document.querySelector('[data-testid=your-taste]').scrollIntoView()); await wait(200);
+await p.screenshot({ path: `${OUT}/your_taste_phone.png` });
+await ok('Stats → Breakdown → Your taste: top genres as shares, the shared theme, the creator, what you steer away from, and the hit rate', async () => {
+  const t = await p.evaluate(() => document.querySelector('[data-testid=your-taste]').innerText.replace(/\s+/g, ' '));
+  const bars = await p.evaluate(() => [...document.querySelectorAll('[data-testid=your-taste] [data-bar]')].map((b) => [b.dataset.bar, +b.querySelector('.sd-bar-val').textContent.replace('%', '')]));
+  assert.equal(bars[0][0], 'Mystery', JSON.stringify(bars)); assert.ok(bars.reduce((n, b) => n + b[1], 0) <= 101);
+  // (labels are upper-cased on screen, so the label part is matched case-insensitively)
+  assert.match(t, /Themes time travel/i); assert.match(t, /People Baran bo Odar \(creator\/director\)/i); assert.match(t, /Steering away from Reality/i);
+  assert.match(t, /Languages German \d+% · English \d+%/i, 'Dark (German, 5★, recent) leads');
+  assert.match(await p.evaluate(() => document.querySelector('[data-testid=taste-hits]').textContent), /you added 1 \(/);
+  assert.match(t, /Discover, Tonight and Movie night all use it\./);
+});
+await p.close();
+// a library with nothing to learn from yet: one imported show, no genres, no rating
+({ page: p } = await open({ shows: { 'tvdb:1': { name: 'Imported', followed: true, totalEpisodes: 10, watched: eps(2, ago(400)) } }, movies: [], settings: { tmdbKey: 'TESTKEY' } }));
+await p.evaluate(() => [...document.querySelectorAll('nav.tabbar button')].find((x) => x.textContent.includes('Stats')).click()); await wait(300);
+await p.evaluate(() => [...document.querySelectorAll('[role=tab]')].find((x) => x.textContent === 'Breakdown').click()); await wait(300);
+await ok('Your taste with nothing to learn from yet: a friendly hint, no errors', async () => assert.match(await p.evaluate(() => document.body.innerText), /what WatchNext learns about your taste will show here/));
+await p.close();
+({ page: p, log } = await open(ANIME_LIB(), { anilist: null })); await toDiscover(p); await done(p);
+await ok('AniList down: no anime row, the rest of Discover is unaffected', async () => {
+  assert.equal(log.filter((l) => l.p === 'anilist').length, 1); const types = (await rowsOf(p)).map((r) => r.type); assert.ok(!types.includes('anime')); assert.ok(types.includes('seed') && types.includes('top'));
 }); await p.close();
 
 // ============================================================ 7. desktop

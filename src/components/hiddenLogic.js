@@ -2,14 +2,15 @@
 //
 //   hidden = { 'tv:1399': { on: true, at: '<ISO>', name, kind, id, poster, year, g: ['drama'] }, … }
 //
-// Keys are 'tv:<tmdb id>' or 'movie:<tmdb id>'. It syncs between devices like yearly goals: per
-// title the most recently changed copy wins. Undoing ("Show again") keeps the entry with
+// Keys are 'tv:<tmdb id>', 'movie:<tmdb id>' or 'anime:<AniList id>' (Discover's anime row; those
+// carry an AniList cover `image` instead of a TMDB `poster`). It syncs between devices like yearly
+// goals: per title the most recently changed copy wins. Undoing ("Show again") keeps the entry with
 // on:false and a fresh time, so the undo syncs too instead of being brought back by another
 // device's older copy.
 
 import { GENRE_LABEL } from './tasteLogic.js';
 
-const KEY = /^(tv|movie):\d{1,9}$/;
+const KEY = /^(tv|movie|anime):\d{1,9}$/;
 const isoOk = (s) => typeof s === 'string' && s !== '' && Number.isFinite(Date.parse(s));
 const str = (v, max = 200) => (typeof v === 'string' ? v.slice(0, max) : '');
 
@@ -26,6 +27,7 @@ export function sanitizeHidden(raw) {
       kind,
       id: Number(id),
       poster: typeof e.poster === 'string' && e.poster.startsWith('/') ? e.poster.slice(0, 100) : null,
+      image: typeof e.image === 'string' && /^https:\/\/s\d*\.anilist\.co\//.test(e.image) ? e.image.slice(0, 300) : null,
       year: Number.isInteger(e.year) ? e.year : null,
       g: Array.isArray(e.g) ? e.g.filter((x) => GENRE_LABEL[x]).slice(0, 6) : [],
     };
@@ -50,12 +52,12 @@ export const sameHidden = (a, b) => JSON.stringify(sanitizeHidden(a)) === JSON.s
 // Returns NEW hidden (the input is not modified).
 export function setHidden(hidden, item, on, nowIso) {
   const cur = sanitizeHidden(hidden);
-  if (!item || (item.kind !== 'tv' && item.kind !== 'movie') || !Number.isInteger(Number(item.id))) return cur;
+  if (!item || !['tv', 'movie', 'anime'].includes(item.kind) || !Number.isInteger(Number(item.id))) return cur;
   const key = `${item.kind}:${Number(item.id)}`;
   const prev = cur[key] || {};
   return sanitizeHidden({
     ...cur,
-    [key]: { on: !!on, at: nowIso, name: item.name || prev.name, poster: item.poster || prev.poster, year: item.year ?? prev.year, g: item.g || prev.g },
+    [key]: { on: !!on, at: nowIso, name: item.name || prev.name, poster: item.poster || prev.poster, image: item.image || prev.image, year: item.year ?? prev.year, g: item.g || prev.g },
   });
 }
 

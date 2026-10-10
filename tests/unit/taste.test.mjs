@@ -1,5 +1,6 @@
 // Discover's taste engine: engagement weights, features, profile, scoring, rows and the
 // whole pipeline against a fake TMDB.   node tests/unit/taste.test.mjs
+process.env.TZ = 'Australia/Hobart'; // NOW below is 08:00 Fri 2 Oct in Hobart: "daytime", no time-of-day nudge
 import assert from 'node:assert/strict';
 import * as T from '../../src/components/tasteLogic.js';
 import { runDiscover, ownedKeys, mapLimit } from '../../src/components/discoverEngine.js';

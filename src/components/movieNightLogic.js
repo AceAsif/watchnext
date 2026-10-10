@@ -12,6 +12,8 @@
 import { MOODS, moodById, moodState, formatMinutes, PICKS } from './tonightLogic.js';
 import { providerToPlatform } from './platformsData.js';
 import { isOnMyServices, servicesLabel } from './servicesLogic.js';
+import { titleTaste, profileIsEmpty } from './tasteLogic.js';
+import { tasteWeight } from './tonightLogic.js';
 
 export { MOODS, moodById, formatMinutes, PICKS };
 
@@ -137,7 +139,8 @@ function jitter(seed, key) {
   return (x % 700) / 100;
 }
 
-// opts: { minutes, mood, seed, exclude:Set<key>, hidden:Set<key>, mine:Set<platformId>|null, onlyMine }
+// opts: { minutes, mood, seed, exclude:Set<key>, hidden:Set<key>, mine:Set<platformId>|null, onlyMine,
+//         taste: { prof, cache } (your taste profile across shows AND movies; optional) }
 // -> { picks, fitting, matching, wrapped }
 export function suggestMovies(cands, opts = {}) {
   const minutes = MOVIE_TIME_CHOICES.includes(opts.minutes) ? opts.minutes : DEFAULT_MOVIE_MINUTES;
@@ -154,9 +157,15 @@ export function suggestMovies(cands, opts = {}) {
     const ms = moodState(c, mood);
     let score = 30 * (c.runtime / minutes) + Math.min(c.seedScore, 20) * SEED_WEIGHT + c.voteAvg * 2 + (c.popular ? 6 : 0) + (on ? 6 : 0);
     score += ms === 'match' ? 40 : ms === 'unknown' ? 8 : 0;
+    let taste = null;
+    if (opts.taste && !profileIsEmpty(opts.taste.prof)) {
+      const d = c.details && typeof c.details === 'object' ? c.details : {};
+      taste = titleTaste(opts.taste.prof, opts.taste.cache, { kind: 'movie', tmdbId: c.tmdbId, genres: c.genres, year: c.year, lang: d.original_language });
+      score += tasteWeight(opts.taste.prof) * taste.taste;
+    }
     score += jitter(opts.seed || 0, String(c.key));
     const where = availOn && c.avail ? servicesLabel(c.avail, mine) : c.onMine ? (c.via === 'free' ? 'Free to watch' : 'On your services') : '';
-    rows.push({ ...c, spare: minutes - c.runtime, moodState: ms, where, score });
+    rows.push({ ...c, spare: minutes - c.runtime, moodState: ms, where, score, taste });
   }
   const rank = (r) => (r.moodState === 'no' ? 2 : r.moodState === 'unknown' ? 1 : 0);
   rows.sort((a, b) => rank(a) - rank(b) || b.score - a.score || String(a.key).localeCompare(String(b.key)));

@@ -123,6 +123,21 @@ export async function searchAnime(query) {
   return items.map((m) => normalizeMedia(m)).filter(Boolean);
 }
 
+// Discover's anime row: AniList users' recommendations for one anime, best-rated first.
+// Returns the raw `mediaRecommendation` objects (tasteLogic.animeCandidate turns them into cards).
+const RECS = `query ($id: Int) {
+  Media(id: $id, type: ANIME) {
+    recommendations(sort: RATING_DESC, perPage: 15) {
+      nodes { rating mediaRecommendation { id isAdult title { romaji english } format seasonYear genres averageScore popularity description(asHtml: false) coverImage { large } trailer { id site } } }
+    }
+  }
+}`;
+export async function animeRecommendations(id) {
+  const data = await post(RECS, { id });
+  const nodes = (data.Media && data.Media.recommendations && data.Media.recommendations.nodes) || [];
+  return nodes.filter((n) => n && n.mediaRecommendation && (n.rating == null || n.rating > 0)).map((n) => n.mediaRecommendation);
+}
+
 // Re-fetch one entry by its AniList id (the "Refresh" button).
 export async function fetchAnime(id) {
   const data = await post(BY_ID, { id });

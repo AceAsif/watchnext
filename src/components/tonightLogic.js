@@ -13,6 +13,27 @@ import { buildUpNext, daysBetween, codeOf } from './upnextLogic.js';
 import { nextToMark } from './showLogic.js';
 import { isEpKey, cleanNote } from '../store/notes.js';
 import { isOnMyServices, servicesLabel } from './servicesLogic.js';
+import { titleTaste, profileIsEmpty } from './tasteLogic.js';
+
+export const TASTE_WEIGHT = 20; // taste match is -1..1, so this moves a pick by up to ±20 points
+export const TASTE_FULL_AT = 10; // titles in your profile before taste counts in full
+// How much your taste counts: in full once it is built from TASTE_FULL_AT titles or more, less
+// before that (two rated dramas shouldn't outvote "recommended by both your favourites").
+export function tasteWeight(prof) {
+  const n = prof && Number.isFinite(prof.titles) ? prof.titles : TASTE_FULL_AT;
+  return TASTE_WEIGHT * Math.min(1, Math.max(0, n) / TASTE_FULL_AT);
+}
+export const CONTEXT_POINTS = 6;
+// The time-of-day nudge for one candidate (ctx from tasteLogic.timeContext): a film at the weekend,
+// a short episode (35 min or less) on a weeknight or late. -> note text or ''.
+export function contextNote(ctx, c) {
+  if (!ctx || !c) return '';
+  if (ctx.slot === 'weekend' && c.kind === 'movie') return 'A film for the weekend';
+  if ((ctx.slot === 'weeknight' || ctx.slot === 'late') && c.kind !== 'movie' && c.runtime && c.runtime.min <= 35) {
+    return ctx.slot === 'late' ? 'Short episodes for a late night' : 'Short episodes for a weeknight';
+  }
+  return '';
+}
 
 export const TIME_CHOICES = [20, 30, 45, 60, 90, 120, 180];
 export const DEFAULT_MINUTES = 45;
@@ -142,7 +163,8 @@ function recency(c, today) {
   return d == null ? 0 : d <= 3 ? 10 : d <= 7 ? 7 : d <= 14 ? 4 : 0;
 }
 
-// opts: { minutes, mood, seed, exclude:Set<key>, mine:Set<platformId>|null, onlyMine, today }
+// opts: { minutes, mood, seed, exclude:Set<key>, mine:Set<platformId>|null, onlyMine, today,
+//         taste: { prof, cache } (your taste profile; optional), ctx: timeContext() (optional) }
 // -> { picks: [...], fitting, matching, wrapped }   (picks carry fit, moodState, score)
 export function suggest(cands, opts = {}) {
   const minutes = TIME_CHOICES.includes(opts.minutes) ? opts.minutes : DEFAULT_MINUTES;
@@ -160,8 +182,15 @@ export function suggest(cands, opts = {}) {
     if (mood === 'funny' && c.funny) score += 8;
     if (c.love) score += 6;
     if (where) score += 6;
+    let taste = null;
+    if (opts.taste && !profileIsEmpty(opts.taste.prof)) {
+      taste = titleTaste(opts.taste.prof, opts.taste.cache, { kind: c.kind === 'movie' ? 'movie' : 'tv', tmdbId: c.tmdbId, genres: c.genres, year: c.year });
+      score += tasteWeight(opts.taste.prof) * taste.taste;
+    }
+    const ctxNote = contextNote(opts.ctx, c);
+    if (ctxNote) score += CONTEXT_POINTS;
     score += jitter(opts.seed || 0, c.key);
-    rows.push({ ...c, fit, moodState: ms, where, score });
+    rows.push({ ...c, fit, moodState: ms, where, score, taste, ctxNote });
   }
   const rank = (r) => (r.moodState === 'no' ? 2 : r.moodState === 'unknown' ? 1 : 0); // matches first, then "we don't know", then non-matches
   rows.sort((a, b) => rank(a) - rank(b) || b.score - a.score || a.key.localeCompare(b.key));

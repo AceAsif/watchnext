@@ -187,8 +187,9 @@ export function ImportCard({ command, copied, onCopy, onChoose, fileRef, onFile 
 // ---------------------------------------------------------------- Clean up
 export function ShowThumb({ show, w = 40, h = 60 }) {
   const [c1, c2] = posterTint(show.name);
-  return show.poster ? (
-    <img className="sd-orph-poster" src={img(show.poster, 'w92')} alt="" loading="lazy" style={{ width: w, height: h }} />
+  const src = show.image || (show.poster ? img(show.poster, 'w92') : null); // image: an AniList cover (Hidden from Discover)
+  return src ? (
+    <img className="sd-orph-poster" src={src} alt="" loading="lazy" style={{ width: w, height: h }} />
   ) : (
     <span className="sd-orph-poster ph" aria-hidden="true" style={{ width: w, height: h, background: `linear-gradient(160deg, ${c1}, ${c2})` }}>
       {initialOf(show.name)}
@@ -235,7 +236,7 @@ export function HiddenCard({ rows, onShowAgain }) {
             <ShowThumb show={e} />
             <div className="who">
               <div className="nm" title={e.name}>{e.name || 'Untitled'}</div>
-              <div className="mt">{[e.year, e.kind === 'tv' ? 'Show' : 'Movie'].filter(Boolean).join(' · ')}</div>
+              <div className="mt">{[e.year, e.kind === 'movie' ? 'Movie' : e.kind === 'anime' ? 'Anime' : 'Show'].filter(Boolean).join(' · ')}</div>
             </div>
             <button type="button" className="sd-setbtn" aria-label={`Show ${e.name} again`} onClick={() => onShowAgain(e)}>
               Show again

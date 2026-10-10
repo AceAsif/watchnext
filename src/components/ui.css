@@ -1001,6 +1001,13 @@
 }
 .sd-disc-foot { margin-top: 14px; }
 .sd-disc-detail { display: flex; flex-direction: column; gap: 10px; }
+/* Tonight / Movie night: how well a pick fits your taste, and the time-of-day reason */
+.sd-tn-taste { font-size: 12px; color: var(--teal); }
+.sd-tn-ctx { font-size: 12px; color: var(--sd-text-2); }
+/* Stats → Your taste */
+.sd-taste-facts { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.sd-taste-facts p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--sd-text-2); }
+.sd-taste-facts .sd-lbl { display: block; margin-bottom: 2px; }
 @media (min-width: 900px) {
   .sd-disc-card { flex-basis: 150px; width: 150px; }
 }

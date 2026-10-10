@@ -216,4 +216,13 @@ await ok('when nothing fits 45 minutes the count says so and the explanation app
 await ok('320px wide: no sideways scroll, the chips wrap, the buttons are reachable', async () => { assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false); assert.equal(await p.evaluate(() => { const d = document.querySelector('[role=dialog]'); return d.scrollWidth <= d.clientWidth + 1; }), true); }); await p.close();
 ({ page: p } = await open(STATE(), { w: 1280, h: 900 })); await openSheet(p); await p.screenshot({ path: `${OUT}/sheet_desktop.png` });
 await ok('desktop: the sheet renders without overflow', async () => assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false)); await p.close();
+// ---------------------------------------------------------------- your taste (Discover Phase 2)
+({ page: p } = await open(STATE(), { tonightPrefs: { minutes: 120, mood: 'any', onlyMine: false } })); await openSheet(p);
+await ok('each pick shows how well it fits your taste ("NN% match", plus a genre you like when there is one); no time-of-day note on a Friday morning', async () => {
+  const t = await p.evaluate(() => [...document.querySelectorAll('[data-testid=tonight-pick]')].map((c) => (c.querySelector('[data-testid=pick-taste]') || {}).textContent || ''));
+  assert.ok(t.length >= 1 && t.every((x) => /^\d{1,2}% match( · you like [A-Z][\w-]+)?$/.test(x)), t.join(' | '));
+  assert.equal(await p.evaluate(() => document.querySelectorAll('[data-testid=pick-ctx]').length), 0);
+});
+await p.close();
+
 console.log(`\n${checks} checks passed`); console.log('PROBLEMS:', problems.length ? '\n' + problems.join('\n') : 'none'); await browser.close(); server.close();
