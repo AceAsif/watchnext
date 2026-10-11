@@ -125,4 +125,40 @@ t('scale: 3,000 shows + 1,000 movies are ranked in well under a second', () => {
   const st = { shows: Object.fromEntries(Array.from({ length: 3000 }, (_, i) => ['s' + i, i % 2 ? wl('W' + i, { genres: ['Comedy'] }) : show('C' + i)])), movies: Array.from({ length: 1000 }, (_, i) => mov('M' + i, { tmdbId: i, runtimeMin: 80 + (i % 50) })) };
   const t0 = Date.now(); const r = T.suggest(T.buildCandidates(st, TODAY, h), { minutes: 120, mood: 'funny', today: TODAY }); assert.ok(Date.now() - t0 < 1500, String(Date.now() - t0)); assert.equal(r.picks.length, 3);
 });
+// ============================================ "Weekend film" mood
+t('"Weekend film" is a mood chip, sets 2 hr as its time, and is remembered like any mood', () => {
+  const m = T.moodById('film'); assert.equal(m.label, 'Weekend film'); assert.equal(m.film, true); assert.equal(T.FILM_MINUTES, 120); assert.equal(T.FILM_STRETCH, 180); assert.ok(T.TIME_CHOICES.includes(T.FILM_MINUTES) && T.TIME_CHOICES.includes(T.FILM_STRETCH));
+  assert.deepEqual(T.sanitizePrefs({ minutes: 120, mood: 'film', onlyMine: false }), { minutes: 120, mood: 'film', onlyMine: false });
+});
+t('Weekend film suggests films only (from the Watchlist), none that are longer than the time, shows never', () => {
+  const r = T.suggest(cands, { minutes: 120, mood: 'film', today: TODAY });
+  assert.deepEqual(names(r).sort(), ['No Genres Yet', 'Short Funny Film'].sort()); assert.equal(r.fitting, 2); assert.equal(r.matching, 2);
+  assert.ok(r.picks.every((p) => p.kind === 'movie' && p.moodState === 'match' && p.longerNote === ''));
+  assert.ok(!names(T.suggest(cands, { minutes: 120, mood: 'film', today: TODAY })).includes('Long Drama Film'), '150 min is over 2 hr');
+});
+t('Weekend film: when no film fits the time, a longer one (up to 3 hr) is offered and says so', () => {
+  const st = { shows: STATE.shows, movies: [mov('Only Long Film', { runtimeMin: 150 })] }; const c = T.buildCandidates(st, TODAY, h);
+  const r = T.suggest(c, { minutes: 120, mood: 'film', today: TODAY }); assert.deepEqual(r.picks.map((p) => p.name), ['Only Long Film']); assert.equal(r.picks[0].longerNote, 'Longer than 2 hr, but fine for a weekend'); assert.equal(r.picks[0].fit.fits, true);
+  const tooLong = T.buildCandidates({ shows: {}, movies: [mov('Epic', { runtimeMin: 200 })] }, TODAY, h); assert.equal(T.suggest(tooLong, { minutes: 120, mood: 'film', today: TODAY }).picks.length, 0);
+  assert.equal(T.suggest(c, { minutes: 180, mood: 'film', today: TODAY }).picks[0].longerNote, '', 'no note when it fits the chosen time');
+});
+t('Weekend film: films under 2 hr come first, and the stretch only happens when nothing fits (a longer film never jumps the queue)', () => {
+  const st = { shows: {}, movies: [mov('Two Fifteen', { runtimeMin: 135, tmdbId: 1 }), mov('Ninety', { runtimeMin: 90, tmdbId: 2 }), mov('One Ten', { runtimeMin: 110, tmdbId: 3 })] }; const c = T.buildCandidates(st, TODAY, h);
+  const r = T.suggest(c, { minutes: 120, mood: 'film', today: TODAY }); assert.deepEqual(r.picks.map((p) => p.name).sort(), ['Ninety', 'One Ten']); assert.equal(r.fitting, 2);
+  const r3 = T.suggest(c, { minutes: 180, mood: 'film', today: TODAY }); assert.equal(r3.fitting, 3);
+  assert.ok(r3.picks.findIndex((p) => p.name === 'Two Fifteen') >= 0);
+});
+t('Weekend film respects "Only on my services"; other moods still mix shows and films', () => {
+  const P = (name) => ({ providers: [{ name }], providersFree: [], providersSynced: '2026-10-01T00:00:00.000Z' });
+  const st = { shows: {}, movies: [mov('On Netflix', { runtimeMin: 100, tmdbId: 1, ...P('Netflix') }), mov('On Binge', { runtimeMin: 100, tmdbId: 2, ...P('Binge') }), mov('Unchecked', { runtimeMin: 100, tmdbId: 3 })] };
+  const c = T.buildCandidates(st, TODAY, h);
+  assert.deepEqual(names(T.suggest(c, { minutes: 120, mood: 'film', today: TODAY, onlyMine: true, mine: new Set(['netflix']) })), ['On Netflix']);
+  assert.equal(T.suggest(c, { minutes: 120, mood: 'film', today: TODAY, onlyMine: false, mine: new Set(['netflix']) }).picks.length, 3);
+  assert.ok(T.suggest(cands, { minutes: 120, mood: 'funny', today: TODAY }).picks.some((p) => p.kind !== 'movie'), 'other moods still mix shows and films');
+});
+t('Weekend film empty text names what to do (add a film or Movie night), not "try a different mood"', () => {
+  assert.match(T.emptyText(120, 'film', false), /^No film on your Watchlist to suggest\. Add a film to your Watchlist or try Movie night on the Watchlist tab for new ones\.$/); assert.match(T.emptyText(120, 'film', true), /on your services to suggest\. Add a film to your Watchlist, switch off “On my services”, or try Movie night|on your services to suggest\. Add a film to your Watchlist, switch off “On my services”, or try Movie night/);
+  assert.equal(T.moodState({ kind: 'movie' }, 'film'), 'match'); assert.equal(T.moodState({ kind: 'continue', genres: ['Drama'] }, 'film'), 'no');
+});
+
 console.log(`\n${n} tests passed`);

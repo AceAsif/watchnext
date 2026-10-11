@@ -9,12 +9,14 @@
 // your planned ones. List results carry no runtime, so the top candidates are looked up
 // (details) before they can be ranked; only movies with a known runtime that fits are shown.
 
-import { MOODS, moodById, moodState, formatMinutes, PICKS } from './tonightLogic.js';
+import { MOODS as ALL_MOODS, moodById, moodState, formatMinutes, PICKS } from './tonightLogic.js';
 import { providerToPlatform } from './platformsData.js';
 import { isOnMyServices, servicesLabel } from './servicesLogic.js';
 import { titleTaste, profileIsEmpty } from './tasteLogic.js';
 import { tasteWeight } from './tonightLogic.js';
 
+// Movie night is already films only, so Tonight's "Weekend film" mood is left out of its list.
+const MOODS = ALL_MOODS.filter((m) => !m.film);
 export { MOODS, moodById, formatMinutes, PICKS };
 
 // Movie nights are 90 minutes and up.

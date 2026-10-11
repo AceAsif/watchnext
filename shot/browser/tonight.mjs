@@ -225,4 +225,24 @@ await ok('each pick shows how well it fits your taste ("NN% match", plus a genre
 });
 await p.close();
 
+// ---------------------------------------------------------------- Weekend film
+({ page: p } = await open(STATE(), { tonightPrefs: { minutes: 45, mood: 'any', onlyMine: false } })); await openSheet(p);
+await chip(p, 'Mood', 'Weekend film'); await wait(500);
+await ok('"Weekend film" is a mood chip; picking it sets the time to 2 hr and remembers both', async () => {
+  assert.equal(await chipOn(p, 'Mood'), 'Weekend film'); assert.equal(await chipOn(p, 'Time you have'), '2 hr'); assert.deepEqual(await tn(p), { minutes: 120, mood: 'film', onlyMine: false });
+});
+await ok('it suggests films only: every card is a "Movie" with "Mark watched", none longer than 2 hr, and the count says so', async () => {
+  const pk = await picks(p); assert.ok(pk.length >= 1, 'something fits'); assert.ok(pk.every((x) => x.kind === 'Movie' && x.actions.includes('Mark watched')), JSON.stringify(pk.map((x) => [x.name, x.kind])));
+  assert.ok(pk.every((x) => !x.lines.some((l) => /Longer than/.test(l))));
+  assert.match(await countLine(p), /^\d+ things? fits? · \d+ match your mood$/);
+});
+await chip(p, 'Time you have', '3 hr'); await wait(400);
+await ok('you can still pick a longer time (the choice sticks while the mood stays on Weekend film)', async () => { assert.equal(await chipOn(p, 'Time you have'), '3 hr'); assert.equal(await chipOn(p, 'Mood'), 'Weekend film'); assert.deepEqual(await tn(p), { minutes: 180, mood: 'film', onlyMine: false }); });
+await chip(p, 'Mood', 'Surprise me'); await wait(300);
+await ok('leaving it keeps your time (no jump back) and shows shows and films again', async () => { assert.equal(await chipOn(p, 'Time you have'), '3 hr'); assert.ok((await picks(p)).some((x) => x.kind !== 'Movie')); });
+await p.close();
+({ page: p } = await open({ shows: JSON.parse(JSON.stringify(SHOWS)), movies: [], settings: { tmdbKey: 'TESTKEY' } }, { tonightPrefs: { minutes: 120, mood: 'film', onlyMine: false } })); await openSheet(p);
+await ok('no film on the Watchlist: it says what to do instead of "try a different mood"', async () => assert.match(await p.evaluate(() => document.querySelector('[data-testid=tonight-empty]').textContent), /^No film on your Watchlist to suggest\. Add a film to your Watchlist or try Movie night on the Watchlist tab for new ones\.$/));
+await p.close();
+
 console.log(`\n${checks} checks passed`); console.log('PROBLEMS:', problems.length ? '\n' + problems.join('\n') : 'none'); await browser.close(); server.close();

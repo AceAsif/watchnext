@@ -6,7 +6,7 @@ import { Sheet } from './ui.jsx';
 import { Poster } from './LibraryUI.jsx';
 import { localISODate } from './showLogic.js';
 import {
-  TIME_CHOICES, MOODS, buildCandidates, fitFor, suggest, whyLines, moodNote, emptyText, formatMinutes, loadPrefs, savePrefs, moodById,
+  FILM_MINUTES, FILM_STRETCH, TIME_CHOICES, MOODS, buildCandidates, fitFor, suggest, whyLines, moodNote, emptyText, formatMinutes, loadPrefs, savePrefs, moodById,
 } from './tonightLogic.js';
 import { statusLine } from './servicesLogic.js';
 import { ServicesToggle, ServicesStatus } from './ServicesUI.jsx';
@@ -54,7 +54,8 @@ export default function TonightSheet({ openShow, onClose }) {
   useMovieGenres(cands, prefs.mood !== 'any');
 
   // Only what fits the time needs an availability check (and only when the services switch is on).
-  const fitting = useMemo(() => cands.filter((c) => fitFor(c, prefs.minutes).fits), [cands, prefs.minutes]);
+  const checkMinutes = prefs.mood === 'film' ? Math.max(prefs.minutes, FILM_STRETCH) : prefs.minutes; // Weekend film may offer a longer film
+  const fitting = useMemo(() => cands.filter((c) => (prefs.mood !== 'film' || c.kind === 'movie') && fitFor(c, checkMinutes).fits), [cands, checkMinutes, prefs.mood]);
   const checkItems = useMemo(
     () => fitting.map((c) => ({ key: c.key, kind: c.kind === 'movie' ? 'movie' : 'tv', id: c.id, tmdbId: c.tmdbId, rec: c.rec })),
     [fitting]
@@ -69,6 +70,8 @@ export default function TonightSheet({ openShow, onClose }) {
 
   const choose = (patch) => {
     const next = { ...prefs, ...patch };
+    if (patch.mood === 'film' && prefs.mood !== 'film') next.minutes = FILM_MINUTES; // "Weekend film" starts at 2 hr
+
     setPrefs(next);
     savePrefs(localStorage, next);
     setShown(new Set()); // a new question: start the suggestions afresh
@@ -125,6 +128,7 @@ export default function TonightSheet({ openShow, onClose }) {
                   {moodNote(p, prefs.mood) ? <span className={'sd-tn-mood' + (p.moodState === 'match' ? ' ok' : '')}>{moodNote(p, prefs.mood)}</span> : null}
                   {p.taste ? <span className="sd-tn-taste" data-testid="pick-taste">{tasteLine(p.taste)}</span> : null}
                   {p.ctxNote ? <span className="sd-tn-ctx" data-testid="pick-ctx">{p.ctxNote}</span> : null}
+                  {p.longerNote ? <span className="sd-tn-ctx" data-testid="pick-longer">{p.longerNote}</span> : null}
                   {p.genres && p.genres.length ? <span className="meta sd-mono">{p.genres.slice(0, 3).join(' · ')}</span> : null}
                   {p.where ? <span className="meta sd-mono sd-svc-meta">{p.where}</span> : null}
                   <span className="sd-tn-acts">

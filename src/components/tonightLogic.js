@@ -42,8 +42,13 @@ export const DEFAULT_MOVIE_RUNTIME = 105;
 export const MAX_EPISODES = 6; // never suggest "binge 9 episodes"; cap what we say fits
 export const PICKS = 3;
 
+export const FILM_MINUTES = 120; // the time "Weekend film" starts on: most films fit
+export const FILM_STRETCH = 180; // if no film fits the time, films up to this long are offered, labelled
 export const MOODS = [
   { id: 'any', label: 'Surprise me', genres: [] },
+  // Only films from your Watchlist. Picking it sets the time to FILM_MINUTES (2 hr); a film a bit
+  // longer is still offered if nothing shorter fits (up to FILM_STRETCH).
+  { id: 'film', label: 'Weekend film', genres: [], film: true },
   { id: 'funny', label: 'Make me laugh', genres: ['Comedy', 'Animation', 'Family'] },
   { id: 'feelgood', label: 'Feel-good', genres: ['Comedy', 'Family', 'Romance', 'Music'] },
   { id: 'gripping', label: 'Edge of my seat', genres: ['Crime', 'Mystery', 'Thriller', 'Horror'] },
@@ -146,6 +151,7 @@ export function fitFor(c, minutes) {
 export function moodState(c, mood) {
   const M = moodById(mood);
   if (M.id === 'any') return null;
+  if (M.film) return c.kind === 'movie' ? 'match' : 'no';
   if (!c.genres || c.genres.length === 0) return 'unknown'; // we don't know its genres (yet)
   return c.genres.some((g) => M.genres.includes(g)) ? 'match' : 'no';
 }
@@ -169,29 +175,38 @@ function recency(c, today) {
 export function suggest(cands, opts = {}) {
   const minutes = TIME_CHOICES.includes(opts.minutes) ? opts.minutes : DEFAULT_MINUTES;
   const mood = moodById(opts.mood).id;
+  const film = moodById(mood).film === true;
   const mine = opts.mine || null;
-  const rows = [];
-  for (const c of cands) {
-    const fit = fitFor(c, minutes);
-    if (!fit.fits) continue;
-    if (opts.onlyMine && !(mine && isOnMyServices(c.rec, mine))) continue;
-    const ms = moodState(c, mood);
-    const where = mine ? servicesLabel(c.rec, mine) : '';
-    let score = 30 * (fit.used / minutes) + (c.kind === 'continue' ? 25 + recency(c, opts.today) : c.kind === 'start' ? 12 : 10);
-    score += ms === 'match' ? 40 : ms === 'unknown' ? 8 : 0;
-    if (mood === 'funny' && c.funny) score += 8;
-    if (c.love) score += 6;
-    if (where) score += 6;
-    let taste = null;
-    if (opts.taste && !profileIsEmpty(opts.taste.prof)) {
-      taste = titleTaste(opts.taste.prof, opts.taste.cache, { kind: c.kind === 'movie' ? 'movie' : 'tv', tmdbId: c.tmdbId, genres: c.genres, year: c.year });
-      score += tasteWeight(opts.taste.prof) * taste.taste;
+  const pool0 = film ? cands.filter((c) => c.kind === 'movie') : cands;
+  const build = (budget) => {
+    const out = [];
+    for (const c of pool0) {
+      const fit = fitFor(c, budget);
+      if (!fit.fits) continue;
+      if (opts.onlyMine && !(mine && isOnMyServices(c.rec, mine))) continue;
+      const ms = moodState(c, mood);
+      const where = mine ? servicesLabel(c.rec, mine) : '';
+      let score = 30 * (fit.used / budget) + (c.kind === 'continue' ? 25 + recency(c, opts.today) : c.kind === 'start' ? 12 : 10);
+      score += ms === 'match' ? 40 : ms === 'unknown' ? 8 : 0;
+      if (mood === 'funny' && c.funny) score += 8;
+      if (film && c.runtime.min <= FILM_MINUTES) score += 8; // you like a film under 2 hours, but longer is fine
+      if (c.love) score += 6;
+      if (where) score += 6;
+      let taste = null;
+      if (opts.taste && !profileIsEmpty(opts.taste.prof)) {
+        taste = titleTaste(opts.taste.prof, opts.taste.cache, { kind: c.kind === 'movie' ? 'movie' : 'tv', tmdbId: c.tmdbId, genres: c.genres, year: c.year });
+        score += tasteWeight(opts.taste.prof) * taste.taste;
+      }
+      const ctxNote = contextNote(opts.ctx, c);
+      if (ctxNote) score += CONTEXT_POINTS;
+      score += jitter(opts.seed || 0, c.key);
+      const longerNote = film && c.runtime.min > minutes ? `Longer than ${formatMinutes(minutes)}, but fine for a weekend` : '';
+      out.push({ ...c, fit, moodState: ms, where, score, taste, ctxNote, longerNote });
     }
-    const ctxNote = contextNote(opts.ctx, c);
-    if (ctxNote) score += CONTEXT_POINTS;
-    score += jitter(opts.seed || 0, c.key);
-    rows.push({ ...c, fit, moodState: ms, where, score, taste, ctxNote });
-  }
+    return out;
+  };
+  let rows = build(minutes);
+  if (film && rows.length === 0 && minutes < FILM_STRETCH) rows = build(FILM_STRETCH); // nothing short enough: offer the longer ones
   const rank = (r) => (r.moodState === 'no' ? 2 : r.moodState === 'unknown' ? 1 : 0); // matches first, then "we don't know", then non-matches
   rows.sort((a, b) => rank(a) - rank(b) || b.score - a.score || a.key.localeCompare(b.key));
 
@@ -227,6 +242,7 @@ export function moodNote(p, mood) {
 }
 export function emptyText(minutes, mood, onlyMine) {
   const M = moodById(mood);
+  if (M.film) return `No film on your Watchlist${onlyMine ? ' on your services' : ''} to suggest. Add a film to your Watchlist${onlyMine ? ', switch off “On my services”,' : ''} or try Movie night on the Watchlist tab for new ones.`;
   return `Nothing on your Up Next or Watchlist fits ${formatMinutes(minutes)}${onlyMine ? ' on your services' : ''}${M.id === 'any' ? '' : ` for “${M.label}”`}. Try more time${onlyMine ? ', switching off “On my services”,' : ''} or a different mood.`;
 }
 

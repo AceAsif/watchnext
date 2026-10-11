@@ -27,12 +27,14 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
+  setDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
 import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markGoalsDirty, markHiddenDirty, queueShowDelete, clearTombstone, isTombstoned, resetAll, wipeLibrary, addWipeTombstones, applyRemoteGoals, applyRemoteHidden } from './db.js';
 import { sanitizeGoals } from '../components/goalsLogic.js';
 import { sanitizeHidden } from '../components/hiddenLogic.js';
+import { cleanEmail } from './accountEmail.js';
 import { mergeNotes } from './notes.js';
 import { runWipe, wipeDecision, isValidWipe, readMeta, writeMeta } from './wipeLogic.js';
 import { mergeWatched } from './watchedMerge.js';
@@ -107,9 +109,26 @@ export function initCloudSyncEngine(setUser) {
   if (!hasFirebaseConfig) return () => {};
   return onAuthStateChanged(auth, (user) => {
     setUser(user);
-    if (user) startSync(user.uid);
+    if (user) { startSync(user.uid); recordAccountEmail(user.uid, user.email); }
     else stopSync();
   });
+}
+
+// Write the account's email onto its own user document (users/{uid}) so the Firebase console
+// shows whose data it is. The email only: never the name or photo. Best effort and written at
+// most once per account per page load; { merge: true } leaves any other field on the doc alone.
+let emailWritten = '';
+export async function recordAccountEmail(forUid, rawEmail) {
+  const email = cleanEmail(rawEmail);
+  if (!forUid || !email || emailWritten === `${forUid}|${email}`) return false;
+  try {
+    await setDoc(doc(db, 'users', forUid), { email }, { merge: true });
+    emailWritten = `${forUid}|${email}`;
+    return true;
+  } catch (err) {
+    console.error('Could not record the account email:', err);
+    return false;
+  }
 }
 
 export function signIn() {

@@ -5,6 +5,11 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // The user's own document (users/{uid}) holds just their email address, so the console shows
+    // whose data it is. Written by the app at sign-in.
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }

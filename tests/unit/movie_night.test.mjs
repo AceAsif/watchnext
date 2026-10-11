@@ -116,4 +116,8 @@ t('trailer link: a real 11-character YouTube key gives the watch URL; anything e
   assert.equal(M.trailerUrl('dQw4w9WgXcQ'), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'); assert.equal(M.trailerUrl('a_b-C1d2E3f'), 'https://www.youtube.com/watch?v=a_b-C1d2E3f');
   for (const bad of [undefined, null, '', 'short', 'dQw4w9WgXcQ&x=1', 'dQw4w9WgXc ', 'https://evil.example/x', 12345678901, 'dQw4w9WgXcQQ']) assert.equal(M.trailerUrl(bad), null, String(bad));
 });
+t('Movie night has no "Weekend film" mood (it is already films only), and a saved "film" mood falls back to "Surprise me"', () => {
+  assert.ok(!M.MOODS.some((m) => m.id === 'film' || m.label === 'Weekend film')); assert.equal(M.MOODS[0].id, 'any');
+  assert.equal(M.sanitizePrefs({ minutes: 120, mood: 'film', onlyMine: false }).mood, 'any');
+});
 console.log(`\n${n} tests passed`);

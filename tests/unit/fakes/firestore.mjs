@@ -18,6 +18,7 @@ globalThis.__fs = {
   docs, writes: [],
   remoteSet(path, data) { docs.set(path, clone(data)); notify(path, false, 'modified'); },
   failNextCommit: false,
+  failNextSetDoc: false,
 };
 export const doc = (db, ...parts) => ({ path: parts.join('/') });
 export const collection = (db, ...parts) => ({ path: parts.join('/'), isCollection: true });
@@ -32,6 +33,13 @@ export function onSnapshot(ref, cb) {
   listeners.push(l);
   if (!l.isCollection) cb(snapOf(ref.path));
   return () => { const i = listeners.indexOf(l); if (i >= 0) listeners.splice(i, 1); };
+}
+export async function setDoc(ref, data, opts) {
+  if (globalThis.__fs.failNextSetDoc) { globalThis.__fs.failNextSetDoc = false; throw new Error('permission-denied'); }
+  const next = opts && opts.merge ? { ...(docs.get(ref.path) || {}), ...clone(data) } : clone(data);
+  globalThis.__fs.writes.push(['setDoc', ref.path]);
+  docs.set(ref.path, next);
+  notify(ref.path, true, 'modified');
 }
 export function writeBatch() {
   const ops = [];
