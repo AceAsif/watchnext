@@ -35,14 +35,21 @@ import { lovedShows, collectNotes, LOVE_WEIGHT, FUNNY_WEIGHT } from '../componen
 const TABS = ['Overview', 'Habits', 'Rankings', 'Breakdown'];
 const plural = (n, one, many) => (n === 1 ? one : many || one + 's');
 
-// The Overview headline: "7 months 23 days" (big numbers, small units); under a month it is just days.
+// The Overview headline: "1 year 2 months 5 days" (big numbers, small units); zero parts are left out,
+// and under a month it is just days.
 function HeroSpan({ span }) {
-  const { months, days } = span;
-  const unit = (text) => <span className="sd-tile-u u-hero">{text}</span>;
+  const { years, months, days } = span;
+  const parts = [];
+  if (years > 0) parts.push([years, plural(years, 'year')]);
+  if (months > 0) parts.push([months, plural(months, 'month')]);
+  if (days > 0 || parts.length === 0) parts.push([days, plural(days, 'day')]);
   return (
     <>
-      {months > 0 && <>{months}{unit(` ${plural(months, 'month')} `)}</>}
-      {(days > 0 || months === 0) && <>{days}{unit(` ${plural(days, 'day')}`)}</>}
+      {parts.map(([n, word], i) => (
+        <React.Fragment key={word}>
+          {n}<span className="sd-tile-u u-hero">{` ${word}${i < parts.length - 1 ? ' ' : ''}`}</span>
+        </React.Fragment>
+      ))}
     </>
   );
 }

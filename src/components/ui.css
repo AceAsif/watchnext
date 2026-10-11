@@ -594,7 +594,7 @@
   letter-spacing: -0.01em;
 }
 .sd-tile--accent .sd-tile-v { color: var(--amber); }
-.v-hero { font-size: 48px; }
+.v-hero { font-size: 48px; line-height: 1.1; }
 .v-lg { font-size: 36px; }
 .v-md { font-size: 28px; }
 .sd-tile-u {
