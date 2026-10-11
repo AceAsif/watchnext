@@ -118,6 +118,10 @@ await clickText(p, 'Mark S1E8 watched', 'button.sd-check'); await wait(350);
 await ok('ticking an episode row resumes + toast', async () => { assert.strictEqual((await show(p, 'tmdb:4')).dropped, false); assert.match(await toast(p), /Resumed · Delta Drop/); });
 await clickText(p, 'Undo', '.sd-toast button'); await wait(300);
 await ok('Undo from an episode tick restores the date too', async () => { const s4 = await show(p, 'tmdb:4'); assert.equal(s4.dropped, true); assert.equal(s4.droppedAt, DROPPED_AT); });
+await ok('the rewatch button is a "+1" chip (not a reload arrow), with a 44px tap target, and the row does not overflow', async () => {
+  const r = await p.evaluate(() => { const b = document.querySelector('button[aria-label="Log another watch of S1E2"]'); const q = b.getBoundingClientRect(); return { text: b.textContent.trim(), svg: b.querySelectorAll('svg').length, w: Math.round(q.width), h: Math.round(q.height), over: document.documentElement.scrollWidth > document.documentElement.clientWidth }; });
+  assert.equal(r.text, '+1'); assert.equal(r.svg, 0); assert.ok(r.w >= 44 && r.h >= 44, JSON.stringify(r)); assert.equal(r.over, false);
+});
 await clickText(p, 'Log another watch of S1E2', 'button'); await wait(350);
 await ok('"Log another watch" (a rewatch) resumes + toast, and counts the rewatch', async () => {
   const s4 = await show(p, 'tmdb:4'); assert.strictEqual(s4.dropped, false); assert.equal(s4.watched['1x2'].n, 2); assert.match(await toast(p), /Resumed · Delta Drop/);

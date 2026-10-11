@@ -252,16 +252,12 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded })
               )}
               {on && (
                 <button
-                  className="sd-check"
-                  style={{ width: 36 }}
-                  title="Log another watch of this episode"
+                  className="sd-rewatch"
+                  title={n > 1 ? `Watched ${n} times · tap to log another watch` : 'Log another watch of this episode'}
                   aria-label={`Log another watch of ${code}`}
                   onClick={() => { resumes(true); logEpisodeRewatch(id, season.n, ep.episode_number, ep.runtime); }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)"
-                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5" />
-                  </svg>
+                  <span aria-hidden="true">+1</span>
                 </button>
               )}
               <button

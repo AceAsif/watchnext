@@ -203,6 +203,35 @@
 }
 .sd-check.next > span { border-color: var(--amber); }
 
+/* "+1": log another watch of an episode (a text chip, so it never reads as a reload button). */
+.sd-rewatch {
+  height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  flex: none;
+}
+.sd-rewatch > span {
+  min-width: 34px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 13px;
+  border: 1px solid var(--sd-line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.sd-rewatch:focus-visible > span { border-color: var(--amber); color: var(--amber); }
+
 /* Folded "E01–E12 · all watched" row: a .sd-ep laid out as a full-width button. */
 .sd-foldrow {
   width: 100%;
@@ -802,6 +831,7 @@
   .sd-btn.primary:not(:disabled):hover { filter: brightness(1.08); }
   .sd-markbtn:hover { background: var(--amber-soft); }
   .sd-check:hover > span { border-color: var(--amber); }
+  .sd-rewatch:hover > span { border-color: var(--amber); color: var(--amber); }
   .sd-seg button[aria-pressed='false']:hover { color: var(--text); }
 }
 
