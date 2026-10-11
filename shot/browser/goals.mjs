@@ -91,6 +91,11 @@ console.log('1. Goals card with no goals');
 const S0 = SEED(); const A26 = actuals(S0, 2026), A25 = actuals(S0, 2025);
 let p = await open(S0);
 await ok('sanity: the seeded year is what the test thinks it is (300 + 10 + 5 rewatched twice = 320 episodes, 3 movies)', async () => { assert.deepEqual(A26, { episodes: 300 + 10 + 5 * 2, movies: 3, hours: Math.round(((300 + 10 + 5 * 2) * 40 + 3 * 100) / 60) }); /* Big 300 + Streaky 10 + Rewatched 5 episodes x2 */ assert.deepEqual([A25.episodes, A25.movies], [120, 2]); });
+await ok('Overview headline shows total TV time as months + days (small units), with the exact days in the line below', async () => {
+  const r = await p.evaluate(() => { const t = document.querySelector('[data-stat=days]'); return { head: t.querySelector('.sd-tile-v').textContent.trim().replace(/\s+/g, ' '), small: t.querySelectorAll('.sd-tile-v .sd-tile-u').length, sub: t.querySelector('.sd-tile-sub').textContent }; });
+  assert.match(r.head, /^(\d+ months?( \d+ days?)?|\d+ days?)$/, r.head); assert.ok(r.small >= 1);
+  assert.match(r.sub, /^of TV — [\d,]+ hours \([\d.]+ days\) across \d+ shows?$/, r.sub);
+});
 await ok('Stats → Overview has a "Goals · 2026" section (above Year in review) with a "Set goals" button, an invitation, and the streak', async () => {
   const order = await p.evaluate(() => [...document.querySelectorAll('.sd-sec2')].map((s) => s.querySelector('.sd-lbl').textContent.trim().toLowerCase())); const i = order.indexOf('goals · 2026'); assert.ok(i >= 0 && order[i + 1] === 'year in review', order.join(' | '));
   const t = await p.evaluate(() => document.querySelector('.a-goals').innerText.replace(/\s+/g, ' ')); assert.match(t, /Set goals/); assert.match(t, /Set a yearly target for episodes, movies or hours and see your progress and pace here\./);

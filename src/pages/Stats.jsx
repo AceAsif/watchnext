@@ -20,6 +20,7 @@ import {
   busiestMonthOf,
   activeDaysOf,
   streakRangeLabel,
+  durationParts,
 } from '../components/statsLogic.js';
 import { localISODate } from '../components/showLogic.js';
 import { rewatchedShows, rewatchedMovies, rewatchSummary } from '../components/rewatchLogic.js';
@@ -33,6 +34,18 @@ import { lovedShows, collectNotes, LOVE_WEIGHT, FUNNY_WEIGHT } from '../componen
 
 const TABS = ['Overview', 'Habits', 'Rankings', 'Breakdown'];
 const plural = (n, one, many) => (n === 1 ? one : many || one + 's');
+
+// The Overview headline: "7 months 23 days" (big numbers, small units); under a month it is just days.
+function HeroSpan({ span }) {
+  const { months, days } = span;
+  const unit = (text) => <span className="sd-tile-u u-hero">{text}</span>;
+  return (
+    <>
+      {months > 0 && <>{months}{unit(` ${plural(months, 'month')} `)}</>}
+      {(days > 0 || months === 0) && <>{days}{unit(` ${plural(days, 'day')}`)}</>}
+    </>
+  );
+}
 
 export default function Stats({ onOpenNotes }) {
   const state = useStore();
@@ -262,6 +275,7 @@ export default function Stats({ onOpenNotes }) {
       episodes,
       hours: Math.round(minutes / 60),
       days: (minutes / 60 / 24).toFixed(1),
+      span: durationParts(minutes),
       showCount: perShow.length,
       movieCount: watchedMovieCount,
       movieHours: Math.round(movieMinutes / 60),
@@ -354,10 +368,9 @@ export default function Stats({ onOpenNotes }) {
           <StatTile
             size="hero"
             statKey="days"
-            value={base.days}
-            unit=" days"
+            value={<HeroSpan span={base.span} />}
             plain
-            label={`of TV — ${base.hours.toLocaleString()} hours across ${base.showCount.toLocaleString()} ${plural(base.showCount, 'show')}`}
+            label={`of TV — ${base.hours.toLocaleString()} hours (${base.days} days) across ${base.showCount.toLocaleString()} ${plural(base.showCount, 'show')}`}
           />
           <div className="sd-tiles">
             <StatTile statKey="episodes" value={base.episodes.toLocaleString()} label="Episodes" />

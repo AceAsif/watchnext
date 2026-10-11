@@ -150,4 +150,29 @@ t('nextTab: arrows wrap, Home/End jump, anything else is ignored', () => {
   assert.equal(S.nextTab(T, 'Habits', 'End'), 'Breakdown'); assert.equal(S.nextTab(T, 'Habits', 'a'), null); assert.equal(S.nextTab(T, 'Nope', 'ArrowRight'), null);
 });
 
+// ============================================ Overview headline: months + days
+t('durationParts: 5,684 hours (your Overview) is 7 months 24 days', () => {
+  assert.deepEqual(S.durationParts(5684 * 60), { months: 7, days: 24, total: 237 });
+});
+t('durationParts: under a month is just days; nothing is zero months zero days by accident', () => {
+  assert.deepEqual(S.durationParts(10 * 24 * 60), { months: 0, days: 10, total: 10 });
+  assert.deepEqual(S.durationParts(0), { months: 0, days: 0, total: 0 });
+  assert.deepEqual(S.durationParts(-5), { months: 0, days: 0, total: 0 });
+  assert.deepEqual(S.durationParts(NaN), { months: 0, days: 0, total: 0 });
+  assert.deepEqual(S.durationParts(undefined), { months: 0, days: 0, total: 0 });
+});
+t('durationParts: months + days always add back to the total (within a day) and days stays under 30', () => {
+  for (let d = 0; d <= 4000; d++) {
+    const r = S.durationParts(d * 24 * 60);
+    assert.equal(r.total, d); assert.ok(Math.abs(r.months * S.DAYS_PER_MONTH + r.days - d) <= 1, `${d} -> ${JSON.stringify(r)}`); assert.ok(r.days >= 0 && r.days <= 29, `${d} -> ${JSON.stringify(r)}`);
+  }
+});
+t('durationParts: a month boundary rolls over (never "11 months 30 days")', () => {
+  assert.deepEqual(S.durationParts(29 * 24 * 60), { months: 0, days: 29, total: 29 });
+  assert.deepEqual(S.durationParts(30 * 24 * 60), { months: 1, days: 0, total: 30 });
+  assert.deepEqual(S.durationParts(31 * 24 * 60), { months: 1, days: 1, total: 31 });
+  assert.deepEqual(S.durationParts(60 * 24 * 60), { months: 2, days: 0, total: 60 });
+  assert.deepEqual(S.durationParts(365 * 24 * 60), { months: 12, days: 0, total: 365 });
+});
+
 console.log(`\n${n} stats tests passed`);

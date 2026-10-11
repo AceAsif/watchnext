@@ -227,3 +227,16 @@ export function nextTab(tabs, current, key) {
   if (key === 'End') return tabs[tabs.length - 1];
   return null;
 }
+
+// Total watch time as months + days, for the Overview headline. A month here is the average
+// calendar month (30.4375 days), because this is a length of time, not a date range.
+// -> { months, days, total } where total = whole days (rounded).
+export const DAYS_PER_MONTH = 30.4375;
+export function durationParts(minutes) {
+  const m = Number(minutes);
+  const total = Number.isFinite(m) && m > 0 ? Math.round(m / 60 / 24) : 0;
+  let months = Math.floor(total / DAYS_PER_MONTH);
+  let days = Math.round(total - months * DAYS_PER_MONTH);
+  if (days >= 30) { months += 1; days = 0; } // 30 days left is a month (never "11 months 30 days")
+  return { months, days, total };
+}
