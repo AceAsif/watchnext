@@ -94,4 +94,4 @@ public/                   PWA manifest, icons, service worker
 
 ## Why not just use another tracker?
 
-Simkl, Showly and friends are good. This exists because the TV Time shutdown made the lesson obvious: when your watch history lives in someone else's product, it can disappear on two weeks' notice. Here the history is a JSON file you own.
+Simkl and Showly are good apps. My app exists because the TV Time shutdown made the lesson obvious: when your watch history lives in someone else's product, it can disappear on two weeks' notice. Here the history is a JSON file you own.
