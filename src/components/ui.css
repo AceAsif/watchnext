@@ -479,6 +479,24 @@
 }
 @media (prefers-reduced-motion: reduce) { .sd-toast { animation: none; } }
 
+/* No-internet notice, pinned to the top while offline. */
+.sd-offline {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+  background: #3a2a0c;
+  border-bottom: 1px solid var(--amber);
+  color: var(--amber);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.sd-offline svg { flex: none; }
+
 /* ------------------------------------------------ Page layout (phone first) */
 /* Show page: on a phone the sidebar and main column simply stack, with the
    same spacing as before (hero -> settings 20px, then 16px between cards). */

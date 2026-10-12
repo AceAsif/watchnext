@@ -123,11 +123,14 @@ await ok('the rewatch button is a "+1" chip (not a reload arrow), with a 44px ta
   assert.equal(r.text, '+1'); assert.equal(r.svg, 0); assert.ok(r.w >= 44 && r.h >= 44, JSON.stringify(r)); assert.equal(r.over, false);
 });
 await clickText(p, 'Log another watch of S1E2', 'button'); await wait(350);
-await ok('"Log another watch" (a rewatch) resumes + toast, and counts the rewatch', async () => {
-  const s4 = await show(p, 'tmdb:4'); assert.strictEqual(s4.dropped, false); assert.equal(s4.watched['1x2'].n, 2); assert.match(await toast(p), /Resumed · Delta Drop/);
+await ok('"Log another watch" (a rewatch) resumes the dropped show, counts the rewatch, and the toast offers Undo for the +1', async () => {
+  const s4 = await show(p, 'tmdb:4'); assert.strictEqual(s4.dropped, false); assert.equal(s4.watched['1x2'].n, 2); assert.match(await toast(p), /^Logged another watch of S1E2 · 2×\s*Undo$/);
 });
 await clickText(p, 'Undo', '.sd-toast button'); await wait(300);
-await ok('Undo after a rewatch re-drops with the original date (the rewatch stays logged)', async () => { const s4 = await show(p, 'tmdb:4'); assert.equal(s4.dropped, true); assert.equal(s4.droppedAt, DROPPED_AT); assert.equal(s4.watched['1x2'].n, 2); });
+await ok('Undo after a rewatch removes ONLY that +1 (episode stays watched, count back to 1) and re-drops with the original date', async () => {
+  const s4 = await show(p, 'tmdb:4'); assert.equal(s4.dropped, true); assert.equal(s4.droppedAt, DROPPED_AT); assert.equal(s4.watched['1x2'].n, 1); assert.ok(s4.watched['1x2'].at);
+  assert.equal(await toast(p), null);
+});
 await clickText(p, 'Mark season watched'); await wait(350); await clickText(p, 'Just now', '[role=dialog] button'); await wait(350);
 await ok('"Mark season watched" resumes + toast', async () => { assert.strictEqual((await show(p, 'tmdb:4')).dropped, false); assert.ok(await toast(p)); });
 await clickText(p, 'Unmark season'); await wait(350);
@@ -243,6 +246,41 @@ console.log('3. signed out (real build)');
 p = await open(4180);
 await tab(p, 'Settings');
 await ok('signed out: Delete all data is there, "Delete everywhere" is NOT', async () => { const t = await text(p); assert.match(t, /Delete all data/); assert.doesNotMatch(t, /Delete everywhere/); });
+await p.close();
+
+// =========================================================== 4. +1 undo on a normal show, and the offline notice (real build)
+console.log('4. +1 undo on a show that is not dropped, and the offline notice');
+p = await open(4180);
+await openShow(p, 'Alpha Airing');
+await ok('no toast before the first +1', async () => assert.equal(await toast(p), null));
+await clickText(p, 'Log another watch of S1E1', 'button'); await wait(300);
+await ok('the show detail page itself shows the undo toast (not only Up Next): "· 2×"', async () => {
+  assert.match(await toast(p), /^Logged another watch of S1E1 · 2×\s*Undo$/); assert.equal((await show(p, 'tmdb:1')).watched['1x1'].n, 2);
+});
+await p.screenshot({ path: `${OUT}/rewatch_undo_toast_phone.png` });
+await clickText(p, 'Log another watch of S1E1', 'button'); await wait(300);
+await ok('a second +1 replaces the toast ("· 3×"); Undo then removes only the latest one (count 2, still watched)', async () => {
+  assert.match(await toast(p), /· 3×/);
+  await clickText(p, 'Undo', '.sd-toast button'); await wait(300);
+  const w1 = (await show(p, 'tmdb:1')).watched['1x1']; assert.equal(w1.n, 2); assert.ok(w1.at); assert.equal(await toast(p), null);
+});
+await ok('the +1 toast clears itself after a few seconds', async () => {
+  await clickText(p, 'Log another watch of S1E2', 'button'); await wait(300); assert.ok(await toast(p));
+  await wait(8600); assert.equal(await toast(p), null); assert.equal((await show(p, 'tmdb:1')).watched['1x2'].n, 2, 'the watch stays');
+});
+await ok('online: no offline notice', async () => assert.equal(await has(p, '[data-testid=offline-banner]'), false));
+await p.setOfflineMode(true); await wait(500);
+await ok('offline: a clear notice appears, says changes are kept on this device, and the page does not overflow', async () => {
+  assert.equal(await has(p, '[data-testid=offline-banner]'), true);
+  const t = await text(p); assert.match(t, /No internet connection/); assert.match(t, /saved on this device and will sync when you.re back online/);
+  assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
+});
+await p.screenshot({ path: `${OUT}/offline_banner_phone.png` });
+await ok('offline: the app still works (a tick is saved locally)', async () => {
+  await clickText(p, 'Log another watch of S1E3', 'button'); await wait(300); assert.equal((await show(p, 'tmdb:1')).watched['1x3'].n, 2);
+});
+await p.setOfflineMode(false); await wait(500);
+await ok('back online: the notice disappears by itself', async () => assert.equal(await has(p, '[data-testid=offline-banner]'), false));
 await p.close();
 
 console.log(`\n${checks} checks passed`);

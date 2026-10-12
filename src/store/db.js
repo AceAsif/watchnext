@@ -604,19 +604,45 @@ export function restoreWatchDates(id, prev) {
 // `n`), but Habits/the activity heatmap only see the most recent watch date,
 // since that's all a single map entry can hold. `at` is bumped to now so
 // "Watched <date>" on the episode row reflects the latest viewing.
+// Returns a copy of the entry as it was BEFORE this watch (null when there was none), so the
+// caller can offer Undo through undoEpisodeRewatch.
 export function logEpisodeRewatch(id, season, episode, runtimeMin) {
+  let prev = null;
   update((s) => {
     const show = s.shows[id];
     if (!show) return;
     const map = { ...(show.watched || {}) };
     const k = epKey(season, episode);
     const existing = map[k];
+    prev = existing ? { ...existing } : null;
     map[k] = existing
       ? { ...existing, at: new Date().toISOString(), n: (existing.n || 1) + 1, min: runtimeMin || existing.min }
       : { at: new Date().toISOString(), min: runtimeMin || show.runtimeMin || null, n: 1 };
     s.shows[id] = { ...show, watched: map, ...resumePatch(show) };
   });
   markShowDirty(id);
+  return prev;
+}
+
+// Undo for logEpisodeRewatch: put the episode back exactly as it was before that one extra
+// watch (count, date and minutes), so the earlier watches stay. With no previous entry the
+// episode is un-marked again. Does nothing when the episode is no longer marked (it was
+// un-marked in the meantime). Returns whether anything changed.
+export function undoEpisodeRewatch(id, season, episode, prev) {
+  let done = false;
+  update((s) => {
+    const show = s.shows[id];
+    if (!show) return;
+    const k = epKey(season, episode);
+    if (!show.watched || !show.watched[k]) return;
+    const map = { ...show.watched };
+    if (prev && typeof prev === 'object') map[k] = { ...prev };
+    else delete map[k];
+    s.shows[id] = { ...show, watched: map };
+    done = true;
+  });
+  if (done) markShowDirty(id);
+  return done;
 }
 
 export function addShowFromTmdb(details) {

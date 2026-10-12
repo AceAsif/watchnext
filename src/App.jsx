@@ -9,6 +9,7 @@ import Stats from './pages/Stats.jsx';
 import Settings from './pages/Settings.jsx';
 import Search from './pages/Search.jsx';
 import Notes from './pages/Notes.jsx';
+import OfflineBanner from './components/OfflineBanner.jsx';
 import { newNotesMemo } from './components/notesSearchLogic.js';
 
 const TABS = [
@@ -90,6 +91,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <OfflineBanner />
       <header className="masthead">
         <h1>
           Watch<span>Next</span>

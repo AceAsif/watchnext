@@ -5,6 +5,7 @@ import {
   setEpisodeNote,
   markSeason,
   logEpisodeRewatch,
+  undoEpisodeRewatch,
   toggleFollow,
   setShowDropped,
   setWatchDates,
@@ -84,7 +85,7 @@ const StarIcon = ({ on }) => (
 );
 
 // ---------------------------------------------------------------- seasons
-function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded }) {
+function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, onRewatched }) {
   // Watching anything resumes a dropped show (see db.js); tell the page so it can
   // offer Undo. `on` is whether the action marks something as watched.
   const resumes = (on) => { if (on && show.dropped === true && onResumed) onResumed(show.droppedAt || null); };
@@ -255,7 +256,12 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded })
                   className="sd-rewatch"
                   title={n > 1 ? `Watched ${n} times · tap to log another watch` : 'Log another watch of this episode'}
                   aria-label={`Log another watch of ${code}`}
-                  onClick={() => { resumes(true); logEpisodeRewatch(id, season.n, ep.episode_number, ep.runtime); }}
+                  onClick={() => {
+                    const wasDropped = show.dropped === true;
+                    const droppedAt = show.droppedAt || null;
+                    const prev = logEpisodeRewatch(id, season.n, ep.episode_number, ep.runtime);
+                    if (onRewatched) onRewatched({ season: season.n, episode: ep.episode_number, code, prev, count: (prev && prev.n ? prev.n : 1) + 1, wasDropped, droppedAt });
+                  }}
                 >
                   <span aria-hidden="true">+1</span>
                 </button>
@@ -331,6 +337,25 @@ export default function ShowDetail({ id, onBack }) {
   const [finishToast, setFinishToast] = useState(false);
   const finishTimer = useRef(null);
   useEffect(() => () => clearTimeout(finishTimer.current), []);
+  // "Logged another watch" toast with Undo, so a stray +1 can be taken back without un-marking the
+  // episode (which would remove every earlier watch too). Undo only reverses the latest +1.
+  const [rewatch, setRewatch] = useState(null); // { season, episode, code, prev, count, wasDropped, droppedAt }
+  const rewatchTimer = useRef(null);
+  useEffect(() => () => clearTimeout(rewatchTimer.current), []);
+  function showRewatched(info) {
+    clearTimeout(resumedTimer.current); setResumed(null);
+    setRewatch(info);
+    clearTimeout(rewatchTimer.current);
+    rewatchTimer.current = setTimeout(() => setRewatch(null), 8000);
+  }
+  function undoRewatch() {
+    if (rewatch) {
+      undoEpisodeRewatch(id, rewatch.season, rewatch.episode, rewatch.prev);
+      if (rewatch.wasDropped) setShowDropped(id, true, rewatch.droppedAt || undefined);
+    }
+    clearTimeout(rewatchTimer.current);
+    setRewatch(null);
+  }
   function undoResume() {
     if (resumed) setShowDropped(id, true, resumed.at || undefined);
     clearTimeout(resumedTimer.current);
@@ -756,6 +781,7 @@ export default function ShowDetail({ id, onBack }) {
             isCurrent={se.n === currentN}
             next={next}
             onResumed={showResumed}
+            onRewatched={showRewatched}
             onAdded={noteAdded}
           />
         ))}
@@ -990,7 +1016,16 @@ export default function ShowDetail({ id, onBack }) {
         </div>
       )}
 
-      {resumed && !finishToast && !datesToast && (
+      {rewatch && !finishToast && !datesToast && (
+        <div className="sd-toast" role="status" data-testid="rewatch-toast">
+          <span className="sd-ell" style={{ flex: 1 }}>Logged another watch of {rewatch.code} · {rewatch.count}×</span>
+          <button className="sd-linkbtn" style={{ height: 44, padding: '0 14px', fontSize: 14 }} onClick={undoRewatch}>
+            Undo
+          </button>
+        </div>
+      )}
+
+      {resumed && !rewatch && !finishToast && !datesToast && (
         <div className="sd-toast" role="status">
           <span className="sd-ell" style={{ flex: 1 }}>Resumed · {show.name}</span>
           <button className="sd-linkbtn" style={{ height: 44, padding: '0 14px', fontSize: 14 }} onClick={undoResume}>
