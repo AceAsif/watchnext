@@ -25,6 +25,20 @@ function setUser(u) {
   userListeners.forEach((fn) => fn(u));
 }
 
+// Same idea for "is this device still downloading the library from the cloud?" (see SyncingNote).
+let syncing = false;
+const syncListeners = new Set();
+function setSyncing(v) {
+  if (syncing === v) return;
+  syncing = v;
+  syncListeners.forEach((fn) => fn());
+}
+export function getCloudSyncing() { return syncing; }
+export function subscribeCloudSyncing(fn) {
+  syncListeners.add(fn);
+  return () => syncListeners.delete(fn);
+}
+
 export function getCloudUser() {
   return currentUser;
 }
@@ -43,7 +57,7 @@ export function initCloudSync() {
   let cancelled = false;
   import('./cloudEngine.js').then((mod) => {
     if (cancelled) return;
-    unsub = mod.initCloudSyncEngine(setUser);
+    unsub = mod.initCloudSyncEngine(setUser, setSyncing);
   });
   return () => {
     cancelled = true;

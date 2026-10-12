@@ -479,6 +479,31 @@
 }
 @media (prefers-reduced-motion: reduce) { .sd-toast { animation: none; } }
 
+/* "Syncing your library" note (first download on a new device). */
+.sd-syncnote {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--sd-line-strong);
+  border-radius: 12px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.sd-syncnote-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: sd-syncpulse 1.2s ease-in-out infinite;
+}
+@keyframes sd-syncpulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sd-syncnote-dot { animation: none; } }
+
 /* No-internet notice, pinned to the top while offline. */
 .sd-offline {
   position: sticky;

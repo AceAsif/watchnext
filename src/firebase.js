@@ -9,6 +9,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig, { hasFirebaseConfig } from './firebaseConfig.js';
+import { GOOGLE_SIGN_IN_PARAMS } from './store/signInParams.js';
 
 export { hasFirebaseConfig };
 
@@ -22,4 +23,5 @@ if (hasFirebaseConfig) {
   auth = getAuth(app);
   db = getFirestore(app);
   googleProvider = new GoogleAuthProvider();
+  googleProvider.setCustomParameters({ ...GOOGLE_SIGN_IN_PARAMS }); // always show Google's account chooser
 }

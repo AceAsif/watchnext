@@ -233,6 +233,23 @@ await ok('success banner states what happened; the TMDB key box is cleared', asy
 await p.screenshot({ path: `${OUT}/after_wipe_phone.png`, fullPage: true });
 await tab(p, 'Shows');
 await ok('Shows tab is the brand-new-library empty state', async () => { const t = await text(p); assert.doesNotMatch(t, /Alpha Airing|Bravo Binge/); });
+await tab(p, 'Movies');
+await ok('Movies empty + not syncing: the normal "No movies yet" state', async () => { const t = await text(p); assert.match(t, /No movies yet/); assert.doesNotMatch(t, /Syncing your library/); });
+await p.evaluate(() => window.__setSyncing(true)); await wait(300);
+await ok('a download that finishes quickly never flashes a notice', async () => { assert.match(await text(p), /No movies yet/); await p.evaluate(() => window.__setSyncing(false)); await wait(900); assert.doesNotMatch(await text(p), /Syncing your library/); });
+await p.evaluate(() => window.__setSyncing(true)); await wait(1100);
+await ok('Movies empty WHILE the library is still downloading says "Syncing your library…" instead of "No movies yet"', async () => {
+  const t = await text(p); assert.match(t, /Syncing your library…/); assert.match(t, /on their way from the cloud/); assert.doesNotMatch(t, /No movies yet/);
+});
+await p.screenshot({ path: `${OUT}/movies_syncing_phone.png` });
+await tab(p, 'Stats'); await wait(700); // the note waits ~0.8s before appearing
+await ok('Stats shows a "Syncing your library…" note while downloading, with no horizontal overflow', async () => {
+  assert.equal(await has(p, '[data-testid=syncing-note]'), true); assert.match(await text(p), /totals may be incomplete/); assert.doesNotMatch(await text(p), /No watch history yet/, 'no misleading empty message while downloading');
+  assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
+});
+await p.screenshot({ path: `${OUT}/stats_syncing_phone.png` });
+await p.evaluate(() => window.__setSyncing(false)); await wait(300);
+await ok('when the download finishes the notes disappear by themselves', async () => { assert.equal(await has(p, '[data-testid=syncing-note]'), false); assert.match(await text(p), /No watch history yet/); await tab(p, 'Movies'); assert.match(await text(p), /No movies yet/); });
 await p.close();
 
 // desktop look of the dialog

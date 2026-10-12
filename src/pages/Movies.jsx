@@ -16,6 +16,7 @@ import { NoteEditor } from '../components/NoteEditor.jsx';
 import { movieNoteOf } from '../store/notes.js';
 import PlatformPicker, { PlatformChip } from '../components/PlatformPicker.jsx';
 import { Sheet } from '../components/ui.jsx';
+import { useLibrarySyncing } from '../components/SyncingNote.jsx';
 import { SearchField, MediaRow, Poster } from '../components/LibraryUI.jsx';
 import {
   MOVIE_SORTS,
@@ -42,6 +43,7 @@ const searchMoviesList = (q) => searchMovies(q).then((d) => d.results || []);
 
 export default function Movies() {
   const state = useStore();
+  const librarySyncing = useLibrarySyncing();
   const [addOpen, setAddOpen] = useState(false); // the "Add a movie" dialog
   const [addQuery, setAddQuery] = useState('');
   const [fixIndex, setFixIndex] = useState(null); // movie index being fixed
@@ -258,6 +260,10 @@ export default function Movies() {
             <MovieTile key={`${m.name}|${m.watchedAt}|${m.index}`} movie={m} onOpen={() => openMovie(m)} />
           ))}
         </div>
+      ) : movies.length === 0 && librarySyncing ? (
+        <LibEmpty icon={<FilmIcon size={28} />} title="Syncing your library…">
+          Your movies are on their way from the cloud and will appear in a moment.
+        </LibEmpty>
       ) : movies.length === 0 ? (
         <LibEmpty
           icon={<FilmIcon size={28} />}

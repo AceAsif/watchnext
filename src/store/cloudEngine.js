@@ -105,8 +105,10 @@ function flushOnLeave() {
 // Called by cloud.js's thin facade once this chunk has loaded. setUser is
 // cloud.js's internal pub/sub setter, kept there (not here) so the reactive
 // user state works even before this chunk arrives.
-export function initCloudSyncEngine(setUser) {
+let reportSyncing = () => {};
+export function initCloudSyncEngine(setUser, setSyncing) {
   if (!hasFirebaseConfig) return () => {};
+  reportSyncing = typeof setSyncing === 'function' ? setSyncing : () => {};
   return onAuthStateChanged(auth, (user) => {
     setUser(user);
     if (user) { startSync(user.uid); recordAccountEmail(user.uid, user.email); }
@@ -142,11 +144,13 @@ export function signOutCloud() {
 function startSync(newUid) {
   uid = newUid;
   pulledOnce = false;
+  reportSyncing(true); // the first download of this account's library has started
   // The pull checks for a wipe marker BEFORE merging. Only after it has finished
   // do we start listening for markers written later, so the two never race.
   pullAndMerge(uid)
     .catch((err) => console.error('Cloud pull failed:', err))
     .then(() => {
+      if (uid === newUid) reportSyncing(false); // downloaded (or failed): stop saying "syncing"
       if (uid !== newUid || unsubWipe) return;
       unsubWipe = onSnapshot(doc(db, 'users', newUid, 'library', 'wipe'), (snap) => {
         if (snap.exists()) handleWipeDoc(newUid, snap.data());
@@ -216,6 +220,7 @@ function stopSync() {
   unsubHidden = null;
   pulledOnce = false;
   uid = null;
+  reportSyncing(false);
   clearInterval(flushTimer);
   flushTimer = null;
   document.removeEventListener('visibilitychange', flushOnLeave);

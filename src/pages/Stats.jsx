@@ -10,6 +10,7 @@ import { cardGoals } from '../components/goalsLogic.js';
 import { platformById } from '../components/PlatformPicker.jsx';
 import Heatmap from '../components/Heatmap.jsx';
 import YourTaste from '../components/YourTaste.jsx';
+import SyncingNote, { useLibrarySyncing } from '../components/SyncingNote.jsx';
 import { StatTile, TabBar, YearSelect, BarList, Section, Note } from '../components/StatsUI.jsx';
 import {
   BATCH_MIN,
@@ -56,6 +57,7 @@ function HeroSpan({ span }) {
 
 export default function Stats({ onOpenNotes }) {
   const state = useStore();
+  const librarySyncing = useLibrarySyncing();
   const [year, setYear] = useState('all');       // Habits day-of-week scope
   const [reviewYear, setReviewYear] = useState(null); // Year in review scope
   const [tab, setTab] = useState('Overview'); // Stats sub-tab
@@ -356,9 +358,12 @@ export default function Stats({ onOpenNotes }) {
     return (
       <div className="sd-page">
         <h1 className="sd-title">Stats</h1>
-        <div className="sd-card sd-pad sd-empty">
-          No watch history yet. Import your TV Time data in Settings, or start marking episodes watched.
-        </div>
+        <SyncingNote />
+        {!librarySyncing && (
+          <div className="sd-card sd-pad sd-empty">
+            No watch history yet. Import your TV Time data in Settings, or start marking episodes watched.
+          </div>
+        )}
       </div>
     );
   }
@@ -588,6 +593,7 @@ export default function Stats({ onOpenNotes }) {
           ) : null}
         </div>
         <TabBar tabs={TABS} value={tab} onChange={setTab} label="Stats sections" />
+        <SyncingNote />
       </div>
       <div className="sd-stats-body" role="tabpanel" id="stats-panel" aria-labelledby={`stats-tab-${tab}`}>
         {panels[tab]}
