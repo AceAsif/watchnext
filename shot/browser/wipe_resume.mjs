@@ -300,6 +300,62 @@ await p.setOfflineMode(false); await wait(500);
 await ok('back online: the notice disappears by itself', async () => assert.equal(await has(p, '[data-testid=offline-banner]'), false));
 await p.close();
 
+// ---- account switch prompt (a different Google account signs in on a device holding another library)
+{
+  const pg = await open(FAKE.address().port);
+  const ask = (v) => pg.evaluate((x) => window.__setAccountSwitch(x), v);
+  const P = { fromEmail: 'asif3678@gmail.com', toEmail: 'second.account@gmail.com', shows: 3, movies: 12, goals: 0, hidden: 0 };
+  const nShows = async () => Object.keys((await stored(pg)).shows).length;
+  const startShows = await nShows();
+  await ok('no prompt until a different account signs in', async () => assert.equal(await has(pg, '[data-testid=account-switch]'), false));
+  await ask(P); await wait(400);
+  await ok('prompt names both accounts, the library size, and the three choices; fits a phone', async () => {
+    const t = await pg.evaluate(() => document.querySelector('[role=alertdialog]').innerText);
+    assert.match(t, /Switching accounts\?/);
+    assert.match(t, /asif3678@gmail\.com \(3 shows and 12 movies\)/);
+    assert.match(t, /signing in as second\.account@gmail\.com/);
+    for (const l of ['Start fresh', 'Add this device.s library', 'Cancel']) assert.match(t, new RegExp(l));
+    assert.equal(await pg.evaluate(() => document.activeElement && document.activeElement.dataset.testid), 'switch-cancel', 'the safe choice has focus');
+    assert.equal(await pg.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
+  });
+  await pg.screenshot({ path: `${OUT}/account_switch_phone.png` });
+  await pg.setViewport({ width: 1280, height: 860, deviceScaleFactor: 1 }); await wait(300);
+  await pg.screenshot({ path: `${OUT}/account_switch_desktop.png` });
+  await pg.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 }); await wait(300);
+  await ok('Cancel: prompt closes and this device keeps its library', async () => {
+    await pg.click('[data-testid=switch-cancel]'); await wait(300);
+    assert.equal(await has(pg, '[data-testid=account-switch]'), false);
+    assert.ok((await pg.evaluate(() => window.__events)).includes('switch-cancel'));
+    assert.equal(await nShows(), startShows);
+  });
+  await ask(P); await wait(300);
+  await ok('Escape (or tapping outside) is the same as Cancel', async () => {
+    await pg.keyboard.press('Escape'); await wait(300);
+    assert.equal(await has(pg, '[data-testid=account-switch]'), false);
+    assert.equal((await pg.evaluate(() => window.__events)).filter((e) => e === 'switch-cancel').length, 2);
+  });
+  await ask(P); await wait(300);
+  await ok('Add this device’s library: keeps the library and goes ahead', async () => {
+    await pg.click('[data-testid=switch-merge]'); await wait(300);
+    assert.ok((await pg.evaluate(() => window.__events)).includes('switch-merge'));
+    assert.equal(await nShows(), startShows);
+  });
+  await ask(P); await wait(300);
+  await ok('Start fresh: a backup downloads FIRST, then the device library is cleared', async () => {
+    await pg.click('[data-testid=switch-fresh]'); await wait(150);
+    assert.match(await pg.evaluate(() => document.querySelector('[data-testid=switch-fresh]').innerText), /Working/);
+    await wait(1200);
+    const ev = await pg.evaluate(() => window.__events);
+    const dl = ev.findIndex((e) => e.startsWith('download:')), fr = ev.indexOf('switch-fresh');
+    assert.ok(dl >= 0 && fr > dl, 'download before clearing: ' + ev.join(','));
+    const file = await pg.evaluate(() => JSON.parse(new TextDecoder().decode(new Uint8Array(window.__dl.at(-1).bytes))));
+    assert.equal(Object.keys(file.shows).length, startShows, 'the backup holds the old library');
+    assert.equal(await nShows(), 0);
+    assert.equal(await has(pg, '[data-testid=account-switch]'), false);
+  });
+  await pg.close();
+}
+
 console.log(`\n${checks} checks passed`);
 console.log('PROBLEMS:', problems.length ? '\n' + problems.join('\n') : 'none');
 await browser.close(); FAKE.close(); REAL.close();

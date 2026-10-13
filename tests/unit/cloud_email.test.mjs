@@ -56,6 +56,7 @@ await t('an account with no usable email (missing, empty, malformed) writes noth
 await t('a refused write (rules, offline) is swallowed: sync carries on, and the next sign-in tries again', async () => {
   const D = await import('../../src/store/db.js');
   FS.docs.set('users/u4/shows/tmdb:9', { name: 'Pulled anyway', tmdbId: 9, followed: true });
+  D.wipeLibrary(); // an empty device changing accounts (a full one now asks first: account_switch.test.mjs)
   FS.failNextSetDoc = true; const orig = console.error; console.error = () => {};
   globalThis.__auth.emit({ uid: 'u4', email: 'four@example.com' }); await settle(); console.error = orig;
   assert.equal(FS.docs.has('users/u4'), false, 'nothing was recorded');
@@ -64,7 +65,8 @@ await t('a refused write (rules, offline) is swallowed: sync carries on, and the
   assert.deepEqual(FS.docs.get('users/u4'), { email: 'four@example.com' });
 });
 await t('"Delete everywhere" leaves the email on the user document (it identifies the account; it is not library data)', async () => {
-  globalThis.__auth.emit(null); globalThis.__auth.emit({ uid: 'u1', email: 'asif3678@gmail.com' }); await settle();
+  globalThis.__auth.emit(null); (await import('../../src/store/db.js')).wipeLibrary();
+  globalThis.__auth.emit({ uid: 'u1', email: 'asif3678@gmail.com' }); await settle();
   const res = await E.wipeEverywhere(); assert.ok(res);
   assert.deepEqual(FS.docs.get('users/u1'), { email: 'asif3678@gmail.com' });
 });

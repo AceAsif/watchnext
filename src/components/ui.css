@@ -1649,3 +1649,18 @@ button.sd-nitem:focus-visible { outline: 2px solid var(--amber); outline-offset:
 .sd-tn-tag { font-size: 13px; font-style: italic; color: var(--text-dim); }
 .sd-tn-over { font-size: 14px; line-height: 1.5; color: #c3cad5; overflow-wrap: anywhere; }
 .sd-tn-note { font-size: 12px; color: var(--amber); }
+
+/* Account switch prompt (components/AccountSwitchSheet.jsx) */
+.sd-switch-intro { margin: 0 0 14px; font-size: 14.5px; line-height: 1.55; color: #c3cad5; overflow-wrap: anywhere; }
+.sd-switch-opts { display: flex; flex-direction: column; gap: 8px; }
+.sd-switch-opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; text-align: left;
+  padding: 12px 14px; border-radius: 12px; background: var(--bg-card); color: var(--text); border: 1px solid #2c3441;
+  font: inherit; cursor: pointer;
+}
+.sd-switch-opt b { font-size: 15px; font-weight: 600; }
+.sd-switch-opt span { font-size: 13px; line-height: 1.45; color: var(--text-dim); overflow-wrap: anywhere; }
+.sd-switch-opt.primary { border-color: var(--amber); background: rgba(242, 163, 60, 0.08); }
+.sd-switch-opt.primary b { color: var(--amber); }
+.sd-switch-opt:disabled { opacity: 0.5; cursor: default; }
+.sd-switch-opt:not(:disabled):focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }

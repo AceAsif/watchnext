@@ -31,7 +31,8 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
-import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markGoalsDirty, markHiddenDirty, queueShowDelete, clearTombstone, isTombstoned, resetAll, wipeLibrary, addWipeTombstones, applyRemoteGoals, applyRemoteHidden } from './db.js';
+import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markGoalsDirty, markHiddenDirty, queueShowDelete, clearTombstone, clearAllTombstones, isTombstoned, resetAll, wipeLibrary, addWipeTombstones, applyRemoteGoals, applyRemoteHidden } from './db.js';
+import { OWNER_KEY, readOwner, ownerRecord, libraryCounts, switchDecision } from './accountSwitch.js';
 import { sanitizeGoals } from '../components/goalsLogic.js';
 import { sanitizeHidden } from '../components/hiddenLogic.js';
 import { cleanEmail } from './accountEmail.js';
@@ -106,14 +107,64 @@ function flushOnLeave() {
 // cloud.js's internal pub/sub setter, kept there (not here) so the reactive
 // user state works even before this chunk arrives.
 let reportSyncing = () => {};
-export function initCloudSyncEngine(setUser, setSyncing) {
+let reportSwitch = () => {};
+export function initCloudSyncEngine(setUser, setSyncing, setAccountSwitch) {
   if (!hasFirebaseConfig) return () => {};
   reportSyncing = typeof setSyncing === 'function' ? setSyncing : () => {};
+  reportSwitch = typeof setAccountSwitch === 'function' ? setAccountSwitch : () => {};
   return onAuthStateChanged(auth, (user) => {
     setUser(user);
-    if (user) { startSync(user.uid); recordAccountEmail(user.uid, user.email); }
-    else stopSync();
+    if (user) beginAccount(user);
+    else { endPendingSwitch(); stopSync(); }
   });
+}
+
+// --- account switch (see accountSwitch.js) ---------------------------------
+// A different Google account signed in on a device that holds another account's library.
+// Nothing syncs until the person picks Start fresh / Add this device's library / Cancel.
+let pendingUser = null;
+function readLocal(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+function beginAccount(user) {
+  const owner = readOwner(readLocal(OWNER_KEY), readLocal(META_KEY));
+  const counts = libraryCounts(getState());
+  const verdict = switchDecision(owner, user, counts);
+  if (verdict === 'ask') {
+    if (uid) stopSync(); // never keep syncing the previous account behind the prompt
+    pendingUser = user;
+    reportSwitch({ fromEmail: owner.email, toEmail: cleanEmail(user.email) || '', ...counts });
+    return;
+  }
+  // An empty device changing hands still carries the old account's delete records: drop them.
+  if (owner && owner.uid !== user.uid) clearAllTombstones();
+  goOnline(user);
+}
+function goOnline(user) {
+  endPendingSwitch();
+  try { localStorage.setItem(OWNER_KEY, ownerRecord(user)); } catch (e) { /* storage full: best effort */ }
+  startSync(user.uid);
+  recordAccountEmail(user.uid, user.email);
+}
+function endPendingSwitch() {
+  if (pendingUser) { pendingUser = null; reportSwitch(null); }
+}
+
+// The person's answer to the prompt: 'fresh' | 'merge' | 'cancel'. Returns false if no
+// prompt was waiting (e.g. a double tap). The UI downloads a backup before calling 'fresh'.
+export async function resolveAccountSwitch(choice) {
+  const user = pendingUser;
+  if (!user) return false;
+  if (choice === 'cancel') {
+    endPendingSwitch();
+    await signOut(auth);
+    return true;
+  }
+  if (choice !== 'fresh' && choice !== 'merge') return false;
+  if (choice === 'fresh') wipeLibrary(); // shows, movies, goals, Not interested; keeps this device's settings
+  clearAllTombstones(); // the old account's deletes must not delete anything in this one
+  goOnline(user);
+  return true;
 }
 
 // Write the account's email onto its own user document (users/{uid}) so the Firebase console

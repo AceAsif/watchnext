@@ -10,6 +10,7 @@ import Settings from './pages/Settings.jsx';
 import Search from './pages/Search.jsx';
 import Notes from './pages/Notes.jsx';
 import OfflineBanner from './components/OfflineBanner.jsx';
+import AccountSwitchSheet from './components/AccountSwitchSheet.jsx';
 import { newNotesMemo } from './components/notesSearchLogic.js';
 
 const TABS = [
@@ -132,6 +133,8 @@ export default function App() {
           {tab === 'settings' && <Settings />}
         </>
       )}
+
+      <AccountSwitchSheet />
 
       <nav className="tabbar" aria-label="Main">
         {TABS.map((t) => (

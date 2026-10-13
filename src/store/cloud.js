@@ -39,6 +39,26 @@ export function subscribeCloudSyncing(fn) {
   return () => syncListeners.delete(fn);
 }
 
+// A different Google account signed in on a device holding another account's library: the
+// engine waits for an answer (see store/accountSwitch.js). null, or
+// { fromEmail, toEmail, shows, movies, goals, hidden } while the prompt is waiting.
+let accountSwitch = null;
+const switchListeners = new Set();
+function setAccountSwitch(v) {
+  accountSwitch = v || null;
+  switchListeners.forEach((fn) => fn());
+}
+export function getAccountSwitch() { return accountSwitch; }
+export function subscribeAccountSwitch(fn) {
+  switchListeners.add(fn);
+  return () => switchListeners.delete(fn);
+}
+// choice: 'fresh' | 'merge' | 'cancel'
+export async function resolveAccountSwitch(choice) {
+  const mod = await import('./cloudEngine.js');
+  return mod.resolveAccountSwitch(choice);
+}
+
 export function getCloudUser() {
   return currentUser;
 }
@@ -57,7 +77,7 @@ export function initCloudSync() {
   let cancelled = false;
   import('./cloudEngine.js').then((mod) => {
     if (cancelled) return;
-    unsub = mod.initCloudSyncEngine(setUser, setSyncing);
+    unsub = mod.initCloudSyncEngine(setUser, setSyncing, setAccountSwitch);
   });
   return () => {
     cancelled = true;

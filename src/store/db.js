@@ -153,6 +153,15 @@ export function clearTombstone(id) {
   if (tombstones.delete(id)) persistTombstones();
   if (wipeTombs.delete(id)) persistWipeTombs();
 }
+// A different Google account is taking over this device (see store/accountSwitch.js). The
+// tombstones record what the PREVIOUS account deleted; left in place they would delete the
+// same shows from the new account's cloud copy. Returns how many were cleared.
+export function clearAllTombstones() {
+  const n = tombstones.size + wipeTombs.size;
+  if (tombstones.size) { tombstones = new Set(); persistTombstones(); }
+  if (wipeTombs.size) { wipeTombs = new Map(); persistWipeTombs(); }
+  return n;
+}
 
 export function markShowDirty(id) {
   dirtyShows.add(id);
