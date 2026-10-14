@@ -649,6 +649,9 @@
 .sd-tile--accent .sd-tile-u { color: var(--amber); }
 .u-hero { font-size: 20px; }
 .u-lg { font-size: 16px; }
+.u-md { font-size: 14px; }
+.v-md { overflow-wrap: anywhere; line-height: 1.15; }
+.sd-tiles + .sd-tile--lg { margin-top: 10px; }
 .sd-tile-l {
   font-family: var(--font-mono);
   font-size: 10.5px;

@@ -181,4 +181,25 @@ t('durationParts: years*365.25 + months + days add back to the total (within a d
   }
 });
 
+// ============================================ movie time and TV + movies combined
+t('timeTotals: your numbers (5,686 h of TV, 821 h of movies) -> movies 1 month 4 days; together 6,507 h', () => {
+  const r = S.timeTotals(5686 * 60, 821 * 60);
+  assert.equal(r.movies.hours, 821); assert.deepEqual(r.movies.span, { years: 0, months: 1, days: 4, total: 34 }); assert.equal(r.movies.days, '34.2');
+  assert.equal(r.tv.hours, 5686); assert.equal(r.tv.days, '236.9');
+  assert.equal(r.both.hours, 6507); assert.equal(r.both.days, '271.1'); assert.deepEqual(r.both.span, { years: 0, months: 8, days: 28, total: 271 });
+});
+t('timeTotals: the combined figure comes from exact minutes, not two rounded ones', () => {
+  // 29.4 days of TV + 29.4 days of movies: each rounds to 29 days (58 together) but the true total is 58.8 -> 59
+  const m = 29.4 * 24 * 60; const r = S.timeTotals(m, m);
+  assert.equal(r.tv.span.total, 29); assert.equal(r.both.span.total, 59);
+});
+t('timeTotals: only movies, only TV, nothing, junk; years appear past 12 months', () => {
+  assert.deepEqual(S.timeTotals(0, 600).both.span, { years: 0, months: 0, days: 0, total: 0 }); assert.equal(S.timeTotals(0, 600).both.hours, 10);
+  assert.equal(S.timeTotals(600, 0).movies.hours, 0); assert.equal(S.timeTotals(600, 0).movies.days, '0.0');
+  for (const v of [null, undefined, NaN, 'x', -9]) assert.equal(S.timeTotals(v, v).both.hours, 0);
+  const big = S.timeTotals(300 * 24 * 60, 100 * 24 * 60).both.span; // 400 days
+  assert.equal(big.years, 1); assert.equal(big.months, 1); assert.equal(big.total, 400);
+  assert.ok(Math.abs((big.years * 12 + big.months) * S.DAYS_PER_MONTH + big.days - 400) <= 1);
+});
+
 console.log(`\n${n} stats tests passed`);

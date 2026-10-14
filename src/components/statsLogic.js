@@ -240,3 +240,13 @@ export function durationParts(minutes) {
   if (days >= 30) { allMonths += 1; days = 0; } // 30 days left is a month (never "11 months 30 days")
   return { years: Math.floor(allMonths / 12), months: allMonths % 12, days, total };
 }
+
+// The Overview's time tiles, all from exact minutes (never from already-rounded hours, so the
+// combined figure is not off by a rounding error). tv / movies / both each give
+// { minutes, hours (rounded), days (1 decimal, as text), span: durationParts(...) }.
+export function timeTotals(tvMinutes, movieMinutes) {
+  const clean = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0);
+  const one = (min) => ({ minutes: min, hours: Math.round(min / 60), days: (min / 60 / 24).toFixed(1), span: durationParts(min) });
+  const tv = clean(tvMinutes), movies = clean(movieMinutes);
+  return { tv: one(tv), movies: one(movies), both: one(tv + movies) };
+}

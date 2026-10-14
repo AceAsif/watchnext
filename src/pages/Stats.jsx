@@ -22,6 +22,7 @@ import {
   activeDaysOf,
   streakRangeLabel,
   durationParts,
+  timeTotals,
 } from '../components/statsLogic.js';
 import { localISODate } from '../components/showLogic.js';
 import { rewatchedShows, rewatchedMovies, rewatchSummary } from '../components/rewatchLogic.js';
@@ -38,7 +39,7 @@ const plural = (n, one, many) => (n === 1 ? one : many || one + 's');
 
 // The Overview headline: "1 year 2 months 5 days" (big numbers, small units); zero parts are left out,
 // and under a month it is just days.
-function HeroSpan({ span }) {
+function HeroSpan({ span, size = 'hero' }) {
   const { years, months, days } = span;
   const parts = [];
   if (years > 0) parts.push([years, plural(years, 'year')]);
@@ -48,7 +49,7 @@ function HeroSpan({ span }) {
     <>
       {parts.map(([n, word], i) => (
         <React.Fragment key={word}>
-          {n}<span className="sd-tile-u u-hero">{` ${word}${i < parts.length - 1 ? ' ' : ''}`}</span>
+          {n}<span className={`sd-tile-u u-${size}`}>{` ${word}${i < parts.length - 1 ? ' ' : ''}`}</span>
         </React.Fragment>
       ))}
     </>
@@ -288,6 +289,8 @@ export default function Stats({ onOpenNotes }) {
       showCount: perShow.length,
       movieCount: watchedMovieCount,
       movieHours: Math.round(movieMinutes / 60),
+      movieSpan: durationParts(movieMinutes),
+      both: timeTotals(minutes, movieMinutes).both, // TV and movies together (exact minutes)
       topShows: perShow.slice(0, 12),
       lovedShows: lovedShows(state.shows),
       rewatchShows: rewatchedShows(state.shows),
@@ -388,8 +391,15 @@ export default function Stats({ onOpenNotes }) {
             <StatTile statKey="episodes" value={base.episodes.toLocaleString()} label="Episodes" />
             <StatTile statKey="shows" value={base.showCount.toLocaleString()} label="Shows started" />
             <StatTile statKey="movies" value={base.movieCount.toLocaleString()} label="Movies" />
-            <StatTile statKey="movie-hours" value={`${base.movieHours.toLocaleString()} h`} label="Of movies" />
+            <StatTile statKey="movie-hours" value={<HeroSpan span={base.movieSpan} size="md" />} label={`Of movies · ${base.movieHours.toLocaleString()} h`} />
           </div>
+          <StatTile
+            size="lg"
+            statKey="all-time-both"
+            value={<HeroSpan span={base.both.span} size="lg" />}
+            plain
+            label={`of TV and movies together — ${base.both.hours.toLocaleString()} hours (${base.both.days} days)`}
+          />
           {(base.watchlistShows > 0 || base.watchlistMovies > 0) && (
             <Note>
               On your watchlist: {base.watchlistShows} {plural(base.watchlistShows, 'show')},{' '}

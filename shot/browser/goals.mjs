@@ -96,6 +96,13 @@ await ok('Overview headline shows total TV time as years + months + days (zero p
   assert.match(r.head, /^(\d+ years?)?( ?\d+ months?)?( ?\d+ days?)?$/, r.head); assert.ok(r.head.length > 0); assert.ok(r.small >= 1);
   assert.match(r.sub, /^of TV — [\d,]+ hours \([\d.]+ days\) across \d+ shows?$/, r.sub);
 });
+await ok('Overview: movies tile is a span too (hours kept in its label), and a new tile shows TV and movies together in the same format', async () => {
+  const r = await p.evaluate(() => { const q = (k) => document.querySelector(`[data-stat=${k}]`); const m = q('movie-hours'), b = q('all-time-both'); return { mv: m.querySelector('.sd-tile-v').textContent.trim().replace(/\s+/g, ' '), mvl: m.querySelector('.sd-tile-l').textContent, both: b.querySelector('.sd-tile-v').textContent.trim().replace(/\s+/g, ' '), bothl: b.querySelector('.sd-tile-sub').textContent, order: [...document.querySelector('.sd-sec2').querySelectorAll('[data-stat]')].map((e) => e.dataset.stat) }; });
+  // the seeded history: 17,600 min of TV + 5 watched movies x 100 min = 18,100 min = 301.7 h = 12.6 days
+  assert.equal(r.mv, '0 days'); assert.equal(r.mvl.trim().toLowerCase(), 'of movies · 8 h');
+  assert.equal(r.both, '13 days'); assert.equal(r.bothl, 'of TV and movies together — 302 hours (12.6 days)');
+  assert.deepEqual(r.order, ['days', 'episodes', 'shows', 'movies', 'movie-hours', 'all-time-both']);
+});
 await ok('Stats → Overview has a "Goals · 2026" section (above Year in review) with a "Set goals" button, an invitation, and the streak', async () => {
   const order = await p.evaluate(() => [...document.querySelectorAll('.sd-sec2')].map((s) => s.querySelector('.sd-lbl').textContent.trim().toLowerCase())); const i = order.indexOf('goals · 2026'); assert.ok(i >= 0 && order[i + 1] === 'year in review', order.join(' | '));
   const t = await p.evaluate(() => document.querySelector('.a-goals').innerText.replace(/\s+/g, ' ')); assert.match(t, /Set goals/); assert.match(t, /Set a yearly target for episodes, movies or hours and see your progress and pace here\./);
