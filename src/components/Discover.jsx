@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/useStore.js';
-import { addShowToWatchlist, addMovieToWatchlist, setDiscoverHidden } from '../store/db.js';
+import { addShowToWatchlist, addMovieToWatchlist, setDiscoverHidden, recordDiscoverSeen, relinkDiscoverSeen } from '../store/db.js';
 import { useServicesPrefs } from '../store/servicesPrefs.js';
 import {
   img, hasKey, showDetails, movieDetails, tasteDetails, searchShows, tvRecommendations, movieRecommendations,
@@ -9,7 +9,8 @@ import {
 } from '../api/tmdb.js';
 import { runDiscover, ownedKeys } from './discoverEngine.js';
 import { animeRecommendations } from '../api/anilist.js';
-import { loadLog, saveLog, recordShown, relinkShown, hitStats, hitLine } from './hitLogic.js';
+import { hitStats, hitLine } from './hitLogic.js';
+import { createSeenTracker, SEEN_RATIO } from './seenTracker.js';
 import { loadCache, saveCache, progressText, genreLabel } from './tasteLogic.js';
 import { hiddenKeySet, hiddenList } from './hiddenLogic.js';
 import { trailerUrl } from './movieNightLogic.js';
@@ -50,6 +51,34 @@ const UNDO_MS = 6000;
 
 const storage = () => { try { return window.localStorage; } catch (e) { return { getItem: () => null, setItem: () => {} }; } };
 
+// Logs a card for the hit rate only once it has really been on screen (see seenTracker.js).
+// Returns the tracker, so opening or adding a card can count it straight away.
+function useSeenCards(rootRef, rows) {
+  const byKey = useRef(new Map()); // key -> name, for the cards currently in the rows
+  byKey.current = new Map(rows.flatMap((r) => r.items.map((c) => [c.key, c.name])));
+  const tracker = useRef(null);
+  if (!tracker.current) {
+    tracker.current = createSeenTracker({
+      onSeen: (keys) => recordDiscoverSeen(keys.map((key) => ({ key, name: byKey.current.get(key) || '' }))),
+      isPageVisible: () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
+    });
+  }
+  const observer = useRef(null);
+  useEffect(() => {
+    if (typeof IntersectionObserver !== 'function') return undefined; // very old browser: nothing is counted
+    observer.current = new IntersectionObserver((entries) => {
+      for (const e of entries) tracker.current.visible(e.target.dataset.key, e.isIntersecting && e.intersectionRatio >= SEEN_RATIO);
+    }, { threshold: [0, SEEN_RATIO] });
+    return () => { observer.current.disconnect(); observer.current = null; tracker.current.stop(); };
+  }, []);
+  useEffect(() => {
+    const io = observer.current, root = rootRef.current;
+    if (!io || !root) return;
+    root.querySelectorAll('.sd-disc-card[data-key]').forEach((el) => io.observe(el)); // observing twice is harmless
+  }, [rows, rootRef]);
+  return tracker.current;
+}
+
 export default function Discover() {
   const state = useStore();
   const svc = useServicesPrefs();
@@ -80,8 +109,7 @@ export default function Discover() {
         onProgress: (p) => { if (alive.current) setProgress(p); },
       });
       saveCache(st, cache);
-      // remember what was suggested (first time only), for the hit rate
-      saveLog(st, recordShown(loadLog(st), res.rows.flatMap((r) => r.items), new Date().toISOString()));
+      // The hit rate logs a title only once its card has been on screen (useSeenCards), not here.
       lastRun = { rows: res.rows, at: Date.now() };
       if (alive.current) {
         setRun(lastRun);
@@ -107,15 +135,18 @@ export default function Discover() {
     .map((r) => ({ ...r, items: r.items.filter((c) => !hiddenNow.has(c.key) && (!owned.has(c.key) || added[c.key])) }))
     .filter((r) => r.items.length > 0), [run, hiddenNow, owned, added]);
   const hiddenCount = useMemo(() => hiddenList(state.hidden).length, [state.hidden]);
-  const hits = useMemo(() => (run ? hitLine(hitStats(loadLog(storage()), state)) : ''), [run, state.shows, state.movies]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hits = useMemo(() => (run ? hitLine(hitStats(state.seenLog, state)) : ''), [run, state.seenLog, state.shows, state.movies]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rootRef = useRef(null);
+  const seen = useSeenCards(rootRef, rows);
 
   async function addItem(c) {
+    seen.seenNow(c.key); // you're adding it, so you saw it
     setAdding(c.key);
     try {
       if (c.kind === 'anime') {
         const d = await tmdbShowForAnime(c);
         addShowToWatchlist(d);
-        const st = storage(); saveLog(st, relinkShown(loadLog(st), c.key, `tv:${d.id}`)); // so it counts as a hit
+        relinkDiscoverSeen(c.key, `tv:${d.id}`); // so it counts as a hit
       }
       else if (c.kind === 'tv') addShowToWatchlist(await showDetails(c.id));
       else addMovieToWatchlist(await movieDetails(c.id));
@@ -189,7 +220,7 @@ export default function Discover() {
   const pct = progress && progress.phase === 'learning' && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : null;
 
   return (
-    <div className="sd-gap10 sd-disc">
+    <div className="sd-gap10 sd-disc" ref={rootRef}>
       {movieNight}
 
       {busy && (
@@ -243,7 +274,7 @@ export default function Discover() {
               <div className="sd-disc-card" key={c.key} data-key={c.key}>
                 <span className="sd-tilebtn-art">
                   <button type="button" className="sd-pick-x" onClick={() => notInterested(c)} title="Not interested" aria-label={`Not interested in ${c.name}`}>×</button>
-                  <button type="button" className="sd-disc-open" onClick={() => { setOpen(c); setTrailer({ key: null, busy: false, msg: '' }); }} aria-label={`About ${c.name}`}>
+                  <button type="button" className="sd-disc-open" onClick={() => { seen.seenNow(c.key); setOpen(c); setTrailer({ key: null, busy: false, msg: '' }); }} aria-label={`About ${c.name}`}>
                     <img src={artOf(c)} alt="" loading="lazy" />
                   </button>
                   <span className="sd-tilebtn-badge sd-disc-match">{c.match}% match</span>

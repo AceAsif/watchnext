@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import useTaste from './useTaste.js';
 import { tasteSummary } from './tasteLogic.js';
-import { loadLog, hitStats, hitLine } from './hitLogic.js';
+import { hitStats, hitLine } from './hitLogic.js';
 import { BarList, Section, Note } from './StatsUI.jsx';
 
 // Stats → Breakdown: what the recommendation engine thinks you like (the same profile Discover,
@@ -10,7 +10,7 @@ export default function YourTaste({ state }) {
   const { prof, cache } = useTaste(state);
   const learned = Object.keys(cache.items).length;
   const sum = useMemo(() => tasteSummary(prof, { learned }), [prof, learned]);
-  const hits = useMemo(() => { try { return hitLine(hitStats(loadLog(window.localStorage), state)); } catch (e) { return ''; } }, [state.shows, state.movies]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hits = useMemo(() => hitLine(hitStats(state.seenLog, state)), [state.seenLog, state.shows, state.movies]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!sum) {
     return (

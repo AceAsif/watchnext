@@ -3,6 +3,7 @@ import { blockedByWipe } from './wipeLogic.js';
 import { setNoteIn, withNotes, withMovieNote } from './notes.js';
 import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
 import { setHidden, mergeHidden, sameHidden } from '../components/hiddenLogic.js';
+import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
 
 // Simple localStorage-backed store with a subscribe API.
 // Single-user app, so no backend needed: everything lives in the browser.
@@ -14,6 +15,7 @@ const empty = () => ({
   movies: [],  // { name, watchedAt, runtimeMin }
   goals: {},   // yearly watch goals: { '2026': { episodes, movies, hours, at } } (see components/goalsLogic.js)
   hidden: {},  // Discover's "Not interested": { 'tv:1399': { on, at, name, … } } (see components/hiddenLogic.js)
+  seenLog: {}, // Discover's hit rate: titles it put on screen { 'tv:1399': { at, name } } (see components/hitLogic.js)
   settings: { tmdbKey: '' },
 });
 
@@ -78,6 +80,7 @@ let dirtyShows = new Set();
 let dirtyMovies = false;
 let dirtyGoals = false;
 let dirtyHidden = false;
+let dirtySeen = false;
 let deletedShows = new Set();
 
 // Persistent tombstones: ids the user has deleted for good. Kept in
@@ -179,6 +182,10 @@ export function markHiddenDirty() {
   dirtyHidden = true;
 }
 
+export function markSeenDirty() {
+  dirtySeen = true;
+}
+
 export function markShowDeleted(id) {
   queueShowDelete(id);
   tombstones.add(id); // remember it across reloads so it can't be resurrected
@@ -198,13 +205,15 @@ export function takeDirty() {
   const movies = dirtyMovies;
   const goals = dirtyGoals;
   const hidden = dirtyHidden;
+  const seen = dirtySeen;
   const deletedIds = deletedShows;
   dirtyShows = new Set();
   dirtyMovies = false;
   dirtyGoals = false;
   dirtyHidden = false;
+  dirtySeen = false;
   deletedShows = new Set();
-  return { showIds, movies, goals, hidden, deletedIds };
+  return { showIds, movies, goals, hidden, seen, deletedIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -761,6 +770,35 @@ export function applyRemoteHidden(remote) {
   return push;
 }
 
+// Discover put these titles on screen (items: [{ key, name }]). Only the first time counts: the
+// date a title was FIRST seen is kept. Returns true when something new was logged.
+export function recordDiscoverSeen(items, nowIso = new Date().toISOString()) {
+  const next = recordShown(state.seenLog, items, nowIso);
+  if (sameLog(next, state.seenLog)) return false;
+  update((s) => { s.seenLog = next; });
+  markSeenDirty();
+  return true;
+}
+
+// An anime pick was added as a TMDB show: count it as that show (see relinkShown).
+export function relinkDiscoverSeen(fromKey, toKey) {
+  const next = relinkShown(state.seenLog, fromKey, toKey);
+  if (sameLog(next, state.seenLog)) return false;
+  update((s) => { s.seenLog = next; });
+  markSeenDirty();
+  return true;
+}
+
+// The hit log from the cloud: union with this device's (earliest date per title). Returns true
+// when this device holds something the cloud copy lacks, so it gets pushed back up.
+export function applyRemoteSeen(remote) {
+  const merged = mergeLog(remote, state.seenLog);
+  if (!sameLog(merged, state.seenLog)) update((s) => { s.seenLog = merged; });
+  const push = !sameLog(merged, remote);
+  if (push) markSeenDirty();
+  return push;
+}
+
 export function restoreBackup(json) {
   const r = mergeBackup(state, json); // throws if the file isn't a backup
   update((s) => {
@@ -768,9 +806,11 @@ export function restoreBackup(json) {
     s.movies = r.movies;
     s.goals = r.goals;
     s.hidden = r.hidden;
+    s.seenLog = r.seenLog;
   });
   if (r.goalsChanged) markGoalsDirty();
   if (r.hiddenChanged) markHiddenDirty();
+  if (r.seenChanged) markSeenDirty();
   r.touchedIds.forEach(markShowDirty);
   r.touchedIds.forEach(clearTombstone);
   if (r.moviesChanged) markMoviesDirty();
@@ -839,6 +879,7 @@ export function wipeLibrary() {
   dirtyMovies = false;
   dirtyGoals = false;
   dirtyHidden = false;
+  dirtySeen = false;
   deletedShows = new Set();
 }
 

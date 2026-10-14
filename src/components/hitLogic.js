@@ -1,7 +1,14 @@
 // PURE: Discover's hit rate — how many of its suggestions you went on to add or watch.
-// No DOM, no store. Kept on this device only (localStorage), like the learned taste.
+// No DOM, no store. The log lives in the library state (state.seenLog) and syncs to the cloud
+// (users/{uid}/library/discover), so every device adds to, and shows, the same numbers.
 //
-//   log = { 'tv:1399': { at: '<first shown ISO>', name }, 'movie:603': {…}, 'anime:21': {…} }
+//   log = { 'tv:1399': { at: '<first seen ISO>', name }, 'movie:603': {…}, 'anime:21': {…} }
+//
+// A title is logged only once it has actually been ON SCREEN (see Discover.jsx: a card at least
+// 60% visible for about a second, or one you opened or added), not merely loaded into a row you
+// never scrolled to. An anime pick added to the library is relinked to its TMDB show key; the
+// anime entry stays behind marked { moved: 'tv:…' } so another device's copy can't bring it back
+// as a second suggestion.
 //
 // A suggestion is never something you already have, so any title in the log that is in your
 // library now was added after Discover showed it. "Watched" = at least one episode marked (a show)
@@ -18,6 +25,7 @@ export function sanitizeLog(raw) {
   for (const [k, e] of Object.entries(src)) {
     if (!KEY.test(k) || !e || typeof e !== 'object' || !isoOk(e.at)) continue;
     out[k] = { at: e.at, name: typeof e.name === 'string' ? e.name.slice(0, 200) : '' };
+    if (typeof e.moved === 'string' && KEY.test(e.moved) && e.moved !== k) out[k].moved = e.moved;
   }
   const keys = Object.keys(out);
   if (keys.length > LOG_MAX) keys.sort((a, b) => out[b].at.localeCompare(out[a].at)).slice(LOG_MAX).forEach((k) => delete out[k]);
@@ -39,10 +47,34 @@ export function recordShown(log, items, nowIso) {
 // to that show's key ('tv:<tmdb id>') so it counts as a hit. Returns a NEW log.
 export function relinkShown(log, fromKey, toKey) {
   const out = { ...sanitizeLog(log) };
-  if (!out[fromKey] || !KEY.test(toKey)) return out;
-  if (!out[toKey]) out[toKey] = out[fromKey];
-  delete out[fromKey];
+  if (!out[fromKey] || out[fromKey].moved || !KEY.test(toKey) || fromKey === toKey) return out;
+  if (!out[toKey]) out[toKey] = { at: out[fromKey].at, name: out[fromKey].name };
+  out[fromKey] = { ...out[fromKey], moved: toKey };
   return out;
+}
+
+// Two devices' logs combined: every title either has seen, with the EARLIER first-seen date; a
+// relinked (moved) mark on either side wins. Order-independent, so both sides converge.
+export function mergeLog(a, b) {
+  const x = sanitizeLog(a), y = sanitizeLog(b);
+  const out = {};
+  for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
+    const p = x[k], q = y[k];
+    if (!p || !q) { out[k] = p || q; continue; }
+    const first = p.at <= q.at ? p : q;
+    const e = { at: first.at, name: first.name || p.name || q.name };
+    const moved = p.moved || q.moved;
+    if (moved) e.moved = moved;
+    out[k] = e;
+  }
+  return sanitizeLog(out);
+}
+
+export function sameLog(a, b) {
+  const x = sanitizeLog(a), y = sanitizeLog(b);
+  const kx = Object.keys(x);
+  if (kx.length !== Object.keys(y).length) return false;
+  return kx.every((k) => y[k] && y[k].at === x[k].at && y[k].name === x[k].name && (y[k].moved || '') === (x[k].moved || ''));
 }
 
 // Library titles by key, with whether you've watched any of it.
@@ -64,7 +96,7 @@ function libraryIndex(state) {
 
 // -> { suggested, added, watched, since, recent: [{ key, name, watched }] } (recent = newest hits first, max 5)
 export function hitStats(log, state) {
-  const l = sanitizeLog(log);
+  const l = Object.fromEntries(Object.entries(sanitizeLog(log)).filter(([, e]) => !e.moved));
   const idx = libraryIndex(state);
   const hits = Object.entries(l).filter(([k]) => idx.has(k)).map(([k, e]) => ({ key: k, name: e.name, at: e.at, watched: idx.get(k) === true }));
   hits.sort((a, b) => b.at.localeCompare(a.at));
@@ -87,5 +119,7 @@ export function hitLine(st) {
   return `Discover has suggested ${n(st.suggested, 'title', 'titles')}: you added ${st.added.toLocaleString()} (${p < 1 ? '<1' : p}%) and watched ${st.watched.toLocaleString()}.`;
 }
 
-export function loadLog(storage) { try { return sanitizeLog(JSON.parse(storage.getItem(LOG_KEY))); } catch (e) { return {}; } }
-export function saveLog(storage, log) { try { storage.setItem(LOG_KEY, JSON.stringify(sanitizeLog(log))); } catch (e) { /* full or blocked */ } }
+// The old device-only log (before it synced, and before it counted only on-screen titles). It is
+// no longer read: its "suggested" number included every title loaded into a row, seen or not.
+// Kept exported so tests can check it is ignored.
+export const OLD_LOG_KEY = LOG_KEY;

@@ -251,10 +251,37 @@ await ok('Discover respects the list on a fresh build: hidden titles stay out, t
   const all = (await rowsOf(p)).flatMap((r) => r.items.map((c) => c.key)); assert.ok(!all.includes(victim2.key) && !all.includes(film.key)); assert.ok(all.includes(victim.key));
   assert.ok(!all.includes(sev.key), 'the show you added is on your watchlist now, so it is not suggested');
 });
-await ok('hit rate: the footer counts what Discover has suggested and that you added one of them', async () => {
+const seenKeys = async () => Object.keys((await stored(p)).seenLog || {});
+const allCards = async () => (await rowsOf(p)).flatMap((r) => r.items.map((c) => c.key));
+await wait(2600); // cards on screen for a second, then one batch
+const firstSeen = await seenKeys();
+await ok('hit rate counts only cards that were actually on screen, not every title loaded into a row', async () => {
+  const loaded = (await allCards()).length;
+  assert.ok(firstSeen.length > 0, 'the cards in view are counted');
+  assert.ok(firstSeen.length < loaded / 2, `seen ${firstSeen.length} of ${loaded} loaded`);
+  assert.equal(await p.evaluate(() => localStorage.getItem('watchnext-discover-log-v1')), null, 'the old device-only log is not written any more');
+  assert.ok(firstSeen.includes(sev.key), 'the show you added counts (adding means you saw it)');
+});
+// scroll the page down through every row, and the first row sideways, pausing on each screen
+await p.evaluate(async () => {
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const strip = document.querySelector('.sd-disc-strip'); strip.scrollLeft = strip.scrollWidth; await pause(1300);
+  for (let y = 0; y < document.documentElement.scrollHeight; y += window.innerHeight * 0.8) { window.scrollTo(0, y); await pause(1300); }
+});
+await wait(1600);
+await ok('scrolling to more cards (down the rows, and along a row) adds them; a quick flick does not', async () => {
+  const now = await seenKeys();
+  assert.ok(now.length > firstSeen.length, `${firstSeen.length} -> ${now.length}`);
+  const before = now.length;
+  await p.evaluate(() => { const strips = [...document.querySelectorAll('.sd-disc-strip')]; const last = strips.at(-1); last.scrollLeft = last.scrollWidth; last.scrollLeft = 0; });
+  await wait(1800);
+  assert.equal((await seenKeys()).length, before, 'cards flicked past in one go are not counted');
+});
+await ok('the footer line matches the synced log: suggested = titles seen, you added 1', async () => {
+  const st = await stored(p); const shown = Object.values(st.seenLog).filter((e) => !e.moved).length;
   const t = await p.evaluate(() => document.querySelector('[data-testid=disc-hits]').textContent);
-  const shown = Object.keys(await p.evaluate(() => JSON.parse(localStorage.getItem('watchnext-discover-log-v1')))).length;
-  assert.ok(shown > 30, String(shown)); assert.equal(t, `Discover has suggested ${shown} titles: you added 1 (${Math.round(100 / shown) < 1 ? '<1' : Math.round(100 / shown)}%) and watched 0.`);
+  const pc = Math.round(100 / shown);
+  assert.equal(t, `Discover has suggested ${shown} titles: you added 1 (${pc < 1 ? '<1' : pc}%) and watched 0.`);
 });
 await p.close();
 

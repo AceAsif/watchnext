@@ -17,6 +17,7 @@
 import { mergeNotes, withMovieNote, movieNoteOf } from './notes.js';
 import { fillGoals } from '../components/goalsLogic.js';
 import { fillHidden } from '../components/hiddenLogic.js';
+import { mergeLog, sameLog } from '../components/hitLogic.js';
 
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -197,5 +198,9 @@ export function mergeBackup(local, backup) {
   const h = fillHidden(local.hidden, backup.hidden);
   summary.hiddenAdded = h.added;
 
-  return { shows, movies, goals: g.goals, goalsChanged: g.added > 0, hidden: h.hidden, hiddenChanged: h.added > 0, touchedIds, moviesChanged, summary };
+  // Discover's hit-rate log: every title either side has seen, earliest date kept (never shrinks)
+  const seenLog = mergeLog(local.seenLog, backup.seenLog);
+  const seenChanged = !sameLog(seenLog, local.seenLog);
+
+  return { shows, movies, goals: g.goals, goalsChanged: g.added > 0, hidden: h.hidden, hiddenChanged: h.added > 0, seenLog, seenChanged, touchedIds, moviesChanged, summary };
 }

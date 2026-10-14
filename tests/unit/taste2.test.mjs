@@ -222,18 +222,30 @@ t('hit stats: suggested titles now in your library count as added; watched = an 
   assert.equal(HL.hitLine({ suggested: 400, added: 1, watched: 0 }), 'Discover has suggested 400 titles: you added 1 (<1%) and watched 0.');
   assert.equal(HL.hitLine(HL.hitStats({}, state)), '');
 });
-t('relinkShown: an anime pick added as a TMDB show moves to that key and then counts as a hit', () => {
+t('relinkShown: an anime pick added as a TMDB show counts once, as that show, and stays marked so it is not counted twice', () => {
   const log = HL.recordShown({}, [{ key: 'anime:101922', name: 'Demon Slayer' }], ago(3));
   const moved = HL.relinkShown(log, 'anime:101922', 'tv:5100');
-  assert.deepEqual(Object.keys(moved), ['tv:5100']); assert.equal(moved['tv:5100'].at, ago(3));
-  assert.equal(HL.hitStats(moved, { shows: { x: { tmdbId: 5100, watched: {} } }, movies: [] }).added, 1);
+  assert.deepEqual(Object.keys(moved).sort(), ['anime:101922', 'tv:5100']); assert.equal(moved['tv:5100'].at, ago(3));
+  assert.equal(moved['anime:101922'].moved, 'tv:5100');
+  const st = HL.hitStats(moved, { shows: { x: { tmdbId: 5100, watched: {} } }, movies: [] });
+  assert.equal(st.added, 1); assert.equal(st.suggested, 1, 'the moved anime entry is not a second suggestion');
   assert.deepEqual(HL.relinkShown(log, 'anime:9', 'tv:1'), log, 'unknown key: unchanged'); assert.deepEqual(HL.relinkShown(log, 'anime:101922', 'bogus'), log);
+  assert.deepEqual(HL.relinkShown(moved, 'anime:101922', 'tv:7'), moved, 'already moved: unchanged');
 });
-t('hit log load/save survive broken or blocked storage', () => {
-  const mem = new Map(); const st = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
-  HL.saveLog(st, { 'tv:1': { at: ago(1), name: 'A' } }); assert.equal(HL.loadLog(st)['tv:1'].name, 'A');
-  mem.set(HL.LOG_KEY, '{x'); assert.deepEqual(HL.loadLog(st), {});
-  const blocked = { getItem: () => { throw new Error('no'); }, setItem: () => { throw new Error('no'); } }; assert.deepEqual(HL.loadLog(blocked), {}); HL.saveLog(blocked, {});
+t('mergeLog: two devices combine to every title either has seen, with the earlier date; moved marks win; order does not matter', () => {
+  const phone = { 'tv:1': { at: ago(5), name: 'A' }, 'anime:9': { at: ago(4), name: 'Anime', moved: 'tv:90' }, 'tv:90': { at: ago(4), name: 'Anime' } };
+  const pc = { 'tv:1': { at: ago(2), name: 'A' }, 'movie:2': { at: ago(1), name: 'B' }, 'anime:9': { at: ago(6), name: 'Anime' } };
+  const m = HL.mergeLog(phone, pc);
+  assert.deepEqual(Object.keys(m).sort(), ['anime:9', 'movie:2', 'tv:1', 'tv:90']);
+  assert.equal(m['tv:1'].at, ago(5)); assert.equal(m['anime:9'].at, ago(6)); assert.equal(m['anime:9'].moved, 'tv:90');
+  assert.ok(HL.sameLog(m, HL.mergeLog(pc, phone)), 'same result either way round');
+  assert.ok(HL.sameLog(HL.mergeLog(m, m), m), 'merging again changes nothing');
+  assert.equal(HL.sameLog(m, pc), false); assert.ok(HL.sameLog({}, null));
+  assert.deepEqual(HL.mergeLog(null, 'junk'), {});
+});
+t('sanitizeLog drops a bad moved mark', () => {
+  const s = HL.sanitizeLog({ 'anime:1': { at: ago(1), name: 'x', moved: 'bogus' }, 'anime:2': { at: ago(1), name: 'y', moved: 'anime:2' } });
+  assert.equal(s['anime:1'].moved, undefined); assert.equal(s['anime:2'].moved, undefined);
 });
 
 for (const [name, fn] of tests) { await fn(); n++; console.log('ok  -', name); }
