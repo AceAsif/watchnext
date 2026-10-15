@@ -98,6 +98,8 @@ const small = await p.evaluate(() => [...document.querySelectorAll('.sd-setbtn, 
 ok('every button and link is at least 44px tall (touch targets)', () => assert.deepEqual(small, []));
 const src = fs.readFileSync(repoPath('src/pages/Settings.jsx'), 'utf8') + fs.readFileSync(repoPath('src/components/SettingsCards.jsx'), 'utf8');
 ok('the Settings code no longer calls the browser popups confirm() or alert()', () => assert.doesNotMatch(src, /(^|[^.\w])(confirm|alert)\(/m));
+const credit = await p.evaluate(() => { const c = document.querySelector('[data-testid=credit]'); const a = c && c.querySelector('a'); const cards = document.querySelectorAll('.sd-setcard'); return c && { text: c.textContent.trim(), href: a.href, rel: a.rel, h: a.getBoundingClientRect().height, below: c.getBoundingClientRect().top >= cards[cards.length - 1].getBoundingClientRect().bottom }; });
+ok('a small "Created by AceAsif" credit sits below the Danger zone, links to GitHub, and is a 44px tap target', () => { assert.equal(credit.text, 'Created by AceAsif'); assert.equal(credit.href, 'https://github.com/AceAsif'); assert.match(credit.rel, /noopener/); assert.ok(credit.h >= 43.5); assert.ok(credit.below); });
 await shot(p, '01_settings_phone');
 await p.close();
 

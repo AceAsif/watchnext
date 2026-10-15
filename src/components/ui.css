@@ -1677,3 +1677,8 @@ button.sd-nitem:focus-visible { outline: 2px solid var(--amber); outline-offset:
 @media (min-width: 720px) { .sd-chip-acct .em { display: inline; } }
 .sd-signout-opt { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; font-size: 13.5px; line-height: 1.45; color: #c3cad5; cursor: pointer; }
 .sd-signout-opt input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--amber); flex: none; }
+
+/* Small credit line at the bottom of Settings */
+.sd-credit { margin: 28px 0 8px; text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); opacity: 0.7; }
+.sd-credit a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.sd-credit a:hover, .sd-credit a:focus-visible { color: var(--amber); opacity: 1; outline: none; }

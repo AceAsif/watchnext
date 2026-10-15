@@ -270,6 +270,10 @@ export default function Settings() {
         <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} onAskEverywhere={() => setConfirm({ type: 'everywhere' })} />
       </div>
 
+      <p className="sd-credit" data-testid="credit">
+        Created by <a href="https://github.com/AceAsif" target="_blank" rel="noopener noreferrer">AceAsif</a>
+      </p>
+
       {target && (
         <ConfirmDialog
           title="Delete this show?"
