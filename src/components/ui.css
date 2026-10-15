@@ -1667,3 +1667,13 @@ button.sd-nitem:focus-visible { outline: 2px solid var(--amber); outline-offset:
 .sd-switch-opt.primary b { color: var(--amber); }
 .sd-switch-opt:disabled { opacity: 0.5; cursor: default; }
 .sd-switch-opt:not(:disabled):focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+
+/* "Signed in as" chip in the masthead (components/AccountChip.jsx) */
+.sd-chip-acct { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 44px; padding: 0 4px; border-radius: 22px; background: transparent; border: 1px solid transparent; color: var(--text-dim); font: inherit; cursor: pointer; }
+.sd-chip-acct .av { width: 32px; height: 32px; border-radius: 50%; background: rgba(242, 163, 60, 0.14); color: var(--amber); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 15px; flex: none; }
+.sd-chip-acct .em { display: none; font-size: 13px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; }
+.sd-chip-acct:hover { background: var(--bg-card); border-color: var(--line); }
+.sd-chip-acct:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+@media (min-width: 720px) { .sd-chip-acct .em { display: inline; } }
+.sd-signout-opt { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; font-size: 13.5px; line-height: 1.45; color: #c3cad5; cursor: pointer; }
+.sd-signout-opt input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--amber); flex: none; }

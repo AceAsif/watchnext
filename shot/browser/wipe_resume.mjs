@@ -356,6 +356,65 @@ await p.close();
   await pg.close();
 }
 
+// ---- "Signed in as" chip + backup before sign-out
+{
+  const pg = await open(FAKE.address().port);
+  const ev = () => pg.evaluate(() => window.__events);
+  await ok('phone: the masthead chip shows just the account initial (not the email), and fits', async () => {
+    const r = await pg.evaluate(() => { const c = document.querySelector('[data-testid=account-chip]'); const em = c.querySelector('.em'); return { av: c.querySelector('.av').textContent, emShown: !!em && getComputedStyle(em).display !== 'none', label: c.getAttribute('aria-label'), over: document.documentElement.scrollWidth > document.documentElement.clientWidth }; });
+    assert.equal(r.av, 'A'); assert.equal(r.emShown, false); assert.match(r.label, /Signed in as asif@example\.com/); assert.equal(r.over, false);
+  });
+  await pg.screenshot({ path: `${OUT}/account_chip_phone.png`, clip: { x: 0, y: 0, width: 390, height: 120 } });
+  await ok('tapping the chip opens Settings, on the Sync card that names the account', async () => {
+    await pg.click('[data-testid=account-chip]'); await wait(500);
+    assert.match(await text(pg), /Sync across devices/); assert.match(await pg.evaluate(() => document.querySelector('.sd-acct').innerText), /Signed in as\s+asif@example\.com/i);
+  });
+  await ok('the backup-before-sign-out box is on by default, with an honest explanation', async () => {
+    assert.equal(await pg.evaluate(() => document.querySelector('[data-testid=signout-backup]').checked), true);
+    assert.match(await pg.evaluate(() => document.querySelector('.sd-signout-opt').innerText), /keeps your library on this device; the backup is a safety copy/);
+  });
+  await pg.screenshot({ path: `${OUT}/signout_backup_phone.png`, fullPage: true });
+  await ok('Sign out: a backup downloads FIRST (holding the library), then it signs out, and says so', async () => {
+    await clickText(pg, 'Sign out', 'button'); await wait(300);
+    assert.match(await pg.evaluate(() => document.querySelector('.sd-acct ~ .sd-setacts button').innerText), /Signing out/, 'busy state');
+    await wait(1400);
+    const e = await ev(); const dl = e.findIndex((x) => x.startsWith('download:')), so = e.indexOf('signout');
+    assert.ok(dl >= 0 && so > dl, e.join(','));
+    const file = await pg.evaluate(() => JSON.parse(new TextDecoder().decode(new Uint8Array(window.__dl.at(-1).bytes))));
+    assert.ok(Object.keys(file.shows).length > 0); assert.equal(file.settings && file.settings.tmdbKey, undefined, 'the TMDB key is left out');
+    assert.match(await text(pg), /Signed out\. A backup of your library was downloaded first\. Your library is still on this device\./);
+    assert.equal((await stored(pg)).shows && Object.keys((await stored(pg)).shows).length > 0, true, 'the library stays');
+  });
+  await ok('switched off: signing out downloads nothing, and the choice is remembered after a reload', async () => {
+    await pg.evaluate(() => window.__events.length = 0);
+    await pg.click('[data-testid=signout-backup]'); await wait(200);
+    await pg.reload({ waitUntil: 'networkidle0' }); await wait(500); await tab(pg, 'Settings');
+    assert.equal(await pg.evaluate(() => document.querySelector('[data-testid=signout-backup]').checked), false);
+    await clickText(pg, 'Sign out', 'button'); await wait(1400);
+    const e = await ev(); assert.deepEqual(e.filter((x) => x.startsWith('download:')), []); assert.ok(e.includes('signout'));
+    assert.match(await text(pg), /Signed out\. Your library is still on this device\./);
+  });
+  await ok('empty library: nothing to back up, so no download even with the box on', async () => {
+    await pg.evaluate(() => { localStorage.setItem('watchnext-state-v1', JSON.stringify({ shows: {}, movies: [], goals: {}, hidden: {}, seenLog: {}, settings: { tmdbKey: '' } })); localStorage.setItem('watchnext-signout-backup-v1', '1'); });
+    await pg.reload({ waitUntil: 'networkidle0' }); await wait(500); await tab(pg, 'Settings');
+    await pg.evaluate(() => window.__events.length = 0);
+    await clickText(pg, 'Sign out', 'button'); await wait(500);
+    const e = await ev(); assert.deepEqual(e.filter((x) => x.startsWith('download:')), []); assert.ok(e.includes('signout'));
+  });
+  await pg.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 }); await wait(400);
+  await ok('desktop: the chip also shows the email', async () => {
+    const r = await pg.evaluate(() => { const em = document.querySelector('[data-testid=account-chip] .em'); return em && getComputedStyle(em).display !== 'none' ? em.textContent : null; });
+    assert.equal(r, 'asif@example.com');
+  });
+  await pg.screenshot({ path: `${OUT}/account_chip_desktop.png`, clip: { x: 0, y: 0, width: 1280, height: 110 } });
+  await pg.close();
+}
+{ // real (signed-out) build: no chip
+  const pg = await open(REAL.address().port);
+  await ok('signed out (real build, no cloud user): no chip in the masthead', async () => assert.equal(await has(pg, '[data-testid=account-chip]'), false));
+  await pg.close();
+}
+
 console.log(`\n${checks} checks passed`);
 console.log('PROBLEMS:', problems.length ? '\n' + problems.join('\n') : 'none');
 await browser.close(); FAKE.close(); REAL.close();

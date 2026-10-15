@@ -12,7 +12,7 @@ export const getCloudSyncing = () => syncing;
 export const subscribeCloudSyncing = (fn) => { syncSubs.add(fn); return () => syncSubs.delete(fn); };
 if (typeof window !== 'undefined') window.__setSyncing = (v) => { syncing = !!v; syncSubs.forEach((f) => f()); };
 export const signIn = async () => {};
-export const signOutCloud = async () => {};
+export const signOutCloud = async () => { (window.__events = window.__events || []).push('signout'); };
 export async function wipeEverywhere() {
   (window.__events = window.__events || []).push('wipe-start');
   await new Promise((r) => setTimeout(r, window.__wipeDelay || 50));

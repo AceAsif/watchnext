@@ -100,3 +100,32 @@ export function deleteAllEffects(signedIn) {
   if (signedIn) lines.push('Your cloud copy is not deleted — it may sync back down');
   return lines;
 }
+
+// ---------------------------------------------------------------- account chip + sign-out backup
+// "Signed in as" chip in the masthead: which account's library is on screen. Initial + short email.
+// -> null when nobody is signed in. Only the email is ever shown (never a name or photo).
+export function accountChip(user) {
+  const email = user && typeof user.email === 'string' ? user.email.trim() : '';
+  if (!user || !email) return user ? { initial: '?', email: '', label: 'Signed in. Open Settings.' } : null;
+  return { initial: email.charAt(0).toUpperCase(), email, label: `Signed in as ${email}. Open Settings.` };
+}
+
+// Backup before sign-out: on by default, switched off per device. Stored apart from the library.
+export const SIGNOUT_BACKUP_KEY = 'watchnext-signout-backup-v1';
+export function signOutBackupOn(storage) {
+  try { return storage.getItem(SIGNOUT_BACKUP_KEY) !== '0'; } catch (e) { return true; }
+}
+export function setSignOutBackup(storage, on) {
+  try { storage.setItem(SIGNOUT_BACKUP_KEY, on ? '1' : '0'); } catch (e) { /* blocked: stays on */ }
+}
+// What signing out does with the backup: 'backup' (download first) or 'skip' (switched off, or
+// nothing in the library to save). `count` is libraryCount(state).
+export function signOutPlan(enabled, count) {
+  return enabled && Number(count) > 0 ? 'backup' : 'skip';
+}
+// The line shown after signing out.
+export function signOutText(plan, { failed = false } = {}) {
+  if (plan === 'backup' && failed) return 'Signed out. The backup could not be saved first, but your library is still on this device.';
+  if (plan === 'backup') return 'Signed out. A backup of your library was downloaded first. Your library is still on this device.';
+  return 'Signed out. Your library is still on this device.';
+}

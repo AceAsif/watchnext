@@ -20,6 +20,10 @@ import {
   orphanShows,
   deleteShowEffects,
   deleteAllEffects,
+  signOutBackupOn,
+  setSignOutBackup,
+  signOutPlan,
+  signOutText,
 } from '../components/settingsLogic.js';
 import {
   Banner,
@@ -100,6 +104,28 @@ export default function Settings() {
     }
   }
 
+  const [backupOnOut, setBackupOnOut] = useState(() => signOutBackupOn(localStorage));
+  function toggleSignOutBackup(on) { setSignOutBackup(localStorage, on); setBackupOnOut(on); }
+  // Sign out: download a backup FIRST (unless it's switched off or the library is empty), give the
+  // browser a moment to start that download, then sign out. The library stays on this device.
+  async function handleSignOut() {
+    if (cloudBusy) return;
+    setCloudBusy(true);
+    const plan = signOutPlan(signOutBackupOn(localStorage), libraryCount(getState()));
+    let failed = false;
+    try {
+      if (plan === 'backup') {
+        try { exportBackup(false); await new Promise((r) => setTimeout(r, 800)); } catch (e) { failed = true; console.error('Backup before sign-out failed', e); }
+      }
+      await signOutCloud();
+      say(signOutText(plan, { failed }), failed ? 'err' : 'ok');
+    } catch (err) {
+      say('Sign-out failed: ' + err.message, 'err');
+    } finally {
+      setCloudBusy(false);
+    }
+  }
+
   function saveKey() {
     setTmdbKey(key);
     setKey(key.trim());
@@ -156,7 +182,7 @@ export default function Settings() {
     reader.readAsText(file);
   }
 
-  function exportBackup() {
+  function exportBackup(announce = true) {
     // The TMDB key is deliberately left out (see backupState).
     const blob = new Blob([JSON.stringify(backupState(getState()), null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -167,7 +193,7 @@ export default function Settings() {
     const next = afterBackup(loadMeta(localStorage), libraryCount(getState()), new Date());
     saveMeta(localStorage, next);
     setBk(next);
-    say('Backup downloaded. Your TMDB key is not included in the file.');
+    if (announce) say('Backup downloaded. Your TMDB key is not included in the file.');
   }
 
   function exportCsv(kind) {
@@ -226,7 +252,7 @@ export default function Settings() {
       {nudge.show && <BackupNudge copy={nudgeCopy(nudge)} onBackup={exportBackup} onLater={remindLater} />}
 
       <div className="sd-set">
-        <SyncCard available={cloudOn} user={cloudUser} busy={cloudBusy} onSignIn={handleSignIn} onSignOut={() => signOutCloud()} />
+        <SyncCard available={cloudOn} user={cloudUser} busy={cloudBusy} onSignIn={handleSignIn} onSignOut={handleSignOut} backupOnSignOut={backupOnOut} onToggleBackup={toggleSignOutBackup} />
         <KeyCard status={keyStatus(savedKey, key)} value={key} onChange={setKey} onSave={saveKey} />
         <ServicesCard mine={svc.mine} onToggle={toggleMyService} />
         <ImportCard

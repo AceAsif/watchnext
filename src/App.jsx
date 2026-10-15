@@ -11,6 +11,7 @@ import Search from './pages/Search.jsx';
 import Notes from './pages/Notes.jsx';
 import OfflineBanner from './components/OfflineBanner.jsx';
 import AccountSwitchSheet from './components/AccountSwitchSheet.jsx';
+import AccountChip from './components/AccountChip.jsx';
 import { newNotesMemo } from './components/notesSearchLogic.js';
 
 const TABS = [
@@ -97,6 +98,9 @@ export default function App() {
         <h1>
           Watch<span>Next</span>
         </h1>
+        <span style={{ marginLeft: 'auto', minWidth: 0 }}>
+          <AccountChip onOpen={() => { setTab('settings'); closeShow(); setSearching(false); setNotesOpen(false); }} />
+        </span>
         <button
           className="sd-ib masthead-search"
           onClick={() => {
@@ -105,7 +109,7 @@ export default function App() {
           }}
           aria-label="Search shows and movies"
           title="Search"
-          style={{ marginLeft: 'auto', color: searching ? 'var(--amber)' : 'var(--text)' }}
+          style={{ color: searching ? 'var(--amber)' : 'var(--text)' }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />

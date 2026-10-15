@@ -49,4 +49,29 @@ t('restoreResultText: real counts, singular/plural, "nothing to restore", and sk
   assert.equal(S.restoreResultText({ ...z, showsUpdated: 2, skipped: 1 }), 'Restored from backup: 2 shows updated, 1 unreadable entry skipped.');
   assert.match(S.restoreResultText({ ...z, skipped: 3 }), /3 unreadable entries skipped/);
 });
+// ---- "Signed in as" chip and backup before sign-out
+t('accountChip: initial + email for a signed-in user; null when signed out; never a name or photo', () => {
+  assert.deepEqual(S.accountChip({ email: ' asif3678@gmail.com ', displayName: 'Asif', photoURL: 'x' }), { initial: 'A', email: 'asif3678@gmail.com', label: 'Signed in as asif3678@gmail.com. Open Settings.' });
+  assert.equal(S.accountChip(null), null); assert.equal(S.accountChip(undefined), null);
+  assert.deepEqual(S.accountChip({ uid: 'u' }), { initial: '?', email: '', label: 'Signed in. Open Settings.' });
+  assert.equal(S.accountChip({ email: 42 }).email, '');
+});
+t('sign-out backup: on by default, off only when switched off, survives blocked storage', () => {
+  const mem = new Map(); const st = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  assert.equal(S.signOutBackupOn(st), true);
+  S.setSignOutBackup(st, false); assert.equal(S.signOutBackupOn(st), false);
+  S.setSignOutBackup(st, true); assert.equal(S.signOutBackupOn(st), true);
+  const blocked = { getItem: () => { throw new Error('no'); }, setItem: () => { throw new Error('no'); } };
+  assert.equal(S.signOutBackupOn(blocked), true); S.setSignOutBackup(blocked, false);
+});
+t('signOutPlan: backs up only when switched on AND there is something in the library', () => {
+  assert.equal(S.signOutPlan(true, 12), 'backup'); assert.equal(S.signOutPlan(true, 0), 'skip');
+  assert.equal(S.signOutPlan(false, 12), 'skip'); assert.equal(S.signOutPlan(true, undefined), 'skip');
+});
+t('signOutText: says what happened, never claims the library left the device', () => {
+  assert.match(S.signOutText('backup'), /backup of your library was downloaded first/); assert.match(S.signOutText('backup'), /still on this device/);
+  assert.match(S.signOutText('backup', { failed: true }), /could not be saved/); assert.match(S.signOutText('backup', { failed: true }), /still on this device/);
+  assert.equal(S.signOutText('skip'), 'Signed out. Your library is still on this device.');
+});
+
 console.log(`\n${n} settings tests passed`);

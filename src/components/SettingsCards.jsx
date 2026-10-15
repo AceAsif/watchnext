@@ -73,7 +73,7 @@ export function Banner({ msg, onClose, bannerRef }) {
 
 // ---------------------------------------------------------------- Sync
 // available: is cloud sync configured for this build?  user: signed-in user or null.
-export function SyncCard({ available, user, busy, onSignIn, onSignOut }) {
+export function SyncCard({ available, user, busy, onSignIn, onSignOut, backupOnSignOut = true, onToggleBackup }) {
   const signedIn = available && !!user;
   return (
     <SetCard icon={I.cloud} label="Sync" title="Sync across devices" className={signedIn ? 'on' : ''}>
@@ -108,8 +108,14 @@ export function SyncCard({ available, user, busy, onSignIn, onSignOut }) {
           <p className="sd-setp">
             Changes sync to the cloud automatically and appear on your other signed-in devices within a few seconds.
           </p>
+          {onToggleBackup && (
+            <label className="sd-signout-opt">
+              <input type="checkbox" checked={backupOnSignOut} onChange={(e) => onToggleBackup(e.target.checked)} data-testid="signout-backup" />
+              <span>Download a backup when I sign out. Signing out keeps your library on this device; the backup is a safety copy.</span>
+            </label>
+          )}
           <div className="sd-setacts">
-            <button type="button" className="sd-setbtn" onClick={onSignOut}>Sign out</button>
+            <button type="button" className="sd-setbtn" onClick={onSignOut} disabled={busy}>{busy ? 'Signing out…' : 'Sign out'}</button>
           </div>
         </>
       )}
