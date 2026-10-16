@@ -183,9 +183,9 @@ export function suggest(cands, opts = {}) {
     for (const c of pool0) {
       const fit = fitFor(c, budget);
       if (!fit.fits) continue;
-      if (opts.onlyMine && !(mine && isOnMyServices(c.rec, mine))) continue;
+      if (opts.onlyMine && !(mine && isOnMyServices(c.rec, mine, opts.region))) continue;
       const ms = moodState(c, mood);
-      const where = mine ? servicesLabel(c.rec, mine) : '';
+      const where = mine ? servicesLabel(c.rec, mine, opts.region) : '';
       let score = 30 * (fit.used / budget) + (c.kind === 'continue' ? 25 + recency(c, opts.today) : c.kind === 'start' ? 12 : 10);
       score += ms === 'match' ? 40 : ms === 'unknown' ? 8 : 0;
       if (mood === 'funny' && c.funny) score += 8;

@@ -84,7 +84,7 @@ export default function Shows({ openShow }) {
   const mine = useMemo(() => new Set(svc.mine), [svc.mine]);
   const servicesOn = svc.showsOnly;
   const [pickServices, setPickServices] = useState(false);
-  const base = useMemo(() => (servicesOn ? entries.filter(([, s]) => isOnMyServices(s, mine)) : entries), [entries, servicesOn, mine]);
+  const base = useMemo(() => (servicesOn ? entries.filter(([, s]) => isOnMyServices(s, mine, svc.region)) : entries), [entries, servicesOn, mine, svc.region]);
   const list = useMemo(
     () => sortShows(filterShows(base, filters, H), sortBy, sortDir, H),
     [base, filters, sortBy, sortDir]
@@ -97,7 +97,7 @@ export default function Shows({ openShow }) {
       .map(([id, s]) => ({ key: 's:' + id, kind: 'tv', id, tmdbId: s.tmdbId, rec: s, p: prio(s) }))
       .sort((a, b) => a.p - b.p);
   }, [entries, filters]);
-  const av = useAvailability(checkItems, servicesOn);
+  const av = useAvailability(checkItems, servicesOn, svc.region);
   const svcStatus = servicesOn ? statusLine({ remaining: av.remaining, failed: av.failed, noKey: av.noKey, noServices: svc.mine.length === 0, unknownIds: av.noId }) : null;
   const toggleServices = () => {
     setServicesPrefs({ showsOnly: !servicesOn });
@@ -136,7 +136,7 @@ export default function Shows({ openShow }) {
   }
 
   async function detectPlatforms() {
-    // Fill empty platform chips from TMDB's AU streaming providers, and cache the
+    // Fill empty platform chips from TMDB's streaming providers for your region, and cache the
     // provider list on each show for the detail page. Only touches shows that
     // don't already have a platform set, so it never overrides your picks.
     const targets = needPlatform;
@@ -144,10 +144,10 @@ export default function Shows({ openShow }) {
     let done = 0;
     for (const [id, show] of targets) {
       try {
-        const au = await watchProviders('tv', show.tmdbId);
+        const au = await watchProviders('tv', show.tmdbId, svc.region);
         const flatrate = (au && au.flatrate) || [];
         const { providers: subs, free, link } = normalizeProviders(au);
-        setShowProviders(id, subs, link, free);
+        setShowProviders(id, subs, link, free, svc.region);
         const pid = platformFromProviders(flatrate);
         if (pid) setShowPlatform(id, pid);
       } catch (err) {
@@ -336,7 +336,7 @@ export default function Shows({ openShow }) {
       ) : list.length > 0 ? (
         <div className="sd-lgrid">
           {list.map(([id, show]) => (
-            <ShowTile key={id} show={show} seen={watchedCount(show)} times={showWatchTimes(show)} onOpen={() => openShow(id)} sub={servicesOn ? servicesLabel(show, mine) : ''} />
+            <ShowTile key={id} show={show} seen={watchedCount(show)} times={showWatchTimes(show)} onOpen={() => openShow(id)} sub={servicesOn ? servicesLabel(show, mine, svc.region) : ''} />
           ))}
         </div>
       ) : kind === 'library' ? (

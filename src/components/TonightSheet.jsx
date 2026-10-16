@@ -60,12 +60,12 @@ export default function TonightSheet({ openShow, onClose }) {
     () => fitting.map((c) => ({ key: c.key, kind: c.kind === 'movie' ? 'movie' : 'tv', id: c.id, tmdbId: c.tmdbId, rec: c.rec })),
     [fitting]
   );
-  const av = useAvailability(checkItems, prefs.onlyMine);
+  const av = useAvailability(checkItems, prefs.onlyMine, svc.region);
 
   const { prof, cache, ctx } = useTaste(state);
   const result = useMemo(
-    () => suggest(cands, { minutes: prefs.minutes, mood: prefs.mood, seed, exclude: shown, mine, onlyMine: prefs.onlyMine, today, taste: { prof, cache }, ctx }),
-    [cands, prefs, seed, shown, mine, today, prof, cache, ctx]
+    () => suggest(cands, { minutes: prefs.minutes, mood: prefs.mood, seed, exclude: shown, mine, onlyMine: prefs.onlyMine, region: svc.region, today, taste: { prof, cache }, ctx }),
+    [cands, prefs, seed, shown, mine, svc.region, today, prof, cache, ctx]
   );
 
   const choose = (patch) => {

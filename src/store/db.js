@@ -1,4 +1,5 @@
 import { mergeBackup } from './backupMerge.js';
+import { cleanRegion } from '../components/regionLogic.js';
 import { blockedByWipe } from './wipeLogic.js';
 import { setNoteIn, withNotes, withMovieNote } from './notes.js';
 import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
@@ -399,9 +400,10 @@ export function setShowUpcoming(id, upcoming) {
   markShowDirty(id);
 }
 
-export function setShowProviders(id, providers, link, free) {
-  // providers: cached AU subscription list [{ name, logo }] for the show detail
-  //   "streaming in Australia" display; free: the free + ad-supported list (same shape),
+export function setShowProviders(id, providers, link, free, region) {
+  // providers: cached subscription list [{ name, logo }] for the show detail
+  //   "streaming in <region>" display; region: the country code it was checked for (stamped as
+  //   providersRegion so a changed Region setting re-checks it; omitted = Australia); free: the free + ad-supported list (same shape),
   //   used by the "On my services" filter; link: the TMDB/JustWatch URL. Filled by the
   //   show page's Check, the Detect platforms action and the filter's background
   //   checks. Rides the per-show sync doc.
@@ -414,6 +416,7 @@ export function setShowProviders(id, providers, link, free) {
         providersFree: Array.isArray(free) ? free : [],
         providersLink: link || '',
         providersSynced: new Date().toISOString(),
+        providersRegion: cleanRegion(region),
       };
     }
   });
@@ -422,7 +425,7 @@ export function setShowProviders(id, providers, link, free) {
 
 // The same availability cache for a PLANNED (watchlist) movie, so the Watchlist's "On my
 // services" filter can use it. Only planned entries with this TMDB id are touched.
-export function setMovieProviders(tmdbId, providers, link, free) {
+export function setMovieProviders(tmdbId, providers, link, free, region) {
   if (tmdbId == null) return;
   let changed = false;
   const now = new Date().toISOString();
@@ -430,7 +433,7 @@ export function setMovieProviders(tmdbId, providers, link, free) {
     s.movies = (s.movies || []).map((m) => {
       if (!m || m.tmdbId !== tmdbId || movieStatus(m) !== 'planned') return m;
       changed = true;
-      return { ...m, providers: providers || [], providersFree: Array.isArray(free) ? free : [], providersLink: link || '', providersSynced: now };
+      return { ...m, providers: providers || [], providersFree: Array.isArray(free) ? free : [], providersLink: link || '', providersSynced: now, providersRegion: cleanRegion(region) };
     });
   });
   if (changed) markMoviesDirty();

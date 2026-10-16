@@ -47,7 +47,7 @@ export function localProfile(state, hidden, cache, now = new Date()) {
   return buildProfile(libraryEntries(state, hiddenList(hidden), now), cache);
 }
 
-export async function runDiscover({ state, hidden, cache, api, mine = [], now = new Date(), onProgress = () => {}, gap = GAP_MS, ctx = timeContext(now) }) {
+export async function runDiscover({ state, hidden, cache, api, mine = [], region = 'AU', now = new Date(), onProgress = () => {}, gap = GAP_MS, ctx = timeContext(now) }) {
   const stats = { learned: 0, failed: 0, calls: 0 };
   const call = async (fn) => { stats.calls++; return fn(); };
   const hid = hiddenList(hidden);
@@ -109,10 +109,10 @@ export async function runDiscover({ state, hidden, cache, api, mine = [], now = 
   const servicesOn = Array.isArray(mine) && mine.length > 0;
   if (servicesOn) {
     jobs.push(async () => {
-      const ids = myProviderIds(results(await call(() => api.providerList())), mine);
+      const ids = myProviderIds(results(await call(() => api.providerList(region))), mine);
       if (!ids.length) return;
       await Promise.all(['tv', 'movie'].map(async (kind) => {
-        const p = { watch_region: 'AU', with_watch_providers: ids.join('|'), with_watch_monetization_types: 'flatrate', sort_by: 'popularity.desc', 'vote_count.gte': 100, include_adult: 'false' };
+        const p = { watch_region: region, with_watch_providers: ids.join('|'), with_watch_monetization_types: 'flatrate', sort_by: 'popularity.desc', 'vote_count.gte': 100, include_adult: 'false' };
         const g = genreIdsFor(kind, genres);
         if (g.length) p.with_genres = g.join('|');
         const r = results(await call(() => api.discover(kind, p)));

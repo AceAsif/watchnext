@@ -4,6 +4,7 @@ import { img } from '../api/tmdb.js';
 import { posterTint, initialOf } from './libraryLogic.js';
 import { orphanIntro, orphanMeta, deleteAllIntro } from './settingsLogic.js';
 import { ServicesPicker, FREE_NOTE } from './ServicesUI.jsx';
+import { REGIONS } from './regionLogic.js';
 import { WIPE_WORD, confirmOk, wipeIntro, wipeEffects, wipeBackupLine } from '../store/wipeLogic.js';
 
 // The Settings cards (Claude Design, Direction A). Purely presentational: the
@@ -255,15 +256,34 @@ export function HiddenCard({ rows, onShowAgain }) {
 }
 
 // ---------------------------------------------------------------- Backup + danger zone
+// Which country streaming availability is checked for (kept on this device).
+export function RegionCard({ region, onChange }) {
+  return (
+    <SetCard icon={I.cloud} label="Streaming" title="Region">
+      <p className="sd-setp">
+        Where you are. Streaming availability is checked for this country, so “On my services”, Tonight and Discover
+        match what you can actually watch. Change it when you travel.
+      </p>
+      <label className="sd-selectwrap">
+        <span className="sd-vh">Region</span>
+        <select className="sd-select" value={region} onChange={(e) => onChange(e.target.value)} data-testid="region-select">
+          {REGIONS.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
+        </select>
+      </label>
+      <div className="sd-setnote">{I.lock}Kept on this device only. Titles are re-checked for the new region as you open them.</div>
+    </SetCard>
+  );
+}
+
 // Which subscriptions you pay for, for the "On my services" filter (kept on this device).
-export function ServicesCard({ mine, onToggle }) {
+export function ServicesCard({ mine, onToggle, region }) {
   return (
     <SetCard icon={I.cloud} label="Streaming" title="My services">
       <p className="sd-setp">
         Tick the subscriptions you pay for. “On my services” on the Watchlist and the Shows tab then shows only what you
         can stream right now.
       </p>
-      <div style={{ marginTop: 14 }}><ServicesPicker mine={mine} onToggle={onToggle} /></div>
+      <div style={{ marginTop: 14 }}><ServicesPicker mine={mine} onToggle={onToggle} region={region} /></div>
       <div className="sd-setinfo">{I.info}<span>{FREE_NOTE}</span></div>
       <div className="sd-setnote">{I.lock}Kept on this device only.</div>
     </SetCard>

@@ -19,7 +19,7 @@ import { moodNote } from './tonightLogic.js';
 
 // Session caches, so reopening the sheet (or changing time/mood) doesn't repeat lookups.
 const detailsCache = new Map(); // tmdb id -> movie details
-let providerListCache = null; // TMDB's AU provider list
+const providerListCache = new Map(); // region -> TMDB's provider list for it
 const trailerCache = new Map(); // tmdb id -> YouTube key, or null when TMDB has no trailer
 
 const GAP_MS = 150;
@@ -84,7 +84,7 @@ export default function MovieNightSheet({ onClose }) {
   const [tick, setTick] = useState(0);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
-  const popKey = `${prefs.minutes}|${prefs.mood}|${mineKey}`;
+  const popKey = `${prefs.minutes}|${prefs.mood}|${mineKey}|${svc.region}`;
 
   // 1) Discover's recommendations (once per sitting)
   useEffect(() => {
@@ -105,9 +105,9 @@ export default function MovieNightSheet({ onClose }) {
       inflight.current.add('pop:' + k);
       (async () => {
         try {
-          if (!providerListCache) providerListCache = ((await movieProviderList('AU')) || {}).results || [];
-          const ids = myProviderIds(providerListCache, mine);
-          const lists = await Promise.all(popularQueries({ providerIds: ids, minutes: prefs.minutes, mood: prefs.mood, page }).map(async (q) => {
+          if (!providerListCache.has(svc.region)) providerListCache.set(svc.region, ((await movieProviderList(svc.region)) || {}).results || []);
+          const ids = myProviderIds(providerListCache.get(svc.region), mine);
+          const lists = await Promise.all(popularQueries({ providerIds: ids, minutes: prefs.minutes, mood: prefs.mood, page, region: svc.region }).map(async (q) => {
             const d = await discoverMovies(q.params);
             return ((d && d.results) || []).map((r) => popularCandidate(r, q.kind)).filter(Boolean);
           }));
@@ -152,8 +152,8 @@ export default function MovieNightSheet({ onClose }) {
       inflight.current.add('a:' + c.tmdbId);
       setTimeout(async () => {
         try {
-          const { providers, free } = normalizeProviders(await watchProviders('movie', c.tmdbId));
-          if (alive.current) setAvail((x) => ({ ...x, [c.tmdbId]: { providers, providersFree: free, providersSynced: new Date().toISOString() } }));
+          const { providers, free } = normalizeProviders(await watchProviders('movie', c.tmdbId, svc.region));
+          if (alive.current) setAvail((x) => ({ ...x, [c.tmdbId]: { providers, providersFree: free, providersSynced: new Date().toISOString(), providersRegion: svc.region } }));
         } catch (e) { failed.current.add('a:' + c.tmdbId); } finally { inflight.current.delete('a:' + c.tmdbId); if (alive.current) setTick((n) => n + 1); }
       }, i * GAP_MS);
     });
@@ -164,8 +164,8 @@ export default function MovieNightSheet({ onClose }) {
   const taste = useRef(null);
   if (!taste.current) taste.current = { prof: liveTaste.prof, cache: liveTaste.cache };
   const result = useMemo(
-    () => suggestMovies(cands, { minutes: prefs.minutes, mood: prefs.mood, seed, exclude: shown, hidden, mine, onlyMine: prefs.onlyMine, taste: taste.current }),
-    [cands, prefs, seed, shown, hidden, mine]
+    () => suggestMovies(cands, { minutes: prefs.minutes, mood: prefs.mood, seed, exclude: shown, hidden, mine, onlyMine: prefs.onlyMine, region: svc.region, taste: taste.current }),
+    [cands, prefs, seed, shown, hidden, mine, svc.region]
   );
 
   const choose = (patch) => {

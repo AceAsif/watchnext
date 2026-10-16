@@ -103,7 +103,7 @@ let { page: p, log } = await open(stateFresh(), null, { tab: 'Settings' });
 await ok('a "My services" card lists the subscription services you can tick (no cinema / other / YouTube / iview), and says free ones always count', async () => {
   const card = await p.evaluate(() => { const c = [...document.querySelectorAll('section')].find((s) => /My services/.test(s.innerText)); return c ? { text: c.innerText.replace(/\s+/g, ' '), chips: [...c.querySelectorAll('.chip')].map((x) => x.textContent.trim()) } : null; });
   assert.ok(card); assert.deepEqual(card.chips.sort(), ['Apple TV+', 'Binge', 'Crunchyroll', 'Disney+', 'Hulu', 'Max', 'Paramount+', 'Prime Video', 'Stan', 'Netflix'].sort());
-  assert.match(card.text, /Free-to-watch services \(ABC iview, SBS On Demand, 7plus and similar\) always count/); assert.match(card.text, /Kept on this device only/);
+  assert.match(card.text, /Free-to-watch services \(like ABC iview, SBS On Demand or BBC iPlayer\) always count/); assert.match(card.text, /Kept on this device only/);
 });
 await p.evaluate(() => { const c = [...document.querySelectorAll('section')].find((s) => /My services/.test(s.innerText)); for (const name of ['Netflix', 'Stan']) [...c.querySelectorAll('.chip')].find((x) => x.textContent.trim() === name).click(); }); await wait(300);
 await ok('ticking Netflix and Stan is remembered on this device (own storage key, not in the library)', async () => {

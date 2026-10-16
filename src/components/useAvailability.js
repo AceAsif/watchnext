@@ -9,7 +9,7 @@ import { normalizeProviders, pending, nextBatch, needsCheck, GAP_MS } from './se
 //
 // items: [{ key, kind: 'tv' | 'movie', id (show id, for tv), tmdbId, rec }]
 // returns { remaining, failed, noKey, noId, retry }
-export default function useAvailability(items, active) {
+export default function useAvailability(items, active, region = 'AU') {
   const failed = useRef(new Set());
   const inflight = useRef(new Set());
   const timers = useRef(new Set());
@@ -24,16 +24,16 @@ export default function useAvailability(items, active) {
 
   useEffect(() => {
     if (!active || !hasKey()) return;
-    const batch = nextBatch(items, { failed: failed.current, inflight: inflight.current });
+    const batch = nextBatch(items, { failed: failed.current, inflight: inflight.current, region });
     batch.forEach((item, i) => {
       inflight.current.add(item.key); // reserve the slot now so a re-render can't start the same lookup twice
       const t = setTimeout(async () => {
         timers.current.delete(t);
         try {
-          const au = await watchProviders(item.kind, item.tmdbId);
-          const { providers, free, link } = normalizeProviders(au); // no AU block at all = "streams nowhere", still a valid answer
-          if (item.kind === 'movie') setMovieProviders(item.tmdbId, providers, link, free);
-          else setShowProviders(item.id, providers, link, free);
+          const au = await watchProviders(item.kind, item.tmdbId, region);
+          const { providers, free, link } = normalizeProviders(au); // no block for the region at all = "streams nowhere", still a valid answer
+          if (item.kind === 'movie') setMovieProviders(item.tmdbId, providers, link, free, region);
+          else setShowProviders(item.id, providers, link, free, region);
         } catch (e) {
           failed.current.add(item.key); // offline / TMDB error: leave it unchecked, try again on Retry or next visit
           if (alive.current) setFailedCount(failed.current.size);
@@ -44,15 +44,15 @@ export default function useAvailability(items, active) {
       }, i * GAP_MS);
       timers.current.add(t);
     });
-  }, [items, active, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [items, active, tick, region]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const retry = useCallback(() => { failed.current.clear(); setFailedCount(0); setTick((n) => n + 1); }, []);
   const now = new Date();
   return {
-    remaining: active ? pending(items, failed.current, now).length : 0,
+    remaining: active ? pending(items, failed.current, now, region).length : 0,
     failed: failedCount,
     noKey: !hasKey(),
-    noId: active ? items.filter((i) => !i.tmdbId && needsCheck(i.rec, now)).length : 0,
+    noId: active ? items.filter((i) => !i.tmdbId && needsCheck(i.rec, now, region)).length : 0,
     retry,
   };
 }

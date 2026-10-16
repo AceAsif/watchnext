@@ -7,10 +7,10 @@ import { useServicesPrefs, toggleMyService } from '../store/servicesPrefs.js';
 
 // Tick the subscription services you pay for. Same chip look as the platform picker
 // (selected = full brand colour). Free-to-watch services always count, so they aren't listed.
-export function ServicesPicker({ mine, onToggle }) {
+export function ServicesPicker({ mine, onToggle, region }) {
   return (
     <div className="chips" role="group" aria-label="Services you pay for">
-      {serviceChoices().map((p) => {
+      {serviceChoices(region, mine).map((p) => {
         const on = mine.includes(p.id);
         const style = on ? { background: p.color, borderColor: p.color, color: p.dark ? '#0b0f17' : '#fff' } : { '--chip': p.color };
         return (
@@ -23,7 +23,7 @@ export function ServicesPicker({ mine, onToggle }) {
   );
 }
 
-export const FREE_NOTE = 'Free-to-watch services (ABC iview, SBS On Demand, 7plus and similar) always count, so you don’t need to tick them.';
+export const FREE_NOTE = 'Free-to-watch services (like ABC iview, SBS On Demand or BBC iPlayer) always count, so you don’t need to tick them.';
 
 // The small pill that turns the filter on and off.
 export function ServicesToggle({ on, onToggle, label = 'On my services' }) {
@@ -50,7 +50,7 @@ export function ServicesSheet({ onClose }) {
   const prefs = useServicesPrefs();
   return (
     <Sheet open title="My services" subtitle="Which ones do you pay for?" onClose={onClose}>
-      <ServicesPicker mine={prefs.mine} onToggle={toggleMyService} />
+      <ServicesPicker mine={prefs.mine} onToggle={toggleMyService} region={prefs.region} />
       <p className="sd-setp" style={{ marginTop: 14 }}>{FREE_NOTE}</p>
     </Sheet>
   );

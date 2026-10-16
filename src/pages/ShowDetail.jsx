@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useServicesPrefs } from '../store/servicesPrefs.js';
+import { recordRegion, inRegion } from '../components/regionLogic.js';
 import { useStore } from '../store/useStore.js';
 import {
   markEpisode,
@@ -294,6 +296,7 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
 // ---------------------------------------------------------------- page
 export default function ShowDetail({ id, onBack }) {
   const state = useStore();
+  const { region } = useServicesPrefs();
   const show = state.shows[id];
   const [syncing, setSyncing] = useState(false);
   const [sheet, setSheet] = useState(null); // 'platform' | 'streaming' | 'menu' | 'fix' | 'anime'
@@ -401,9 +404,9 @@ export default function ShowDetail({ id, onBack }) {
     if (!show.tmdbId) return;
     setStreamLoading(true);
     try {
-      const au = await watchProviders('tv', show.tmdbId);
+      const au = await watchProviders('tv', show.tmdbId, region);
       const { providers: subs, free, link } = normalizeProviders(au);
-      setShowProviders(id, subs, link, free);
+      setShowProviders(id, subs, link, free, region);
     } catch (err) {
       alert('Could not load streaming info: ' + err.message);
     } finally {
@@ -477,7 +480,10 @@ export default function ShowDetail({ id, onBack }) {
   const finished = total > 0 && seen >= total;
   const next = nextToMark(show, today);
   const platform = platformById(show.platform);
-  const providers = show.providers || [];
+  // What was cached for a different region (the Region setting changed) is not shown as this region's answer.
+  const stream = recordRegion(show) === region ? show : { ...show, providers: [], providersFree: [], providersSynced: undefined, providersLink: '' };
+  const where = inRegion(region);
+  const providers = stream.providers || [];
   const anime = show.anime || null;
   // The "Anime details" row appears up front for animation shows (and any
   // already linked); everything else can still link it from the ⋯ menu.
@@ -501,10 +507,10 @@ export default function ShowDetail({ id, onBack }) {
   let streamSub;
   if (!show.tmdbId) streamSub = 'Link to TMDB to check availability';
   else if (!hasKey()) streamSub = 'Add a TMDB API key in Settings';
-  else if (providers.length || (show.providersFree || []).length) {
-    const free = (show.providersFree || []).map((p) => p.name);
+  else if (providers.length || (stream.providersFree || []).length) {
+    const free = (stream.providersFree || []).map((p) => p.name);
     streamSub = [providers.map((p) => p.name).join(' · '), free.length ? `Free: ${free.slice(0, 2).join(', ')}` : ''].filter(Boolean).join(' · ');
-  } else if (show.providersSynced) streamSub = 'Not streaming in Australia';
+  } else if (stream.providersSynced) streamSub = `Not streaming ${where}`;
   else streamSub = 'Tap to check availability';
 
   const rating = show.rating || 0;
@@ -682,7 +688,7 @@ export default function ShowDetail({ id, onBack }) {
           onClick={() => setSheet('streaming')}
         >
           <span style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span>Streaming in Australia</span>
+            <span>Streaming {where}</span>
             <span className="sd-ell" style={{ fontSize: 12, color: 'var(--text-dim)' }}>{streamSub}</span>
           </span>
           {providers.length > 0 && (
@@ -822,8 +828,8 @@ export default function ShowDetail({ id, onBack }) {
 
       <Sheet
         open={sheet === 'streaming'}
-        title="Streaming in Australia"
-        subtitle={show.providersSynced ? 'Subscription services' : 'Not checked yet'}
+        title={`Streaming ${where}`}
+        subtitle={stream.providersSynced ? 'Subscription services' : 'Not checked yet'}
         onClose={() => setSheet(null)}
       >
         {providers.length > 0 ? (
@@ -845,16 +851,16 @@ export default function ShowDetail({ id, onBack }) {
           </div>
         ) : (
           <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-            {show.providersSynced && !(show.providersFree || []).length
-              ? 'Not currently streaming anywhere in Australia, per TMDB/JustWatch.'
-              : show.providersSynced
+            {stream.providersSynced && !(stream.providersFree || []).length
+              ? `Not currently streaming anywhere ${where}, per TMDB/JustWatch.`
+              : stream.providersSynced
               ? 'No subscription service has it right now.'
               : 'Tap “Check” to see where this is streaming.'}
           </p>
         )}
-        {(show.providersFree || []).length > 0 && (
+        {(stream.providersFree || []).length > 0 && (
           <div className="sd-card" style={{ marginTop: 12 }} aria-label="Free to watch">
-            {show.providersFree.map((p, i) => (
+            {stream.providersFree.map((p, i) => (
               <div key={p.name} className={'sd-row' + (i > 0 ? ' sd-sep' : '')} style={{ cursor: 'default' }}>
                 <span style={{ width: 32, height: 32, borderRadius: 8, overflow: 'hidden', flex: 'none', background: 'var(--line)', display: 'block' }}>
                   {p.logo && <img src={img(p.logo, 'w92')} alt="" style={{ width: 32, height: 32, display: 'block' }} />}
@@ -871,11 +877,11 @@ export default function ShowDetail({ id, onBack }) {
           onClick={refreshStreaming}
           disabled={streamLoading}
         >
-          {streamLoading ? 'Checking…' : show.providersSynced ? 'Refresh' : 'Check'}
+          {streamLoading ? 'Checking…' : stream.providersSynced ? 'Refresh' : 'Check'}
         </button>
-        {show.providersLink && (
+        {stream.providersLink && (
           <a
-            href={show.providersLink}
+            href={stream.providersLink}
             target="_blank"
             rel="noreferrer"
             className="muted"

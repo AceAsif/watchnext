@@ -54,9 +54,9 @@ export default function Watchlist({ openShow }) {
     }
     return out;
   }, [shows, movies]);
-  const av = useAvailability(checkItems, on);
-  const showsShown = on ? shows.filter(([, s]) => isOnMyServices(s, mine)) : shows;
-  const moviesShown = on ? movies.filter((m) => isOnMyServices(m, mine)) : movies;
+  const av = useAvailability(checkItems, on, svc.region);
+  const showsShown = on ? shows.filter(([, s]) => isOnMyServices(s, mine, svc.region)) : shows;
+  const moviesShown = on ? movies.filter((m) => isOnMyServices(m, mine, svc.region)) : movies;
   const nothingOn = on && showsShown.length === 0 && moviesShown.length === 0;
   const svcStatus = on ? statusLine({ remaining: av.remaining, failed: av.failed, noKey: av.noKey, noServices: svc.mine.length === 0, unknownIds: av.noId }) : null;
   const toggle = () => { setServicesPrefs({ watchlistOnly: !on }); if (!on && svc.mine.length === 0) setPick(true); };
@@ -130,7 +130,7 @@ export default function Watchlist({ openShow }) {
                       {show.genres && show.genres.length ? (
                         <span className="sd-mrow-meta">{show.genres.slice(0, 3).join(' · ')}</span>
                       ) : null}
-                      {on && servicesLabel(show, mine) ? <span className="sd-mrow-meta sd-svc-meta">{servicesLabel(show, mine)}</span> : null}
+                      {on && servicesLabel(show, mine, svc.region) ? <span className="sd-mrow-meta sd-svc-meta">{servicesLabel(show, mine, svc.region)}</span> : null}
                     </MediaRow>
                   ))}
                 </div>
@@ -172,7 +172,7 @@ export default function Watchlist({ openShow }) {
                     >
                       <span className="sd-mrow-name">{m.name}</span>
                       {m.year ? <span className="sd-mrow-meta">{m.year}</span> : null}
-                      {on && servicesLabel(m, mine) ? <span className="sd-mrow-meta sd-svc-meta">{servicesLabel(m, mine)}</span> : null}
+                      {on && servicesLabel(m, mine, svc.region) ? <span className="sd-mrow-meta sd-svc-meta">{servicesLabel(m, mine, svc.region)}</span> : null}
                     </MediaRow>
                   ))}
                 </div>

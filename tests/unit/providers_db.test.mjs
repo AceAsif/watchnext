@@ -42,4 +42,12 @@ t('movie list order and length are preserved; free list defaults to [] for junk'
 t('the cached lists survive a persisted round trip (reload)', () => {
   const saved = JSON.parse(store.get('watchnext-state-v1')); assert.deepEqual(saved.shows['tmdb:1'].providersFree, free); assert.deepEqual(saved.movies[0].providers, subs);
 });
+t('region: the answer is stamped with the country it was checked for; no region means Australia; junk falls back to Australia', () => {
+  D.setShowProviders('tmdb:1', subs, '', free, 'NZ'); assert.equal(D.getState().shows['tmdb:1'].providersRegion, 'NZ');
+  D.setShowProviders('tmdb:1', subs, '', free); assert.equal(D.getState().shows['tmdb:1'].providersRegion, 'AU');
+  D.setShowProviders('tmdb:1', subs, '', free, 'zz'); assert.equal(D.getState().shows['tmdb:1'].providersRegion, 'AU');
+  D.setMovieProviders(10, subs, '', free, 'GB'); assert.equal(D.getState().movies.find((m) => m.tmdbId === 10 && m.status === 'planned').providersRegion, 'GB');
+  D.setMovieProviders(10, subs, '', free); assert.equal(D.getState().movies.find((m) => m.tmdbId === 10 && m.status === 'planned').providersRegion, 'AU');
+  assert.ok(!JSON.stringify(D.getState()).includes('undefined'));
+});
 console.log(`\n${n} tests passed`);

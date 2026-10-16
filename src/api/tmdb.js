@@ -88,11 +88,11 @@ export async function resolveShow(show) {
   return showDetails(tmdbId);
 }
 
-export function watchProviders(kind, tmdbId) {
-  // kind: 'tv' | 'movie'. Returns the Australian providers block
-  // ({ flatrate, rent, buy, link, ... }) or null when TMDB has none for AU.
+export function watchProviders(kind, tmdbId, region = 'AU') {
+  // kind: 'tv' | 'movie'. Returns the providers block for `region` (a country code, Australia by
+  // default) ({ flatrate, rent, buy, link, ... }) or null when TMDB has none there.
   return get(`/${kind}/${tmdbId}/watch/providers`).then(
-    (d) => (d && d.results && d.results.AU) || null
+    (d) => (d && d.results && d.results[region]) || null
   );
 }
 

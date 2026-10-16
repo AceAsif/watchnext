@@ -61,9 +61,9 @@ export function discoverParams({ providerIds = [], minutes, mood = 'any', page =
   else { p.with_watch_providers = providerIds.join('|'); p.with_watch_monetization_types = 'flatrate'; }
   return p;
 }
-export const popularQueries = ({ providerIds = [], minutes, mood, page = 1 }) => [
-  ...(providerIds.length ? [{ kind: 'subs', params: discoverParams({ providerIds, minutes, mood, page, kind: 'subs' }) }] : []),
-  { kind: 'free', params: discoverParams({ providerIds, minutes, mood, page, kind: 'free' }) },
+export const popularQueries = ({ providerIds = [], minutes, mood, page = 1, region = 'AU' }) => [
+  ...(providerIds.length ? [{ kind: 'subs', params: discoverParams({ providerIds, minutes, mood, page, kind: 'subs', region }) }] : []),
+  { kind: 'free', params: discoverParams({ providerIds, minutes, mood, page, kind: 'free', region }) },
 ];
 
 // ------------------------------------------------------------------ candidates
@@ -153,7 +153,7 @@ export function suggestMovies(cands, opts = {}) {
   for (const c of cands) {
     if (!c || typeof c !== 'object') continue;
     if (hidden.has(c.key) || !(c.runtime >= MIN_FEATURE_MINUTES) || c.runtime > minutes) continue; // runtime must be known and fit
-    const availOn = !!(c.avail && mine && isOnMyServices(c.avail, mine));
+    const availOn = !!(c.avail && mine && isOnMyServices(c.avail, mine, opts.region));
     const on = c.onMine || availOn;
     if (opts.onlyMine && !on) continue; // not confirmed on your services (or free)
     const ms = moodState(c, mood);
@@ -166,7 +166,7 @@ export function suggestMovies(cands, opts = {}) {
       score += tasteWeight(opts.taste.prof) * taste.taste;
     }
     score += jitter(opts.seed || 0, String(c.key));
-    const where = availOn && c.avail ? servicesLabel(c.avail, mine) : c.onMine ? (c.via === 'free' ? 'Free to watch' : 'On your services') : '';
+    const where = availOn && c.avail ? servicesLabel(c.avail, mine, opts.region) : c.onMine ? (c.via === 'free' ? 'Free to watch' : 'On your services') : '';
     rows.push({ ...c, spare: minutes - c.runtime, moodState: ms, where, score, taste });
   }
   const rank = (r) => (r.moodState === 'no' ? 2 : r.moodState === 'unknown' ? 1 : 0);

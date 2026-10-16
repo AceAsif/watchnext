@@ -5,7 +5,7 @@ import { hiddenList } from '../components/hiddenLogic.js';
 import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
 import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud, wipeEverywhere } from '../store/cloud.js';
 import { wipeDoneText, wipeFailText } from '../store/wipeLogic.js';
-import { useServicesPrefs, toggleMyService } from '../store/servicesPrefs.js';
+import { useServicesPrefs, toggleMyService, setServicesPrefs } from '../store/servicesPrefs.js';
 import {
   loadMeta, saveMeta, libraryCount, withSince, nudgeStatus, nudgeCopy, afterBackup, afterSnooze, lastBackupLine,
 } from '../components/backupNudgeLogic.js';
@@ -35,6 +35,7 @@ import {
   BackupCard,
   BackupNudge,
   ServicesCard,
+  RegionCard,
   CsvCard,
   WipeDialog,
   DangerCard,
@@ -254,7 +255,8 @@ export default function Settings() {
       <div className="sd-set">
         <SyncCard available={cloudOn} user={cloudUser} busy={cloudBusy} onSignIn={handleSignIn} onSignOut={handleSignOut} backupOnSignOut={backupOnOut} onToggleBackup={toggleSignOutBackup} />
         <KeyCard status={keyStatus(savedKey, key)} value={key} onChange={setKey} onSave={saveKey} />
-        <ServicesCard mine={svc.mine} onToggle={toggleMyService} />
+        <RegionCard region={svc.region} onChange={(r) => setServicesPrefs({ region: r })} />
+        <ServicesCard mine={svc.mine} onToggle={toggleMyService} region={svc.region} />
         <ImportCard
           command={IMPORT_COMMAND}
           copied={copied}

@@ -28,7 +28,7 @@ const api = {
   similar: (kind, id) => (kind === 'tv' ? tvSimilar(id, 1) : movieSimilar(id, 1)),
   personCredits: (id) => personCombinedCredits(id),
   discover: (kind, params) => discoverTitles(kind, params),
-  providerList: () => movieProviderList('AU'),
+  providerList: (region) => movieProviderList(region),
   trending: () => trendingWeek(),
   animeRecs: (anilistId) => animeRecommendations(anilistId),
 };
@@ -105,7 +105,7 @@ export default function Discover() {
       const st = storage();
       const cache = loadCache(st);
       const res = await runDiscover({
-        state, hidden: state.hidden, cache, api, mine: svc.mine,
+        state, hidden: state.hidden, cache, api, mine: svc.mine, region: svc.region,
         onProgress: (p) => { if (alive.current) setProgress(p); },
       });
       saveCache(st, cache);

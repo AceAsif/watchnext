@@ -1684,3 +1684,8 @@ button.sd-nitem:focus-visible { outline: 2px solid var(--amber); outline-offset:
 .sd-credit { margin: 28px 0 8px; text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); opacity: 0.7; }
 .sd-credit a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .sd-credit a:hover, .sd-credit a:focus-visible { color: var(--amber); opacity: 1; outline: none; }
+
+/* Settings → Region: a native select (best on phones), styled like the key field. */
+.sd-selectwrap { display: block; margin-top: 14px; }
+.sd-select { width: 100%; max-width: 360px; height: 44px; padding: 0 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); color: var(--text); font: inherit; font-size: 15px; box-sizing: border-box; }
+.sd-select:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-color: var(--amber); }

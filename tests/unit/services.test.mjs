@@ -66,10 +66,10 @@ t('status line: choose services / needs a key / checking N left / N could not be
   assert.match(S.statusLine({ unknownIds: 2 }), /^2 titles have no TMDB link/); assert.equal(S.statusLine({}), null); assert.equal(S.statusLine({ remaining: 3, failed: 2 }), 'Checking availability… 3 left');
 });
 t('preferences: sanitised (unknown / non-service ids dropped, duplicates removed, strict booleans); corrupt, missing and throwing storage are safe', () => {
-  const s = S.sanitizePrefs({ mine: ['netflix', 'netflix', 'cinema', 'iview', 'bogus', 5, 'stan'], showsOnly: 'yes', watchlistOnly: true }); assert.deepEqual(s, { mine: ['netflix', 'stan'], showsOnly: false, watchlistOnly: true });
-  for (const bad of [null, undefined, 5, 'x', [], { mine: 'netflix' }]) assert.deepEqual(S.sanitizePrefs(bad), { mine: [], showsOnly: false, watchlistOnly: false });
+  const s = S.sanitizePrefs({ mine: ['netflix', 'netflix', 'cinema', 'iview', 'bogus', 5, 'stan'], showsOnly: 'yes', watchlistOnly: true }); assert.deepEqual(s, { mine: ['netflix', 'stan'], showsOnly: false, watchlistOnly: true, region: 'AU' });
+  for (const bad of [null, undefined, 5, 'x', [], { mine: 'netflix' }]) assert.deepEqual(S.sanitizePrefs(bad), { mine: [], showsOnly: false, watchlistOnly: false, region: 'AU' });
   const m = new Map(); const st = { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)) };
-  assert.deepEqual(S.loadPrefs(st), { mine: [], showsOnly: false, watchlistOnly: false }); S.savePrefs(st, { mine: ['stan', 'paramount'], showsOnly: true, watchlistOnly: false }); assert.deepEqual(S.loadPrefs(st), { mine: ['stan', 'paramount'], showsOnly: true, watchlistOnly: false });
+  assert.deepEqual(S.loadPrefs(st), { mine: [], showsOnly: false, watchlistOnly: false, region: 'AU' }); S.savePrefs(st, { mine: ['stan', 'paramount'], showsOnly: true, watchlistOnly: false }); assert.deepEqual(S.loadPrefs(st), { mine: ['stan', 'paramount'], showsOnly: true, watchlistOnly: false, region: 'AU' });
   m.set(S.PREFS_KEY, '{oops'); assert.deepEqual(S.loadPrefs(st).mine, []);
   const bad = { getItem() { throw new Error('x'); }, setItem() { throw new Error('y'); } }; assert.deepEqual(S.loadPrefs(bad).mine, []); S.savePrefs(bad, { mine: ['stan'] });
   assert.equal(S.PREFS_KEY, 'watchnext-services-v1');
