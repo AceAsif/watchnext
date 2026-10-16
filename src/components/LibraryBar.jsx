@@ -458,12 +458,12 @@ function Art({ path, name, children, initialPos = 'top' }) {
 
 // A show in the library grid: poster, progress bar while watching, a teal tick
 // when finished, then title, "27 / 49 eps" and your star rating.
-export function ShowTile({ show, seen, onOpen, sub }) {
+export function ShowTile({ show, seen, onOpen, sub, times = 0 }) {
   const total = show.totalEpisodes || 0;
   const done = total > 0 && seen >= total;
   const pct = total ? Math.min(100, Math.round((seen / total) * 100)) : 0;
   const dropped = show.dropped === true;
-  const label = (total ? `${show.name}, ${seen} of ${total} episodes` : `${show.name}, ${seen} episodes watched`) + (dropped ? ', dropped' : '');
+  const label = (total ? `${show.name}, ${seen} of ${total} episodes` : `${show.name}, ${seen} episodes watched`) + (dropped ? ', dropped' : '') + (times >= 2 ? `, watched ${times} times` : '');
   return (
     <button type="button" className="sd-ltile" aria-label={label} onClick={onOpen} style={dropped ? { opacity: 0.7 } : undefined}>
       <Art path={show.poster} name={show.name}>
@@ -471,6 +471,7 @@ export function ShowTile({ show, seen, onOpen, sub }) {
           <span className="sd-ltile-prog" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
         ) : null}
         {done ? <span className="sd-ltile-done" aria-hidden="true"><CheckIcon size={14} sw={2.6} /></span> : null}
+        {times >= 2 ? <span className="sd-ltile-times left" data-testid="times-chip" aria-hidden="true">{times}×</span> : null}
       </Art>
       <span className="sd-ltile-name">{show.name}</span>
       <span className="sd-ltile-row">
@@ -485,19 +486,20 @@ export function ShowTile({ show, seen, onOpen, sub }) {
 }
 
 // A watched movie: poster with a rating pill, title and the date you watched it.
-export function MovieTile({ movie, onOpen }) {
+export function MovieTile({ movie, onOpen, times = 1 }) {
   const date = (movie.watchedAt || '').slice(0, 10) || movie.year || '';
   return (
     <button
       type="button"
       className="sd-ltile"
-      aria-label={`${movie.name}${movie.rating ? `, rated ${movie.rating}` : ''}${date ? `, watched ${date}` : ''}`}
+      aria-label={`${movie.name}${movie.rating ? `, rated ${movie.rating}` : ''}${date ? `, watched ${date}` : ''}${times >= 2 ? `, seen ${times} times` : ''}`}
       onClick={onOpen}
     >
       <Art path={movie.poster} name={movie.name} initialPos="bottom">
         {movie.rating ? (
           <span className="sd-ltile-badge"><StarIcon size={11} />{movie.rating}</span>
         ) : null}
+        {times >= 2 ? <span className="sd-ltile-times" data-testid="times-chip" aria-hidden="true">{times}×</span> : null}
       </Art>
       <span className="sd-ltile-name">{movie.name}</span>
       {date ? <span className="sd-ltile-date">{date}</span> : null}

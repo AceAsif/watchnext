@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { showWatchTimes } from '../components/rewatchLogic.js';
 import { useStore } from '../store/useStore.js';
 import {
   watchedCount,
@@ -335,7 +336,7 @@ export default function Shows({ openShow }) {
       ) : list.length > 0 ? (
         <div className="sd-lgrid">
           {list.map(([id, show]) => (
-            <ShowTile key={id} show={show} seen={watchedCount(show)} onOpen={() => openShow(id)} sub={servicesOn ? servicesLabel(show, mine) : ''} />
+            <ShowTile key={id} show={show} seen={watchedCount(show)} times={showWatchTimes(show)} onOpen={() => openShow(id)} sub={servicesOn ? servicesLabel(show, mine) : ''} />
           ))}
         </div>
       ) : kind === 'library' ? (

@@ -12,6 +12,7 @@ import {
 } from '../store/db.js';
 import { searchMovies, movieDetails, hasKey, img, movieVideos, pickTrailer } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
+import { movieViewings } from '../components/rewatchLogic.js';
 import { NoteEditor } from '../components/NoteEditor.jsx';
 import { movieNoteOf } from '../store/notes.js';
 import PlatformPicker, { PlatformChip } from '../components/PlatformPicker.jsx';
@@ -212,6 +213,7 @@ export default function Movies() {
     return st.kind === 'planned' ? 'On watchlist' : null;
   };
 
+  const viewings = useMemo(() => movieViewings(state.movies), [state.movies]);
   const shown = useMemo(() => shownMovies(movies, libQuery, sortBy), [movies, libQuery, sortBy]);
 
   const sel = openIndex != null ? movies.find((m) => m.index === openIndex) : null;
@@ -257,7 +259,7 @@ export default function Movies() {
       {shown.length > 0 ? (
         <div className="sd-lgrid">
           {shown.map((m) => (
-            <MovieTile key={`${m.name}|${m.watchedAt}|${m.index}`} movie={m} onOpen={() => openMovie(m)} />
+            <MovieTile key={`${m.name}|${m.watchedAt}|${m.index}`} movie={m} times={viewings(m)} onOpen={() => openMovie(m)} />
           ))}
         </div>
       ) : movies.length === 0 && librarySyncing ? (

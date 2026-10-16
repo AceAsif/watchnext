@@ -77,3 +77,36 @@ export function rewatchedMovies(movies, limit = REWATCH_LIMIT) {
 
 export const rewatchSummary = (total, titles, noun) =>
   `${total.toLocaleString()} ${total === 1 ? 'rewatch' : 'rewatches'} across ${titles.toLocaleString()} ${titles === 1 ? noun : noun + 's'}, all time.`;
+
+// ---- the "2×" chip on library cards ------------------------------------------
+// Shows: the whole show counts as watched N times when EVERY episode you have marked has been
+// watched at least N times (the lowest count). A show with only a few episodes rewatched gets
+// no chip; those episodes carry their own "2×" on the show page. Returns 0 when there is none.
+export function showWatchTimes(show) {
+  let min = 0;
+  for (const w of Object.values((show && show.watched) || {})) {
+    if (!w || typeof w !== 'object') continue;
+    const n = count(w.n);
+    if (min === 0 || n < min) min = n;
+  }
+  return min >= 2 ? min : 0;
+}
+
+// Movies: how many viewings of each title (same key rule as rewatchedMovies). Returns a
+// function movie -> viewings (1 when seen once, or when the movie can't be told apart).
+export function movieViewings(movies) {
+  const keyOf = (m) => {
+    const name = String((m && m.name) || '').trim();
+    return m && m.tmdbId != null ? 't' + m.tmdbId : name ? 'n' + name.toLowerCase() : '';
+  };
+  const counts = new Map();
+  for (const m of Array.isArray(movies) ? movies : []) {
+    if (!m || typeof m !== 'object' || (m.status || 'watched') !== 'watched') continue;
+    const k = keyOf(m);
+    if (k) counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  return (m) => counts.get(keyOf(m)) || 1;
+}
+
+// "2×", or '' when there is nothing to show (once or never).
+export const timesLabel = (n) => (Number.isFinite(n) && n >= 2 ? `${Math.floor(n)}×` : '');

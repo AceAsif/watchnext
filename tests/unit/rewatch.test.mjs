@@ -64,4 +64,29 @@ t('scale: 5,000 shows x 20 episodes in well under a second', () => {
   const big = Object.fromEntries(Array.from({ length: 5000 }, (_, i) => ['s' + i, show('S' + i, Array.from({ length: 20 }, (_, j) => 1 + ((i + j) % 3)))]));
   const t0 = Date.now(); const r = R.rewatchedShows(big); assert.ok(Date.now() - t0 < 1000); assert.equal(r.rows.length, 8);
 });
+
+// ---- "2×" chip helpers
+t('chip (shows): the lowest count over watched episodes, only when every episode was seen twice or more', () => {
+  assert.equal(R.showWatchTimes(show('A', [2, 2, 3])), 2);
+  assert.equal(R.showWatchTimes(show('B', [3, 3])), 3);
+  assert.equal(R.showWatchTimes(show('C', [2, 1, 2])), 0); // one episode only once: no chip
+  assert.equal(R.showWatchTimes(show('D', [1, 1])), 0);
+});
+t('chip (shows): empty, junk and decimals never throw; 2.9 counts as 2', () => {
+  for (const v of [null, undefined, {}, { watched: null }, { watched: { '1x1': null, '1x2': 'x' } }, 'text', 5]) assert.equal(R.showWatchTimes(v), 0);
+  assert.equal(R.showWatchTimes(show('E', [2.9, 3])), 2);
+  assert.equal(R.showWatchTimes(show('F', [NaN, 'abc'])), 0);
+});
+t('chip (movies): each viewing of a title sees the title\'s total; planned entries do not count', () => {
+  const mv = (name, tmdbId, status) => ({ name, ...(tmdbId != null ? { tmdbId } : null), ...(status ? { status } : null) });
+  const list = [mv('Dune', 1), mv('dune renamed', 1), mv('Dune', 1, 'planned'), mv('Up', 2), mv('Solo'), mv('solo'), mv('')];
+  const v = R.movieViewings(list);
+  assert.equal(v(list[0]), 2); assert.equal(v(list[1]), 2); assert.equal(v(list[3]), 1);
+  assert.equal(v(list[4]), 2); assert.equal(v(list[5]), 2); // no id: matched by name, any case
+  assert.equal(v(list[6]), 1); assert.equal(v(null), 1);
+});
+t('chip: label is "N×" from 2 up, nothing for once, zero or junk', () => {
+  assert.equal(R.timesLabel(2), '2×'); assert.equal(R.timesLabel(10), '10×');
+  for (const x of [1, 0, -2, NaN, undefined, null, 'a']) assert.equal(R.timesLabel(x), '');
+});
 console.log(`\n${n} tests passed`);

@@ -71,4 +71,31 @@ await ok('nothing rewatched: the sections are simply absent (no empty cards, no 
   const t = await p.evaluate(() => document.body.innerText); assert.doesNotMatch(t, /most rewatched/i); assert.match(t, /most watched shows/i);
 });
 await p.close();
+// ---- the "2×" chip on library cards
+async function tab(page, label) { await page.evaluate((l) => [...document.querySelectorAll('nav.tabbar button')].find((x) => x.textContent.includes(l)).click(), label); await wait(600); }
+const chips = (page) => page.evaluate(() => [...document.querySelectorAll('.sd-ltile')].map((t) => [t.querySelector('.sd-ltile-name').textContent, (t.querySelector('[data-testid=times-chip]') || {}).textContent || '']));
+p = await open(WITH);
+await tab(p, 'Shows');
+await ok('Shows grid: chip only where EVERY watched episode was seen at least twice (Brooklyn 2×, Fullmetal 3×)', async () => {
+  const c = await chips(p); const by = Object.fromEntries(c);
+  assert.equal(by['Brooklyn Nine-Nine'], '2×'); assert.equal(by['Suits'], ''); assert.equal(by['The Office (US)'], ''); assert.equal(by['Never Rewatched'], '');
+  assert.equal(c.find((r) => /FULLMETAL/.test(r[0]))[1], '3×');
+});
+await ok('chip is spoken in the tile label, but hidden from the visual duplicate', async () => {
+  const l = await p.evaluate(() => [...document.querySelectorAll('.sd-ltile')].find((t) => /Brooklyn/.test(t.textContent)).getAttribute('aria-label')); assert.match(l, /watched 2 times/);
+});
+await p.screenshot({ path: `${OUT}/shows_chip_phone.png` });
+await tab(p, 'Movies');
+await ok('Movies grid: every viewing of Dune shows 3×, Up 2×, Heat (once) and nothing else gets a chip', async () => {
+  const c = await chips(p); assert.deepEqual(c.filter((r) => r[0] === 'Dune').map((r) => r[1]), ['3×', '3×', '3×']);
+  assert.deepEqual(c.filter((r) => r[0] === 'Up').map((r) => r[1]), ['2×', '2×']); assert.deepEqual(c.filter((r) => r[0] === 'Heat').map((r) => r[1]), ['']);
+  assert.ok(!c.some((r) => r[0] === 'Planned Only'));
+});
+await ok('no sideways scroll with chips', async () => { assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false); });
+await p.screenshot({ path: `${OUT}/movies_chip_phone.png` });
+await p.close();
+p = await open(NONE);
+await tab(p, 'Shows');
+await ok('nothing rewatched: no chips anywhere', async () => { assert.equal((await chips(p)).filter((r) => r[1]).length, 0); });
+await p.close();
 console.log(`\n${checks} checks passed`); console.log('PROBLEMS:', problems.length ? '\n' + problems.join('\n') : 'none'); await browser.close(); server.close();
