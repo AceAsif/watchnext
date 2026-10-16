@@ -172,7 +172,7 @@ assert.ok((await stored(p)).shows['tmdb:3']); checks++; console.log('  PASS the 
 await p.click('button[aria-label="Delete Beelzebub"]'); await wait(300); await click(p, '.sd-confirm-acts button', 'Delete show'); await wait(400);
 st = await stored(p); bn = await banner(p);
 ok('confirming deletes exactly that show (others untouched) and says "Deleted “Beelzebub”."', () => { assert.equal(st.shows['tmdb:3'], undefined); assert.ok(st.shows['tmdb:4'] && st.shows['tmdb:5'] && st.shows['tmdb:1']); assert.equal(bn.text, 'Deleted “Beelzebub”.'); });
-assert.equal(await p.evaluate(() => document.querySelectorAll('.sd-orphs li').length), 2); checks++; console.log('  PASS the list now has 2 leftovers');
+assert.equal(await p.evaluate(() => document.querySelectorAll('#cleanup .sd-orphs li').length), 2); checks++; console.log('  PASS the list now has 2 leftovers');
 for (const id of ['Black Jack (2004)', 'Baki the Grappler']) { await p.click(`button[aria-label="Delete ${id}"]`); await wait(250); await click(p, '.sd-confirm-acts button', 'Delete show'); await wait(300); }
 assert.equal(await p.evaluate(() => !document.querySelector('#cleanup')), true); checks++; console.log('  PASS when the last leftover is gone the whole Clean up card disappears');
 await p.close();

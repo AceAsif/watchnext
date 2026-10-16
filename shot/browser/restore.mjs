@@ -123,7 +123,7 @@ ok('RESTORED EXACTLY: every show (ratings, platforms, watchlist, rewatch counts,
 ok('RESTORED EXACTLY: every movie, including the rewatch, the planned film and the Cinema platform', () => assert.deepEqual(st.movies, orig.movies));
 ok('the TMDB key is NOT restored (backups never carry it)', () => assert.equal(st.settings.tmdbKey, ''));
 ok(`banner reports the real numbers: 6 shows, ${TOTAL_WATCHES} episode watches, 4 movies`, () => { assert.equal(bn.text, `Restored from backup: 6 shows added, ${TOTAL_WATCHES} episode watches restored, 4 movies added.`); assert.equal(bn.err, false); });
-const ui = await p.evaluate(() => ({ leftovers: document.querySelectorAll('.sd-orphs li').length, pill: (document.querySelector('#cleanup .sd-pill') || {}).textContent }));
+const ui = await p.evaluate(() => ({ leftovers: document.querySelectorAll('#cleanup .sd-orphs li').length, pill: (document.querySelector('#cleanup .sd-pill') || {}).textContent }));
 ok('the page reflects the restore immediately (the Clean up card is back with its 3 leftovers)', () => assert.deepEqual(ui, { leftovers: 3, pill: '3 left over' }));
 await shot(p, '01_restore_result', false);
 await ri.uploadFile(backupPath); await wait(600); bn = await banner(p);

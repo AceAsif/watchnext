@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { findDuplicateMovies } from '../components/duplicateMoviesLogic.js';
 import { useStore } from '../store/useStore.js';
 import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount, setDiscoverHidden } from '../store/db.js';
 import { hiddenList } from '../components/hiddenLogic.js';
@@ -31,6 +32,7 @@ import {
   KeyCard,
   ImportCard,
   CleanupCard,
+  DuplicatesCard,
   HiddenCard,
   BackupCard,
   BackupNudge,
@@ -89,6 +91,7 @@ export default function Settings() {
   }, [msg]);
   useEffect(() => () => clearTimeout(copyTimer.current), []);
 
+  const dups = useMemo(() => findDuplicateMovies(state.movies), [state.movies]);
   const orphans = useMemo(
     () => orphanShows(state.shows).map(([id, sh]) => [id, sh, watchedCount(sh)]),
     [state.shows]
@@ -266,6 +269,7 @@ export default function Settings() {
           onFile={onImportFile}
         />
         <CleanupCard rows={orphans} onAskDelete={(id) => setConfirm({ type: 'show', id })} />
+        <DuplicatesCard groups={dups.groups} titles={dups.titles} extra={dups.extra} />
         <HiddenCard rows={hiddenList(state.hidden)} onShowAgain={(e) => setDiscoverHidden(e, false)} />
         <BackupCard lastLine={lastBackupLine(bk, new Date())} onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} />
         <CsvCard onExport={exportCsv} />

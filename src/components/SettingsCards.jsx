@@ -5,6 +5,7 @@ import { posterTint, initialOf } from './libraryLogic.js';
 import { orphanIntro, orphanMeta, deleteAllIntro } from './settingsLogic.js';
 import { ServicesPicker, FREE_NOTE } from './ServicesUI.jsx';
 import { REGIONS } from './regionLogic.js';
+import { duplicatesIntro, dupTag, dayLabel, removeHint } from './duplicateMoviesLogic.js';
 import { WIPE_WORD, confirmOk, wipeIntro, wipeEffects, wipeBackupLine } from '../store/wipeLogic.js';
 
 // The Settings cards (Claude Design, Direction A). Purely presentational: the
@@ -224,6 +225,50 @@ export function CleanupCard({ rows, onAskDelete }) {
           </li>
         ))}
       </ul>
+    </SetCard>
+  );
+}
+
+// Movies that appear more than once (read-only: you remove copies yourself in Movies). Hidden when there are none.
+// groups: findDuplicateMovies(...).groups
+const DUP_FIRST = 8;
+export function DuplicatesCard({ groups, titles, extra }) {
+  const [all, setAll] = useState(false);
+  if (!groups.length) return null;
+  const shown = all ? groups : groups.slice(0, DUP_FIRST);
+  return (
+    <SetCard icon={I.broom} label="Cleanup" title="Duplicate movies" pill={<Pill tone="amber">{titles} {titles === 1 ? 'title' : 'titles'}</Pill>} id="duplicates">
+      <p className="sd-setp">{duplicatesIntro(titles, extra)}</p>
+      <ul className="sd-orphs sd-dups" data-testid="dup-list">
+        {shown.map((g) => (
+          <li key={g.key} data-testid="dup-row">
+            <ShowThumb show={{ name: g.name, poster: g.poster }} />
+            <div className="who">
+              <div className="nm" title={g.name}>{g.name}{g.year ? <span className="yr"> ({g.year})</span> : null}</div>
+              <div className="sd-dup-tag"><span className={'sd-dup-chip' + (g.sameDay ? ' warn' : '')}>{dupTag(g)}</span><span className="mt">{g.entries.length} copies</span></div>
+              <ul className="sd-dup-entries">
+                {g.entries.map((e, i) => (
+                  <li key={i}>
+                    <span>{dayLabel(e.date)}</span>
+                    {e.rating ? <span className="r">★ {e.rating}</span> : null}
+                    {e.hasNote ? <span className="n">note</span> : null}
+                    {!e.linked ? <span className="n">not linked</span> : null}
+                    {i === 0 ? <span className="n">oldest</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {groups.length > DUP_FIRST ? (
+        <div className="sd-setacts">
+          <button type="button" className="sd-setbtn" onClick={() => setAll(!all)} aria-expanded={all}>
+            {all ? 'Show fewer' : `Show all ${groups.length}`}
+          </button>
+        </div>
+      ) : null}
+      <div className="sd-setinfo">{I.info}<span>{removeHint}</span></div>
     </SetCard>
   );
 }
