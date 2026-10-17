@@ -11,6 +11,7 @@ import {
   loadMeta, saveMeta, libraryCount, withSince, nudgeStatus, nudgeCopy, afterBackup, afterSnooze, lastBackupLine,
 } from '../components/backupNudgeLogic.js';
 import { localISODate } from '../components/showLogic.js';
+import { useLetterboxd } from '../components/useLetterboxd.js';
 import { buildCsv, csvDoneText } from '../components/csvExport.js';
 import {
   keyStatus,
@@ -31,6 +32,7 @@ import {
   SyncCard,
   KeyCard,
   ImportCard,
+  LetterboxdCard,
   CleanupCard,
   DuplicatesCard,
   HiddenCard,
@@ -62,6 +64,8 @@ export default function Settings() {
   const [confirm, setConfirm] = useState(null); // { type: 'show', id } | { type: 'all' }
   const [cloudBusy, setCloudBusy] = useState(false);
   const fileRef = useRef();
+  const lbRef = useRef();
+  const lb = useLetterboxd();
   const restoreRef = useRef();
   const bannerRef = useRef();
   const copyTimer = useRef();
@@ -268,6 +272,7 @@ export default function Settings() {
           fileRef={fileRef}
           onFile={onImportFile}
         />
+        <LetterboxdCard st={lb.st} fileRef={lbRef} onChoose={() => lbRef.current.click()} onFiles={lb.onFiles} onStart={lb.start} onStop={lb.stop} onReset={lb.reset} />
         <CleanupCard rows={orphans} onAskDelete={(id) => setConfirm({ type: 'show', id })} />
         <DuplicatesCard groups={dups.groups} titles={dups.titles} extra={dups.extra} />
         <HiddenCard rows={hiddenList(state.hidden)} onShowAgain={(e) => setDiscoverHidden(e, false)} />

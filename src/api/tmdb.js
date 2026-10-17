@@ -40,6 +40,11 @@ export function searchMovies(query) {
   return searchWithYear((params) => get('/search/movie', params), query);
 }
 
+// Raw movie search with explicit params (query, year…), used by the Letterboxd import.
+export function searchMovieParams(params) {
+  return get('/search/movie', params);
+}
+
 export function movieDetails(tmdbId) {
   return get(`/movie/${tmdbId}`);
 }

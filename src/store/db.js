@@ -1,4 +1,5 @@
 import { mergeBackup } from './backupMerge.js';
+import { mergeLetterboxd } from '../components/letterboxdLogic.js';
 import { cleanRegion } from '../components/regionLogic.js';
 import { blockedByWipe } from './wipeLogic.js';
 import { setNoteIn, withNotes, withMovieNote } from './notes.js';
@@ -865,6 +866,19 @@ export function importTvTime(json) {
   touchedIds.forEach(clearTombstone); // re-importing a show lifts its tombstone
   if ((json.movies || []).length) markMoviesDirty();
   return { shows, watches };
+}
+
+// Letterboxd import: add entries without duplicating or deleting anything.
+// Returns { added, skipped }.
+export function importLetterboxd(entries) {
+  let res = { added: 0, skipped: 0 };
+  update((s) => {
+    const r = mergeLetterboxd(s.movies, entries);
+    s.movies = r.movies;
+    res = { added: r.added, skipped: r.skipped };
+  });
+  if (res.added) markMoviesDirty();
+  return res;
 }
 
 export function resetAll() {

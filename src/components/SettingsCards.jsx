@@ -192,6 +192,63 @@ export function ImportCard({ command, copied, onCopy, onChoose, fileRef, onFile 
   );
 }
 
+// ------------------------------------------------------- Letterboxd import
+export function LetterboxdCard({ st, onChoose, fileRef, onFiles, onStart, onStop, onReset }) {
+  const pct = st.phase === 'running' && st.total ? Math.round((st.done / st.total) * 100) : 0;
+  return (
+    <SetCard icon={I.upload} label="Import" title="Import from Letterboxd">
+      {st.phase === 'idle' && (
+        <>
+          <p className="sd-setp">
+            On letterboxd.com go to Settings → Import &amp; Export → <b>Export your data</b>, then choose the zip it gives you
+            (or just <code>watched.csv</code>, <code>diary.csv</code>, <code>ratings.csv</code> and <code>watchlist.csv</code>).
+          </p>
+          <input ref={fileRef} type="file" accept=".zip,.csv,application/zip,text/csv" multiple onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} style={{ display: 'none' }} aria-label="Letterboxd file" data-testid="lb-file" />
+          <button type="button" className="sd-setbtn primary" onClick={onChoose}>{I.upload} Choose Letterboxd file</button>
+        </>
+      )}
+      {st.phase === 'preview' && (
+        <>
+          <p className="sd-setp" data-testid="lb-preview">{st.line}</p>
+          {st.keyMissing && <div className="sd-setinfo">{I.info}<span>Add your TMDB key above first — it is used to find posters and run times.</span></div>}
+          <div className="sd-setacts">
+            <button type="button" className="sd-setbtn primary" onClick={onStart} data-testid="lb-start">{I.upload} Import now</button>
+            <button type="button" className="sd-setbtn" onClick={onReset}>Cancel</button>
+          </div>
+        </>
+      )}
+      {st.phase === 'running' && (
+        <>
+          <p className="sd-setp" data-testid="lb-progress">Importing… {st.done.toLocaleString()} of {st.total.toLocaleString()} films{st.unmatched ? ` (${st.unmatched.toLocaleString()} not matched yet)` : ''}</p>
+          <div className="sd-lbbar" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100"><span style={{ width: pct + '%' }} /></div>
+          <div className="sd-setacts"><button type="button" className="sd-setbtn" onClick={onStop}>Stop</button></div>
+        </>
+      )}
+      {st.phase === 'done' && (
+        <>
+          <p className="sd-setp" data-testid="lb-done">{st.text}</p>
+          {st.result.unmatched.length > 0 && (
+            <details className="sd-lbun">
+              <summary>Films not matched ({st.result.unmatched.length.toLocaleString()})</summary>
+              <ul data-testid="lb-unmatched">
+                {st.result.unmatched.map((u, i) => <li key={i}>{u.name}{u.year ? ` (${u.year})` : ''}</li>)}
+              </ul>
+            </details>
+          )}
+          <div className="sd-setacts"><button type="button" className="sd-setbtn" onClick={onReset}>Done</button></div>
+        </>
+      )}
+      {st.phase === 'error' && (
+        <>
+          <p className="sd-setp err" data-testid="lb-error">{st.message}</p>
+          <div className="sd-setacts"><button type="button" className="sd-setbtn" onClick={onReset}>Try again</button></div>
+        </>
+      )}
+      <div className="sd-setinfo">{I.info}<span>Importing only adds movies — it never deletes anything and skips films you already logged on the same day. Films with no diary date use the day you logged them on Letterboxd.</span></div>
+    </SetCard>
+  );
+}
+
 // ---------------------------------------------------------------- Clean up
 export function ShowThumb({ show, w = 40, h = 60 }) {
   const [c1, c2] = posterTint(show.name);
