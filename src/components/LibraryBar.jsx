@@ -543,7 +543,7 @@ export function AddDialog({ kind, search, initialQuery = '', onClose, badgeFor, 
     setError(null);
     try {
       const r = await search(text);
-      if (mine === seq.current) setResults((r || []).slice(0, 10));
+      if (mine === seq.current) setResults((r || []).slice(0, 20));
     } catch (e) {
       if (mine === seq.current) {
         setError(e.message || 'Search failed');

@@ -2,6 +2,7 @@
 // or from a VITE_TMDB_API_KEY env var at build time.
 
 import { getState } from '../store/db.js';
+import { searchWithYear } from '../components/movieSearchLogic.js';
 
 const BASE = 'https://api.themoviedb.org/3';
 
@@ -34,8 +35,9 @@ export function searchShows(query) {
   return get('/search/tv', { query });
 }
 
+// Accepts a trailing year ("Ready 2011") to narrow the match.
 export function searchMovies(query) {
-  return get('/search/movie', { query });
+  return searchWithYear((params) => get('/search/movie', params), query);
 }
 
 export function movieDetails(tmdbId) {

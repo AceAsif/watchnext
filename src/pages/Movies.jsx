@@ -10,6 +10,7 @@ import {
   setMovieNote,
   movieStatus,
 } from '../store/db.js';
+import { FIX_RESULTS_MAX } from '../components/movieSearchLogic.js';
 import { searchMovies, movieDetails, hasKey, img, movieVideos, pickTrailer } from '../api/tmdb.js';
 import Stars from '../components/Stars.jsx';
 import { movieViewings } from '../components/rewatchLogic.js';
@@ -358,14 +359,14 @@ export default function Movies() {
             {fixing && (
               <div className="sd-mdet-sec">
                 <span className="sd-lbl">Fix match</span>
-                <p className="sd-sub">Search TMDB and pick the correct movie — try the English title. Your watch date stays.</p>
+                <p className="sd-sub">Search TMDB and pick the correct movie — try the English title, and add the year if it is a common name (e.g. Ready 2011). Your watch date stays.</p>
                 <SearchField value={fixQuery} onChange={setFixQuery} placeholder="Movie title" onSubmit={runFixSearch} />
                 {fixResults &&
                   (fixResults.length === 0 ? (
                     <p className="sd-sub">No results — try another spelling or the English title.</p>
                   ) : (
                     <div className="sd-card">
-                      {fixResults.slice(0, 6).map((r, i) => (
+                      {fixResults.slice(0, FIX_RESULTS_MAX).map((r, i) => (
                         <MediaRow
                           key={r.id}
                           sep={i > 0}
