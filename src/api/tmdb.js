@@ -49,6 +49,11 @@ export function movieDetails(tmdbId) {
   return get(`/movie/${tmdbId}`);
 }
 
+// A movie collection (e.g. "Harry Potter Collection"): { id, name, poster_path, parts: [movies] }.
+export function movieCollection(collectionId) {
+  return get(`/collection/${collectionId}`);
+}
+
 export async function findByTvdb(tvdbId) {
   const data = await get(`/find/${tvdbId}`, { external_source: 'tvdb_id' });
   return (data.tv_results && data.tv_results[0]) || null;

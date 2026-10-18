@@ -12,6 +12,10 @@ import {
 } from '../store/db.js';
 import { FIX_RESULTS_MAX } from '../components/movieSearchLogic.js';
 import { searchMovies, movieDetails, hasKey, img, movieVideos, pickTrailer } from '../api/tmdb.js';
+import useCollections, { useCollectionForDetails } from '../components/useCollections.js';
+import CollectionsView from '../components/CollectionsView.jsx';
+import { progressLabel, nextLabel } from '../components/collectionsLogic.js';
+import { fmtDay } from '../components/CollectionsView.jsx';
 import Stars from '../components/Stars.jsx';
 import { movieViewings } from '../components/rewatchLogic.js';
 import { NoteEditor } from '../components/NoteEditor.jsx';
@@ -43,6 +47,12 @@ import {
 
 const searchMoviesList = (q) => searchMovies(q).then((d) => d.results || []);
 
+// "Movies" (the grid of watched films) or "Collections" (film series and how far you are).
+const MOVIE_VIEWS = [
+  { id: 'all', label: 'Movies' },
+  { id: 'collections', label: 'Collections' },
+];
+
 export default function Movies() {
   const state = useStore();
   const librarySyncing = useLibrarySyncing();
@@ -55,6 +65,8 @@ export default function Movies() {
   const [details, setDetails] = useState({}); // tmdbId -> TMDB movie details
   const [libQuery, setLibQuery] = useState(''); // filters the watched grid
   const [sortBy, setSortBy] = useState('recent'); // 'recent' | 'title' | 'rating'
+  const [view, setView] = useState('all'); // 'all' | 'collections'
+  const [collFocus, setCollFocus] = useState(null); // { id } the collection a movie sheet asked to see
 
   // Overviews are fetched on demand rather than stored: they're always
   // re-queryable from TMDB, and keeping 395 of them in local storage would
@@ -215,11 +227,21 @@ export default function Movies() {
   };
 
   const viewings = useMemo(() => movieViewings(state.movies), [state.movies]);
+  // Collections: only asks TMDB while the Collections view is open; answers are cached on this device.
+  const collInfo = useCollections(state.movies, view === 'collections');
+  // From a collection's film list: open the sheet of the latest watch of that film.
+  const openByTmdb = (tmdbId) => {
+    const m = movies.find((x) => x.tmdbId === tmdbId); // `movies` is newest-first
+    if (m) openMovie(m);
+  };
+  const addNextToWatchlist = async (part) => addMovieToWatchlist(await movieDetails(part.id));
   const shown = useMemo(() => shownMovies(movies, libQuery, sortBy), [movies, libQuery, sortBy]);
 
   const sel = openIndex != null ? movies.find((m) => m.index === openIndex) : null;
   const d = sel && sel.tmdbId ? details[sel.tmdbId] : null;
   const fixing = sel && fixIndex === sel.index;
+  const selCollId = useCollectionForDetails(d);
+  const selColl = selCollId ? collInfo.collections.find((c) => c.id === selCollId) || null : null;
   const closeSheet = () => {
     setOpenIndex(null);
     setFixIndex(null);
@@ -233,6 +255,16 @@ export default function Movies() {
       </LibHead>
 
       {movies.length > 0 && (
+        <div className="sd-lviews">
+          <SegmentedSort options={MOVIE_VIEWS} value={view} onChange={setView} label="Movies view" />
+        </div>
+      )}
+
+      {view === 'collections' && movies.length > 0 ? (
+        <CollectionsView info={collInfo} focus={collFocus} onOpenMovie={openByTmdb} onAddNext={addNextToWatchlist} />
+      ) : null}
+
+      {view === 'all' && movies.length > 0 && (
         <>
           <div className="sd-lbar">
             <FilterField
@@ -257,7 +289,7 @@ export default function Movies() {
         </>
       )}
 
-      {shown.length > 0 ? (
+      {view === 'collections' && movies.length > 0 ? null : shown.length > 0 ? (
         <div className="sd-lgrid">
           {shown.map((m) => (
             <MovieTile key={`${m.name}|${m.watchedAt}|${m.index}`} movie={m} times={viewings(m)} onOpen={() => openMovie(m)} />
@@ -339,6 +371,31 @@ export default function Movies() {
                 </>
               )}
             </div>
+
+            {selCollId ? (
+              <div className="sd-mdet-sec" data-testid="sheet-coll">
+                <span className="sd-lbl">Collection</span>
+                {selColl ? (
+                  <div className="sd-card sd-pad sd-coll-mini">
+                    <b>{selColl.name}</b>
+                    <span>{progressLabel(selColl)} · {nextLabel(selColl, fmtDay)}</span>
+                    <button
+                      type="button"
+                      className="sd-btn sm"
+                      onClick={() => {
+                        setView('collections');
+                        setCollFocus({ id: selColl.id });
+                        closeSheet();
+                      }}
+                    >
+                      See all films
+                    </button>
+                  </div>
+                ) : (
+                  <p className="sd-mdet-over">Loading collection…</p>
+                )}
+              </div>
+            ) : null}
 
             <div className="sd-mdet-sec">
               <span className="sd-lbl">Your thoughts</span>
