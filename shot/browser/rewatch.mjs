@@ -86,9 +86,9 @@ await ok('chip is spoken in the tile label, but hidden from the visual duplicate
 });
 await p.screenshot({ path: `${OUT}/shows_chip_phone.png` });
 await tab(p, 'Movies');
-await ok('Movies grid: every viewing of Dune shows 3×, Up 2×, Heat (once) and nothing else gets a chip', async () => {
-  const c = await chips(p); assert.deepEqual(c.filter((r) => r[0] === 'Dune').map((r) => r[1]), ['3×', '3×', '3×']);
-  assert.deepEqual(c.filter((r) => r[0] === 'Up').map((r) => r[1]), ['2×', '2×']); assert.deepEqual(c.filter((r) => r[0] === 'Heat').map((r) => r[1]), ['']);
+await ok('Movies grid: ONE tile per film — Dune 3×, Up 2×, Heat (once) and nothing else gets a chip', async () => {
+  const c = await chips(p); assert.deepEqual(c.filter((r) => r[0] === 'Dune').map((r) => r[1]), ['3×']);
+  assert.deepEqual(c.filter((r) => r[0] === 'Up').map((r) => r[1]), ['2×']); assert.deepEqual(c.filter((r) => r[0] === 'Heat').map((r) => r[1]), ['']);
   assert.ok(!c.some((r) => r[0] === 'Planned Only'));
 });
 await ok('no sideways scroll with chips', async () => { assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false); });

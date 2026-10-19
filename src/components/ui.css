@@ -1744,3 +1744,9 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-coll-more { align-self: center; }
 .sd-coll-mini { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; align-items: flex-start; }
 .sd-coll-mini span { color: var(--text-dim); }
+
+/* Movie sheet: every viewing of a film you've watched more than once (newest first). */
+.sd-views { display: flex; flex-wrap: wrap; gap: 6px; }
+.sd-view { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border-radius: 16px; border: 1px solid var(--line); background: var(--bg-raise); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.sd-view .r { color: var(--amber); font-size: 12px; }
+.sd-view.on { border-color: var(--amber); background: rgba(240, 160, 60, 0.14); font-weight: 600; }

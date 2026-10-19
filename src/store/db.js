@@ -875,9 +875,9 @@ export function importLetterboxd(entries) {
   update((s) => {
     const r = mergeLetterboxd(s.movies, entries);
     s.movies = r.movies;
-    res = { added: r.added, skipped: r.skipped };
+    res = { added: r.added, skipped: r.skipped, updated: r.updated || 0 };
   });
-  if (res.added) markMoviesDirty();
+  if (res.added || res.updated) markMoviesDirty();
   return res;
 }
 

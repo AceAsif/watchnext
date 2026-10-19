@@ -25,18 +25,19 @@ await t('kind: by file name, then by columns', () => {
   assert.equal(L.csvKind('stuff.csv', WATCHED), null);
   assert.equal(L.csvKind('reviews.csv', 'Date,Name,Year,Letterboxd URI,Rating,Rewatch,Review,Tags,Watched Date'), null);
 });
-await t('stars: half stars round up to whole, 0.5 stays 1 star, junk is 0', () => {
-  assert.deepEqual(['0.5', '1', '3.5', '4.5', '5', '', 'x', '0'].map(L.starsFrom), [1, 1, 4, 5, 5, 0, 0, 0]);
+await t('stars: half stars are kept exactly (0.5, 3.5, 4.5), junk is 0, odd values snap to the nearest half', () => {
+  assert.deepEqual(['0.5', '1', '3.5', '4.5', '5', '', 'x', '0', '6', '2.3'].map(L.starsFrom), [0.5, 1, 3.5, 4.5, 5, 0, 0, 0, 5, 2.5]);
+  assert.deepEqual(['0.5', '3.5', '4', ''].map(L.oldWholeStars), [1, 4, 4, 0]);
 });
 await t('plan: diary dates, rewatch, same-day dupes, watched fallback, ratings, watchlist', () => {
   const p = L.buildPlan({ watched: rec(WATCHED), diary: rec(DIARY), ratings: rec(RATINGS), watchlist: rec(WL) });
   const by = Object.fromEntries(p.films.map((f) => [f.name, f]));
   assert.deepEqual(by.Inception.views.map((v) => v.day), ['2020-03-22', '2021-05-30']);
   assert.equal(by.Inception.views[1].rewatch, true);
-  assert.equal(by.Inception.views[0].rating, 5); // 4.5 rounds up
+  assert.equal(by.Inception.views[0].rating, 4.5); // halves are kept
   assert.equal(by.Ready.views.length, 1); assert.equal(by.Ready.views[0].day, '2020-05-01'); assert.ok(by.Ready.views[0].approx);
-  assert.equal(by.Ready.views[0].rating, 4); // from ratings.csv 3.5
-  assert.equal(by['Tár'].views[0].rating, 1);
+  assert.equal(by.Ready.views[0].rating, 3.5); // from ratings.csv 3.5
+  assert.equal(by['Tár'].views[0].rating, 0.5);
   assert.deepEqual(p.watchlist.map((w) => w.name), ['Dune']); // Ready is already watched; Dune listed once
   assert.deepEqual(p.counts, { films: 3, viewings: 4, rewatches: 1, rated: 3, watchlist: 1 });
 });

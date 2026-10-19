@@ -12,6 +12,7 @@
 import { localISODate } from './showLogic.js';
 import { normTitle } from './duplicateMoviesLogic.js';
 import { searchWithYear } from './movieSearchLogic.js';
+import { cleanRating } from './starsLogic.js';
 
 // ---------------------------------------------------------------- CSV
 // RFC 4180: quoted cells, "" escapes, commas/newlines inside quotes, CRLF, BOM.
@@ -67,8 +68,12 @@ export function csvKind(name, text) {
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const validDate = (d) => DATE.test(d || '');
 
-// Letterboxd rates in halves (0.5–5). WatchNext has whole stars: round half up.
-export function starsFrom(raw) {
+// Letterboxd rates in halves (0.5–5), and so do WatchNext movies: kept exactly.
+export const starsFrom = (raw) => cleanRating(raw);
+
+// What older versions of the import saved: whole stars, halves rounded up (0.5 -> 1, 3.5 -> 4).
+// Used to spot those ratings on a re-import and put the half back.
+export function oldWholeStars(raw) {
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) return 0;
   return Math.min(5, Math.max(1, Math.round(n)));
@@ -213,8 +218,12 @@ const nameKey = (m) => normTitle(m.name);
 // Skips a watched entry when the library already has that film on that same
 // day (matched by TMDB id, or by title for older name-only entries), and a
 // planned entry when the film is already in the library in any form.
+// One exception: an entry an EARLIER Letterboxd import saved with its half star rounded
+// up (3.5 -> 4) gets the exact half back (`updated`). A rating changed in WatchNext since
+// (anything other than the rounded value) is left alone.
 export function mergeLetterboxd(movies, entries) {
   const have = new Set();
+  const lbAt = new Map(); // "t<id>|day" / "n<name>|day" -> index of an earlier Letterboxd-imported viewing
   const linkedIds = new Set();
   const names = new Set();
   for (const m of movies) {
@@ -227,9 +236,16 @@ export function mergeLetterboxd(movies, entries) {
       have.add(`n${nameKey(m)}|${d}`);
     }
   }
+  movies.forEach((m, i) => {
+    if (m.source !== 'letterboxd' || (m.status || 'watched') !== 'watched' || !m.watchedAt) return;
+    const d = dayOf(m.watchedAt);
+    if (m.tmdbId != null) lbAt.set(`t${m.tmdbId}|${d}`, i);
+    lbAt.set(`n${nameKey(m)}|${d}`, i);
+  });
   const out = [...movies];
   let added = 0;
   let skipped = 0;
+  let updated = 0;
   for (const e of entries) {
     if (e.status === 'planned') {
       if ((e.tmdbId != null && linkedIds.has(e.tmdbId)) || names.has(nameKey(e))) { skipped++; continue; }
@@ -241,14 +257,23 @@ export function mergeLetterboxd(movies, entries) {
     const d = dayOf(e.watchedAt);
     const k1 = e.tmdbId != null ? `t${e.tmdbId}|${d}` : null;
     const k2 = `n${nameKey(e)}|${d}`;
-    if ((k1 && have.has(k1)) || have.has(k2)) { skipped++; continue; }
+    if ((k1 && have.has(k1)) || have.has(k2)) {
+      skipped++;
+      const i = k1 && lbAt.has(k1) ? lbAt.get(k1) : lbAt.get(k2);
+      const old = i != null ? out[i] : null;
+      if (old && e.rating && old.rating !== e.rating && Number(old.rating) === oldWholeStars(e.rating)) {
+        out[i] = { ...old, rating: e.rating };
+        updated++;
+      }
+      continue;
+    }
     out.push(e); added++;
     if (k1) have.add(k1);
     have.add(k2);
     if (e.tmdbId != null) linkedIds.add(e.tmdbId);
     names.add(nameKey(e));
   }
-  return { movies: out, added, skipped };
+  return { movies: out, added, skipped, updated };
 }
 
 // ---------------------------------------------------------------- runner
@@ -267,12 +292,13 @@ export async function runImport(plan, deps, { concurrency = 4, batch = 25 } = {}
   let matched = 0;
   let next = 0;
   let pending = [];
-  const result = { added: 0, skipped: 0, matched: 0, unmatched, total, stopped: false };
+  const result = { added: 0, skipped: 0, updated: 0, matched: 0, unmatched, total, stopped: false };
   const flush = () => {
     if (!pending.length) return;
     const r = deps.save(pending);
     result.added += r.added;
     result.skipped += r.skipped;
+    result.updated += r.updated || 0;
     pending = [];
   };
   async function work() {
@@ -323,6 +349,7 @@ export function resultText(r) {
   const head = r.stopped ? 'Stopped early. ' : '';
   const bits = [`${n(r.added, 'entry', 'entries')} added`];
   if (r.skipped) bits.push(`${r.skipped.toLocaleString()} already there`);
+  if (r.updated) bits.push(`${n(r.updated, 'rating', 'ratings')} changed to the exact half star`);
   const un = r.unmatched.length;
   let tail = '';
   if (un) tail = ` ${n(un, 'film', 'films')} couldn’t be matched on TMDB — they were kept by name. Open them in Movies → Fix match (try adding the year).`;

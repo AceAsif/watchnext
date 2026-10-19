@@ -57,7 +57,7 @@ async function open(state) {
     if (u.includes('fonts.googleapis.com')) return r.respond({ status: 200, contentType: 'text/css', body: fontsCss });
     if (u.includes('image.tmdb.org')) return r.respond({ status: 200, contentType: 'image/png', body: PNG });
     if (u.includes('api.themoviedb.org')) {
-      const url = new URL(u); const j = (o) => r.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(o) });
+      const url = new URL(u); const j = (o) => r.respond({ status: 200, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(o) });
       if (url.pathname === '/3/search/movie') {
         const q = url.searchParams.get('query'); const y = url.searchParams.get('year'); searched.push({ q, y });
         const by = FILMS[q] || {}; const all = Object.values(by);
@@ -99,13 +99,13 @@ await p.evaluate(() => [...document.querySelectorAll('section')].find((x) => /Im
 await p.screenshot({ path: `${OUT}/letterboxd_done.png` });
 await ok('searches carried the year, so Ready 2011 was found (not Ready 2019)', async () => {
   assert.ok(searched.some((s) => s.q === 'Ready' && s.y === '2011'), JSON.stringify(searched));
-  const m = await movies(p); const ready = m.find((x) => x.name === 'Ready'); assert.equal(ready.tmdbId, 2); assert.equal(ready.year, '2011'); assert.equal(ready.runtimeMin, 150); assert.equal(ready.rating, 4);
+  const m = await movies(p); const ready = m.find((x) => x.name === 'Ready'); assert.equal(ready.tmdbId, 2); assert.equal(ready.year, '2011'); assert.equal(ready.runtimeMin, 150); assert.equal(ready.rating, 3.5); // halves are kept
 });
 await ok('Inception: two viewings on the real watch dates (22 Mar 2020, 30 May 2021), ratings on the viewings', async () => {
   const inc = (await movies(p)).filter((x) => x.name === 'Inception').sort((a, b) => a.watchedAt.localeCompare(b.watchedAt));
   assert.equal(inc.length, 2); assert.equal(inc[0].tmdbId, 1);
   const day = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Australia/Hobart' });
-  assert.deepEqual(inc.map((x) => day(x.watchedAt)), ['2020-03-22', '2021-05-30']); assert.deepEqual(inc.map((x) => x.rating), [5, 5]);
+  assert.deepEqual(inc.map((x) => day(x.watchedAt)), ['2020-03-22', '2021-05-30']); assert.deepEqual(inc.map((x) => x.rating), [4.5, 5]);
 });
 await ok('unmatched film kept by name; watchlist film is planned', async () => {
   const m = await movies(p); const tar = m.find((x) => x.name === 'Tár'); assert.ok(tar && tar.tmdbId === undefined && tar.status === 'watched');

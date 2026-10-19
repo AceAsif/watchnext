@@ -17,7 +17,7 @@ import CollectionsView from '../components/CollectionsView.jsx';
 import { progressLabel, nextLabel } from '../components/collectionsLogic.js';
 import { fmtDay } from '../components/CollectionsView.jsx';
 import Stars from '../components/Stars.jsx';
-import { movieViewings } from '../components/rewatchLogic.js';
+import { groupMovies, groupOfIndex, viewingsLabel } from '../components/movieGroupsLogic.js';
 import { NoteEditor } from '../components/NoteEditor.jsx';
 import { movieNoteOf } from '../store/notes.js';
 import PlatformPicker, { PlatformChip } from '../components/PlatformPicker.jsx';
@@ -226,7 +226,8 @@ export default function Movies() {
     return st.kind === 'planned' ? 'On watchlist' : null;
   };
 
-  const viewings = useMemo(() => movieViewings(state.movies), [state.movies]);
+  // One tile per film: rewatches are grouped, and the tile shows "4×" (movieGroupsLogic.js).
+  const groups = useMemo(() => groupMovies(movies), [movies]);
   // Collections: only asks TMDB while the Collections view is open; answers are cached on this device.
   const collInfo = useCollections(state.movies, view === 'collections');
   // From a collection's film list: open the sheet of the latest watch of that film.
@@ -235,9 +236,10 @@ export default function Movies() {
     if (m) openMovie(m);
   };
   const addNextToWatchlist = async (part) => addMovieToWatchlist(await movieDetails(part.id));
-  const shown = useMemo(() => shownMovies(movies, libQuery, sortBy), [movies, libQuery, sortBy]);
+  const shown = useMemo(() => shownMovies(groups, libQuery, sortBy), [groups, libQuery, sortBy]);
 
   const sel = openIndex != null ? movies.find((m) => m.index === openIndex) : null;
+  const selGroup = sel ? groupOfIndex(groups, sel.index) : null;
   const d = sel && sel.tmdbId ? details[sel.tmdbId] : null;
   const fixing = sel && fixIndex === sel.index;
   const selCollId = useCollectionForDetails(d);
@@ -250,7 +252,7 @@ export default function Movies() {
 
   return (
     <div className="sd-page sd-page--wide">
-      <LibHead title="Movies" count={movies.length}>
+      <LibHead title="Movies" count={groups.length}>
         <AddButton label="Add a movie from TMDB" onClick={() => openAdd()} />
       </LibHead>
 
@@ -270,7 +272,7 @@ export default function Movies() {
             <FilterField
               value={libQuery}
               onChange={setLibQuery}
-              placeholder={`Filter ${movies.length.toLocaleString()} movie${movies.length === 1 ? '' : 's'}`}
+              placeholder={`Filter ${groups.length.toLocaleString()} movie${groups.length === 1 ? '' : 's'}`}
             />
             <div className="sd-lbar-sort">
               <span className="sd-lbl">Sort</span>
@@ -280,7 +282,7 @@ export default function Movies() {
           </div>
           <CountLine
             shown={shown.length}
-            total={movies.length}
+            total={groups.length}
             noun="movies"
             summary={movieSortSummary(sortBy)}
             filtered={!!libQuery.trim()}
@@ -291,8 +293,8 @@ export default function Movies() {
 
       {view === 'collections' && movies.length > 0 ? null : shown.length > 0 ? (
         <div className="sd-lgrid">
-          {shown.map((m) => (
-            <MovieTile key={`${m.name}|${m.watchedAt}|${m.index}`} movie={m} times={viewings(m)} onOpen={() => openMovie(m)} />
+          {shown.map((g) => (
+            <MovieTile key={g.key} movie={g} times={g.times} onOpen={() => openMovie(g.latest)} />
           ))}
         </div>
       ) : movies.length === 0 && librarySyncing ? (
@@ -344,7 +346,7 @@ export default function Movies() {
             <div className="sd-mdet-head">
               <Poster path={sel.poster} name={sel.name} width={84} height={126} radius={10} />
               <div className="sd-gap10" style={{ minWidth: 0, flex: 1 }}>
-                <Stars value={sel.rating || 0} size={24} onChange={(n) => setMovieRating(sel.index, n)} />
+                <Stars value={sel.rating || 0} size={24} half onChange={(n) => setMovieRating(sel.index, n)} />
                 {sel.platform ? <div><PlatformChip id={sel.platform} /></div> : null}
                 {d && !d.error && (
                   <div className="sd-mdet-facts">
@@ -355,6 +357,27 @@ export default function Movies() {
                 )}
               </div>
             </div>
+
+            {selGroup && selGroup.times > 1 ? (
+              <div className="sd-mdet-sec" data-testid="viewings">
+                <span className="sd-lbl">{viewingsLabel(selGroup.times)}</span>
+                <div className="sd-views" role="group" aria-label="Your viewings, newest first">
+                  {selGroup.viewings.map((v) => (
+                    <button
+                      key={v.index}
+                      type="button"
+                      className={'sd-view' + (v.index === sel.index ? ' on' : '')}
+                      aria-pressed={v.index === sel.index}
+                      onClick={() => setOpenIndex(v.index)}
+                    >
+                      {fmtDay((v.watchedAt || '').slice(0, 10)) || 'No date'}
+                      {Number(v.rating) > 0 ? <span className="r">★ {v.rating}</span> : null}
+                    </button>
+                  ))}
+                </div>
+                <p className="sd-sub">Rating, notes and platform below are for the viewing you pick here.</p>
+              </div>
+            ) : null}
 
             <div className="sd-mdet-sec">
               <span className="sd-lbl">About</span>
@@ -459,13 +482,16 @@ export default function Movies() {
               <button
                 className="sd-btn danger"
                 onClick={() => {
-                  if (confirm(`Remove "${sel.name}" from your watched movies?`)) {
+                  const msg = selGroup && selGroup.times > 1
+                    ? `Remove the ${fmtDay((sel.watchedAt || '').slice(0, 10)) || 'undated'} viewing of "${sel.name}"? Your other ${selGroup.times - 1 === 1 ? 'viewing stays' : `${selGroup.times - 1} viewings stay`}.`
+                    : `Remove "${sel.name}" from your watched movies?`;
+                  if (confirm(msg)) {
                     removeMovie(sel.index);
                     closeSheet();
                   }
                 }}
               >
-                Remove
+                {selGroup && selGroup.times > 1 ? 'Remove this one' : 'Remove'}
               </button>
             </div>
           </>

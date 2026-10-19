@@ -122,7 +122,7 @@ export function movieEngagement(movie) {
   const planned = (movie.status || 'watched') === 'planned';
   const at = latest([movie.ratedAt, movie.watchedAt, movie.addedAt]);
   const r = Number(movie.rating);
-  if (r >= 1 && r <= 5) return { at, w: ratingWeight(r), why: 'rated', stars: r };
+  if (r >= 0.5 && r <= 5) return { at, w: ratingWeight(r), why: 'rated', stars: r };
   if (planned) return { at, w: 0.25, why: 'watchlist' };
   return { at, w: 0.5, why: 'watched' };
 }
