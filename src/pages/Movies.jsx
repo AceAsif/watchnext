@@ -17,7 +17,8 @@ import CollectionsView from '../components/CollectionsView.jsx';
 import { progressLabel, nextLabel } from '../components/collectionsLogic.js';
 import { fmtDay } from '../components/CollectionsView.jsx';
 import Stars from '../components/Stars.jsx';
-import { groupMovies, groupOfIndex, viewingsLabel } from '../components/movieGroupsLogic.js';
+import { groupMovies, groupOfIndex, viewingsLabel, viewingDay, watchedAtFor } from '../components/movieGroupsLogic.js';
+import ViewingDateEditor from '../components/ViewingDateEditor.jsx';
 import { NoteEditor } from '../components/NoteEditor.jsx';
 import { movieNoteOf } from '../store/notes.js';
 import PlatformPicker, { PlatformChip } from '../components/PlatformPicker.jsx';
@@ -358,24 +359,32 @@ export default function Movies() {
               </div>
             </div>
 
-            {selGroup && selGroup.times > 1 ? (
+            {selGroup ? (
               <div className="sd-mdet-sec" data-testid="viewings">
                 <span className="sd-lbl">{viewingsLabel(selGroup.times)}</span>
-                <div className="sd-views" role="group" aria-label="Your viewings, newest first">
-                  {selGroup.viewings.map((v) => (
-                    <button
-                      key={v.index}
-                      type="button"
-                      className={'sd-view' + (v.index === sel.index ? ' on' : '')}
-                      aria-pressed={v.index === sel.index}
-                      onClick={() => setOpenIndex(v.index)}
-                    >
-                      {fmtDay((v.watchedAt || '').slice(0, 10)) || 'No date'}
-                      {Number(v.rating) > 0 ? <span className="r">★ {v.rating}</span> : null}
-                    </button>
-                  ))}
-                </div>
-                <p className="sd-sub">Rating, notes and platform below are for the viewing you pick here.</p>
+                {selGroup.times > 1 ? (
+                  <div className="sd-views" role="group" aria-label="Your viewings, newest first">
+                    {selGroup.viewings.map((v) => (
+                      <button
+                        key={v.index}
+                        type="button"
+                        className={'sd-view' + (v.index === sel.index ? ' on' : '')}
+                        aria-pressed={v.index === sel.index}
+                        onClick={() => setOpenIndex(v.index)}
+                      >
+                        {fmtDay(viewingDay(v)) || 'No date'}
+                        {Number(v.rating) > 0 ? <span className="r">★ {v.rating}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <ViewingDateEditor
+                  key={sel.index}
+                  group={selGroup}
+                  entry={sel}
+                  onSave={(ymd) => updateMovie(sel.index, { watchedAt: watchedAtFor(ymd) })}
+                />
+                {selGroup.times > 1 ? <p className="sd-sub">Date, rating, notes and platform here are for the viewing you picked above.</p> : null}
               </div>
             ) : null}
 
@@ -483,7 +492,7 @@ export default function Movies() {
                 className="sd-btn danger"
                 onClick={() => {
                   const msg = selGroup && selGroup.times > 1
-                    ? `Remove the ${fmtDay((sel.watchedAt || '').slice(0, 10)) || 'undated'} viewing of "${sel.name}"? Your other ${selGroup.times - 1 === 1 ? 'viewing stays' : `${selGroup.times - 1} viewings stay`}.`
+                    ? `Remove the ${fmtDay(viewingDay(sel)) || 'undated'} viewing of "${sel.name}"? Your other ${selGroup.times - 1 === 1 ? 'viewing stays' : `${selGroup.times - 1} viewings stay`}.`
                     : `Remove "${sel.name}" from your watched movies?`;
                   if (confirm(msg)) {
                     removeMovie(sel.index);

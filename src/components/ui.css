@@ -1750,3 +1750,9 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-view { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border-radius: 16px; border: 1px solid var(--line); background: var(--bg-raise); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
 .sd-view .r { color: var(--amber); font-size: 12px; }
 .sd-view.on { border-color: var(--amber); background: rgba(240, 160, 60, 0.14); font-weight: 600; }
+
+/* Movie sheet: the open viewing's date, with "Change date". */
+.sd-vdate { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--text-dim); }
+.sd-vdate b { color: var(--text); font-weight: 600; }
+.sd-vdate-edit .sd-datefield { margin-top: 0; }
+.sd-when-hint.err { color: var(--amber); }

@@ -1,3 +1,7 @@
+import { localISODate } from './showLogic.js';
+import { isAllowedDay, stampForDay } from './watchDatesLogic.js';
+import { fmtDay } from './statsLogic.js';
+
 // One tile per film in the Movies grid. PURE: no DOM, no store.
 //
 // Every viewing of a movie is its own dated entry (a rewatch is a second entry). The grid used
@@ -58,3 +62,31 @@ export function groupOfIndex(groups, index) {
 
 // "Watched 4 times" / "Watched once"
 export const viewingsLabel = (n) => (n === 1 ? 'Watched once' : `Watched ${n} times`);
+
+// ------------------------------------------------------------------ change a viewing's date
+// "Log again" and "Watched it" stamp TODAY. When a rewatch really happened earlier, the
+// movie sheet lets you move that one viewing to its real day.
+
+
+// The LOCAL day a viewing is dated ('YYYY-MM-DD'), or '' when it has no usable date.
+export function viewingDay(v) {
+  const t = Date.parse(v && v.watchedAt);
+  return Number.isFinite(t) ? localISODate(new Date(t)) : '';
+}
+
+// Can viewing `index` of this film move to day `ymd`?
+// -> { ok, msg } — msg is the hint shown under the date box ('' when there is nothing to say).
+export function checkNewDay(group, index, ymd, today) {
+  if (!ymd) return { ok: false, msg: '' };
+  if (!isAllowedDay(ymd, today)) return { ok: false, msg: 'Choose a real date that is not in the future.' };
+  const viewings = (group && group.viewings) || [];
+  const me = viewings.find((v) => v.index === index);
+  if (me && viewingDay(me) === ymd) return { ok: false, msg: '' }; // unchanged: nothing to save, nothing to warn about
+  if (viewings.some((v) => v.index !== index && viewingDay(v) === ymd)) {
+    return { ok: false, msg: 'You already have a viewing of this film on that day. If this one is a copy, use “Remove this one” instead.' };
+  }
+  return { ok: true, msg: `This viewing will be dated ${fmtDay(ymd)}. Rating and notes stay.` };
+}
+
+// The new watchedAt to save for that day (local noon, never in the future).
+export const watchedAtFor = (ymd, now = new Date()) => stampForDay(ymd, now);

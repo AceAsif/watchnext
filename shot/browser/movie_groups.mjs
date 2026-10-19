@@ -93,9 +93,9 @@ await ok('"Remove this one" removes only that viewing; the tile then shows 3×',
   const m = await lib(p); assert.equal(m.filter((x) => x.tmdbId === 6477).length, 3); assert.ok(!m.some((x) => (x.watchedAt || '').startsWith('2020-01-01')));
   assert.equal((await tiles(p)).find((x) => /Alvin/.test(x.name)).chip, '3×');
 });
-await ok('a film watched once has no Viewings list and a plain "Remove"', async () => {
+await ok('a film watched once has no date chips (just "Watched once") and a plain "Remove"', async () => {
   await openTile(p, '^Shaun'); await wait(400);
-  assert.equal(await viewings(p), null); assert.ok(await p.evaluate(() => [...document.querySelectorAll('.sd-mdet-actions button')].some((b) => b.textContent === 'Remove')));
+  assert.deepEqual(await viewings(p), { label: 'Watched once', chips: [] }); assert.ok(await p.evaluate(() => [...document.querySelectorAll('.sd-mdet-actions button')].some((b) => b.textContent === 'Remove')));
 });
 
 console.log('C. HALF STARS');
@@ -125,6 +125,49 @@ await ok('tile badge reads 0.5, and Stats shows the rating as half a star', asyn
   assert.ok(ro.includes('0.5 out of 5 stars'), ro.join(','));
 });
 await ok('phone: no sideways scroll', async () => { assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false); });
+await p.close();
+
+
+console.log('D. CHANGE DATE');
+p = await open();
+const setDate = (p, v) => p.evaluate((v) => { const i = document.querySelector('[data-testid=viewing-date-edit] input[type=date]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, v); i.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+const editState = (p) => p.evaluate(() => { const e = document.querySelector('[data-testid=viewing-date-edit]'); if (!e) return null; return { hint: e.querySelector('.sd-when-hint').textContent, save: !e.querySelector('button.primary').disabled }; });
+await openTile(p, '^Alvin'); await wait(500);
+await ok('every viewing shows "Watched on <date>" with a Change date button', async () => {
+  assert.equal(await p.evaluate(() => document.querySelector('[data-testid=viewing-date]').innerText.replace(/\s+/g, ' ').trim()), 'Watched on 19 Sep 2026 Change date');
+});
+await ok('a future date, or a day another viewing already has, cannot be saved (with a reason)', async () => {
+  await p.evaluate(() => [...document.querySelectorAll('[data-testid=viewing-date] button')][0].click()); await wait(200);
+  await setDate(p, '2099-01-01'); await wait(150); let e = await editState(p); assert.equal(e.save, false); assert.match(e.hint, /not in the future/);
+  await setDate(p, '2023-05-05'); await wait(150); e = await editState(p); assert.equal(e.save, false); assert.match(e.hint, /already have a viewing of this film on that day/);
+});
+await ok('picking 4 Mar 2022 and Save moves ONLY this viewing; its rating stays; the list and tile re-sort', async () => {
+  const before = (await lib(p)).filter((x) => x.tmdbId === 6477);
+  await setDate(p, '2022-03-04'); await wait(150); const e = await editState(p); assert.equal(e.save, true); assert.equal(e.hint, 'This viewing will be dated 4 Mar 2022. Rating and notes stay.');
+  await p.evaluate(() => document.querySelector('[data-testid=viewing-date-edit] button.primary').click()); await wait(400);
+  const after = (await lib(p)).filter((x) => x.tmdbId === 6477);
+  assert.equal(after.length, 4);
+  const moved = after.filter((x) => !before.some((b) => b.watchedAt === x.watchedAt)); assert.equal(moved.length, 1);
+  assert.equal(new Date(moved[0].watchedAt).toLocaleDateString('en-CA', { timeZone: 'Australia/Hobart' }), '2022-03-04');
+  assert.deepEqual((await viewings(p)).chips, ['1 Jan 2024', '5 May 2023★ 4', '4 Mar 2022 *', '1 Jan 2020★ 3']);
+  assert.equal(await p.evaluate(() => document.querySelector('[data-testid=viewing-date]').innerText.replace(/\s+/g, ' ').trim()), 'Watched on 4 Mar 2022 Change date');
+  assert.equal((await tiles(p)).find((x) => /Alvin/.test(x.name)).date, '2024-01-01');
+});
+await ok('Cancel closes the date box without changing anything', async () => {
+  const before = JSON.stringify(await lib(p));
+  await p.evaluate(() => [...document.querySelectorAll('[data-testid=viewing-date] button')][0].click()); await wait(200);
+  await setDate(p, '2010-10-10'); await p.evaluate(() => [...document.querySelectorAll('[data-testid=viewing-date-edit] button')].find((b) => b.textContent === 'Cancel').click()); await wait(200);
+  assert.equal(JSON.stringify(await lib(p)), before); assert.ok(await p.evaluate(() => !!document.querySelector('[data-testid=viewing-date]')));
+});
+await ok('a film watched once also has Change date (no viewings list)', async () => {
+  await openTile(p, '^The Dog Stars'); await wait(400);
+  assert.equal(await p.evaluate(() => document.querySelectorAll('.sd-view').length), 0);
+  assert.match(await p.evaluate(() => document.querySelector('[data-testid=viewing-date]').innerText), /Watched on 1 Sep 2026/);
+  assert.equal(await p.evaluate(() => document.querySelector('[data-testid=viewings] .sd-lbl').textContent), 'Watched once');
+});
+await p.evaluate(() => [...document.querySelectorAll('[data-testid=viewing-date] button')][0].click()); await wait(250);
+await p.screenshot({ path: `${OUT}/change_date_phone.png` });
+await ok('phone: no sideways scroll with the date box open', async () => { assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false); });
 await p.close();
 
 console.log(`\n${checks} checks passed`); console.log('PROBLEMS:', problems.length ? '\n' + problems.join('\n') : 'none'); await browser.close(); server.close();
