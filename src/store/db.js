@@ -6,6 +6,7 @@ import { setNoteIn, withNotes, withMovieNote } from './notes.js';
 import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
 import { setHidden, mergeHidden, sameHidden } from '../components/hiddenLogic.js';
 import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
+import { cleanTombs, lostKeys, addTombs, liftPresent } from './movieTombsLogic.js';
 
 // Simple localStorage-backed store with a subscribe API.
 // Single-user app, so no backend needed: everything lives in the browser.
@@ -67,8 +68,10 @@ export function update(mutator) {
   // cloud-sync update from another device/tab is the main way this happens).
   // Individual show/movie objects inside stay reference-stable when unchanged,
   // which is the correct, standard immutable-update shape.
+  const before = state.movies;
   state = { ...state, shows: { ...state.shows }, movies: [...state.movies] };
   mutator(state);
+  trackMovieTombs(before, state.movies);
   commit();
 }
 
@@ -84,6 +87,50 @@ let dirtyGoals = false;
 let dirtyHidden = false;
 let dirtySeen = false;
 let deletedShows = new Set();
+
+// Removed movie viewings ("tombs"), see store/movieTombsLogic.js. A viewing whose
+// "name|watchedAt" key disappears from the list (removed, or moved to another date) is
+// remembered here, and saved with the cloud movies, so a sign-in pull can't bring it back.
+const MOVIE_TOMB_KEY = 'watchnext-movie-tombs-v1';
+function loadMovieTombs() {
+  try {
+    const raw = localStorage.getItem(MOVIE_TOMB_KEY);
+    if (raw) return cleanTombs(JSON.parse(raw));
+  } catch (e) {
+    console.error('Failed to load removed-movie list', e);
+  }
+  return [];
+}
+let movieTombs = loadMovieTombs();
+function persistMovieTombs() {
+  try {
+    localStorage.setItem(MOVIE_TOMB_KEY, JSON.stringify(movieTombs));
+  } catch (e) {
+    console.error('Failed to save removed-movie list', e);
+  }
+}
+export function getMovieTombs() {
+  return movieTombs;
+}
+// Replace the list (the sign-in merge hands over the union of this device's and the cloud's).
+export function setMovieTombs(list) {
+  movieTombs = cleanTombs(list);
+  persistMovieTombs();
+}
+// After every change: note the viewings that just disappeared, and lift the tomb of any
+// viewing that is present again (logged again, imported, restored from a backup).
+function trackMovieTombs(before, after) {
+  if (before === after) return;
+  let next = movieTombs;
+  const gone = lostKeys(before, after);
+  if (gone.length) next = addTombs(next, gone);
+  if (next.length) next = liftPresent(next, after);
+  if (next.length !== movieTombs.length || next.some((k, i) => k !== movieTombs[i])) {
+    movieTombs = next;
+    persistMovieTombs();
+    markMoviesDirty(); // the list of removed viewings rides with the cloud movies
+  }
+}
 
 // Persistent tombstones: ids the user has deleted for good. Kept in
 // localStorage (unlike deletedShows, which is an in-memory flush queue that
@@ -162,7 +209,8 @@ export function clearTombstone(id) {
 // tombstones record what the PREVIOUS account deleted; left in place they would delete the
 // same shows from the new account's cloud copy. Returns how many were cleared.
 export function clearAllTombstones() {
-  const n = tombstones.size + wipeTombs.size;
+  const n = tombstones.size + wipeTombs.size + movieTombs.length;
+  if (movieTombs.length) { movieTombs = []; persistMovieTombs(); }
   if (tombstones.size) { tombstones = new Set(); persistTombstones(); }
   if (wipeTombs.size) { wipeTombs = new Map(); persistWipeTombs(); }
   return n;
@@ -883,6 +931,7 @@ export function importLetterboxd(entries) {
 
 export function resetAll() {
   state = empty();
+  if (movieTombs.length) { movieTombs = []; persistMovieTombs(); }
   commit();
 }
 

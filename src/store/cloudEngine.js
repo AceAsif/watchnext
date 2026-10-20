@@ -31,7 +31,8 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
-import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markGoalsDirty, markHiddenDirty, markSeenDirty, queueShowDelete, clearTombstone, clearAllTombstones, isTombstoned, resetAll, wipeLibrary, addWipeTombstones, applyRemoteGoals, applyRemoteHidden, applyRemoteSeen } from './db.js';
+import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markGoalsDirty, markHiddenDirty, markSeenDirty, queueShowDelete, clearTombstone, clearAllTombstones, isTombstoned, resetAll, wipeLibrary, addWipeTombstones, applyRemoteGoals, applyRemoteHidden, applyRemoteSeen, getMovieTombs, setMovieTombs } from './db.js';
+import { mergeRemoteMovies } from './movieTombsLogic.js';
 import { OWNER_KEY, readOwner, ownerRecord, libraryCounts, switchDecision } from './accountSwitch.js';
 import { sanitizeGoals } from '../components/goalsLogic.js';
 import { sanitizeHidden } from '../components/hiddenLogic.js';
@@ -336,15 +337,12 @@ async function pullAndMerge(forUid) {
     });
 
     if (moviesSnap.exists()) {
-      const remoteMovies = moviesSnap.data().movies || [];
-      const seen = new Set(s.movies.map((m) => `${m.name}|${m.watchedAt}`));
-      for (const m of remoteMovies) {
-        const k = `${m.name}|${m.watchedAt}`;
-        if (!seen.has(k)) {
-          s.movies = [...s.movies, m];
-          seen.add(k);
-        }
-      }
+      // Union the two lists, but never bring back a viewing either side has removed (or moved
+      // to another date): see movieTombsLogic.js.
+      const data = moviesSnap.data();
+      const m = mergeRemoteMovies(s.movies, data.movies || [], getMovieTombs(), data.removed);
+      s.movies = m.movies;
+      setMovieTombs(m.tombs);
     }
   });
 
@@ -382,7 +380,7 @@ async function flush() {
     });
   }
   if (movies) {
-    batch.set(doc(db, 'users', uid, 'library', 'movies'), { movies: state.movies });
+    batch.set(doc(db, 'users', uid, 'library', 'movies'), { movies: state.movies, removed: getMovieTombs() });
   }
   if (goals) {
     batch.set(goalsRef(uid), { goals: sanitizeGoals(state.goals) });
