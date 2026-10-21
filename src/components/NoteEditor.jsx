@@ -3,6 +3,8 @@ import { Sheet } from './ui.jsx';
 import { XIcon } from './LibraryBar.jsx';
 import { nextTab } from './statsLogic.js';
 import { REACTIONS, NOTE_MAX, cleanNote, isEmptyNote } from '../store/notes.js';
+import Stars from './Stars.jsx';
+import { starLabel } from './starsLogic.js';
 
 // Reaction + note editor, used inline on the movie sheet and inside a sheet for
 // an episode. `value` is { react, text } (from cleanNote); onSave receives the
@@ -93,9 +95,11 @@ export function NoteEditor({ value, onSave, onRemove, saveLabel = 'Save' }) {
   );
 }
 
-// An episode's note, in a bottom sheet (phone) / centred dialog (desktop). The
-// × closes WITHOUT saving; Save is explicit so nothing is lost or stored by accident.
-export function NoteSheet({ title, subtitle, value, onSave, onRemove, onClose }) {
+// An episode's rating, reaction and note, in a bottom sheet (phone) / centred dialog
+// (desktop). The rating saves as soon as you tap a star (tap it again to clear it), like a
+// movie's. For the note, the × closes WITHOUT saving; Save is explicit.
+//   rating / onRate: optional; without onRate there is no star row.
+export function NoteSheet({ title, subtitle, value, onSave, onRemove, onClose, rating = 0, onRate }) {
   return (
     <Sheet
       open
@@ -108,6 +112,15 @@ export function NoteSheet({ title, subtitle, value, onSave, onRemove, onClose })
         </button>
       }
     >
+      {onRate && (
+        <div className="sd-eprate" data-testid="episode-rating">
+          <span className="sd-lbl">Your rating</span>
+          <div className="sd-eprate-row">
+            <Stars value={rating} onChange={onRate} size={28} half />
+            <span className="sd-mono sd-eprate-val">{rating ? `${starLabel(rating)} / 5` : 'Not rated'}</span>
+          </div>
+        </div>
+      )}
       <NoteEditor value={value} saveLabel="Save note" onSave={onSave} onRemove={onRemove} />
     </Sheet>
   );

@@ -13,6 +13,7 @@ import {
   setWatchDates,
   restoreWatchDates,
   setShowRating,
+  setEpisodeRating,
   setShowPlatform,
   setShowProviders,
   deleteShow,
@@ -37,6 +38,9 @@ import { PLATFORMS, platformById } from '../components/PlatformPicker.jsx';
 import CastCrew from '../components/CastCrew.jsx';
 import { NoteSheet } from '../components/NoteEditor.jsx';
 import { reactionById } from '../store/notes.js';
+import { ratingOf } from '../store/epRatings.js';
+import { starLabel } from '../components/starsLogic.js';
+import EpisodeRatings from '../components/EpisodeRatings.jsx';
 import AnimeSheet from '../components/AnimeSheet.jsx';
 import FinishCardSheet from '../components/FinishCardSheet.jsx';
 import { WhenSheet, FixDatesSheet } from '../components/WatchDateSheets.jsx';
@@ -226,6 +230,8 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
           }
           const note = (show.notes || {})[k];
           const noteReaction = note && reactionById(note.react);
+          const epRating = ratingOf(show, k);
+          if (epRating) sub = sub ? { ...sub, text: `${sub.text} · ★ ${starLabel(epRating)}` } : { text: `★ ${starLabel(epRating)}`, color: 'var(--text-dim)' };
           return (
             <div className="sd-ep" key={ep.id}>
               <span className="sd-mono" style={{ width: 30, fontSize: 12, color: isNext ? 'var(--amber)' : 'var(--text-dim)' }}>
@@ -235,12 +241,12 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
                 <div style={{ fontSize: 14 }}>{ep.name || `Episode ${ep.episode_number}`}</div>
                 {sub && <div style={{ fontSize: 12, color: sub.color, marginTop: 2 }}>{sub.text}</div>}
               </div>
-              {(on || note) && (
+              {(on || note || epRating > 0) && (
                 <button
                   className="sd-check"
                   style={{ width: 36 }}
-                  title={note ? 'Edit your note' : 'Add a note or reaction'}
-                  aria-label={`${note ? 'Edit note for' : 'Add note for'} ${code}`}
+                  title={note || epRating ? 'Your rating and note' : 'Rate it, react or add a note'}
+                  aria-label={`${note || epRating ? 'Edit rating and note for' : 'Rate or add a note for'} ${code}`}
                   onClick={() => setNoteEp({ n: ep.episode_number, name: ep.name || `Episode ${ep.episode_number}` })}
                 >
                   {noteReaction ? (
@@ -284,6 +290,8 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
           title={`S${season.n}E${noteEp.n}`}
           subtitle={noteEp.name}
           value={(show.notes || {})[epKey(season.n, noteEp.n)]}
+          rating={ratingOf(show, epKey(season.n, noteEp.n))}
+          onRate={(r) => setEpisodeRating(id, epKey(season.n, noteEp.n), r, noteEp.name)}
           onSave={(v) => { setEpisodeNote(id, epKey(season.n, noteEp.n), v); setNoteEp(null); }}
           onRemove={() => { setEpisodeNote(id, epKey(season.n, noteEp.n), {}); setNoteEp(null); }}
           onClose={() => setNoteEp(null)}
@@ -792,6 +800,9 @@ export default function ShowDetail({ id, onBack }) {
           />
         ))}
       </section>
+
+      {/* ---------------- your episode ratings (hidden until you rate one) */}
+      <EpisodeRatings show={show} />
 
       {/* ---------------- cast & crew */}
       {hasKey() && show.tmdbId && (

@@ -39,6 +39,7 @@ import { sanitizeHidden } from '../components/hiddenLogic.js';
 import { sanitizeLog } from '../components/hitLogic.js';
 import { cleanEmail } from './accountEmail.js';
 import { mergeNotes } from './notes.js';
+import { mergeEpRatings } from './epRatings.js';
 import { runWipe, wipeDecision, isValidWipe, readMeta, writeMeta } from './wipeLogic.js';
 import { mergeWatched } from './watchedMerge.js';
 
@@ -333,6 +334,10 @@ async function pullAndMerge(forUid) {
       const notes = mergeNotes(local.notes, remote.notes);
       if (notes) merged.notes = notes;
       else delete merged.notes;
+      // Episode ratings: a union too; an episode rated on both devices keeps the newer rating.
+      const epRatings = mergeEpRatings(local.epRatings, remote.epRatings);
+      if (epRatings) merged.epRatings = epRatings;
+      else delete merged.epRatings;
       s.shows[d.id] = merged;
     });
 

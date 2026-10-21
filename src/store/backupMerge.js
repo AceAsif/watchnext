@@ -15,6 +15,7 @@
 // Ids / keys that must never be copied from a file: assigning to one of these on
 // a plain object can rewrite its prototype.
 import { mergeNotes, withMovieNote, movieNoteOf } from './notes.js';
+import { mergeEpRatings } from './epRatings.js';
 import { fillGoals } from '../components/goalsLogic.js';
 import { fillHidden } from '../components/hiddenLogic.js';
 import { mergeLog, sameLog } from '../components/hitLogic.js';
@@ -64,6 +65,11 @@ function mergeShow(local, back) {
   const notes = mergeNotes(local.notes, back.notes);
   if (notes) out.notes = notes;
   const notesAdded = Math.max(0, Object.keys(notes || {}).length - Object.keys(local.notes || {}).length);
+
+  // episode ratings: union; for an episode rated on both sides the newer rating wins (cleaned)
+  delete out.epRatings;
+  const epRatings = mergeEpRatings(local.epRatings, back.epRatings);
+  if (epRatings) out.epRatings = epRatings;
 
   // library / watchlist: being in the library beats being on the watchlist
   // (only written when the value actually changes, so a show that simply never
@@ -128,6 +134,9 @@ export function mergeBackup(local, backup) {
         copy.notes = n;
         summary.notesAdded += Object.keys(n).length;
       }
+      const er = mergeEpRatings(undefined, copy.epRatings); // sanitise episode ratings too
+      delete copy.epRatings;
+      if (er) copy.epRatings = er;
       shows[id] = copy;
       summary.showsAdded++;
       summary.watchesAdded += Object.keys(copy.watched).length;

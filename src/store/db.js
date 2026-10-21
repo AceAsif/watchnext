@@ -3,6 +3,7 @@ import { mergeLetterboxd } from '../components/letterboxdLogic.js';
 import { cleanRegion } from '../components/regionLogic.js';
 import { blockedByWipe } from './wipeLogic.js';
 import { setNoteIn, withNotes, withMovieNote } from './notes.js';
+import { setRatingIn, withEpRatings } from './epRatings.js';
 import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
 import { setHidden, mergeHidden, sameHidden } from '../components/hiddenLogic.js';
 import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
@@ -1036,6 +1037,17 @@ export function setEpisodeNote(showId, epKey, input) {
   update((s) => {
     const show = s.shows[showId];
     s.shows[showId] = withNotes(show, setNoteIn(show.notes, epKey, input, new Date().toISOString()));
+  });
+  markShowDirty(showId);
+}
+// Episode rating (0.5–5, half stars; 0 removes it). Stored in show.epRatings keyed "SxE",
+// beside notes and NOT inside show.watched, so un-marking an episode keeps its rating.
+// `title` is remembered so "Best episode" can name it without asking TMDB again.
+export function setEpisodeRating(showId, epKey, rating, title) {
+  if (!state.shows[showId]) return;
+  update((s) => {
+    const show = s.shows[showId];
+    s.shows[showId] = withEpRatings(show, setRatingIn(show.epRatings, epKey, rating, title, new Date().toISOString()));
   });
   markShowDirty(showId);
 }

@@ -13,6 +13,7 @@
 import { watchedTitles, isAnime } from './originsLogic.js';
 import { groupMovies } from './movieGroupsLogic.js';
 import { collectNotes } from './notesSearchLogic.js';
+import { ratedEpisodes } from './epRatingsLogic.js';
 
 export const LEVEL_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Legend'];
 
@@ -32,7 +33,7 @@ export const BADGES = [
   { id: 'streak', title: 'On a roll', what: 'Longest run of days in a row with something watched', goals: [3, 7, 14, 30, 60, 100], unit: (n) => plural(n, 'day') },
   { id: 'rewatch', title: 'Comfort watch', what: 'Films watched more than once', goals: [1, 5, 10, 25, 50], unit: (n) => plural(n, 'film') },
   { id: 'cinema', title: 'Big screen', what: 'Films watched at the cinema', goals: [1, 10, 25, 50, 100], unit: (n) => plural(n, 'film') },
-  { id: 'critic', title: 'Critic', what: 'Ratings given', goals: [10, 50, 100, 250, 500], unit: (n) => plural(n, 'rating') },
+  { id: 'critic', title: 'Critic', what: 'Ratings given (shows, episodes and films)', goals: [10, 50, 100, 250, 500], unit: (n) => plural(n, 'rating') },
   { id: 'notes', title: 'Note taker', what: 'Notes and reactions written', goals: [1, 10, 50, 100, 250], unit: (n) => plural(n, 'note') },
   { id: 'collections', title: 'Completionist', what: 'Movie collections fully watched', goals: [1, 5, 10, 25, 50], unit: (n) => plural(n, 'collection') },
 ];
@@ -76,6 +77,7 @@ export function computeMetrics(state, { origins = { items: {} }, collections = n
     if (ws.length) for (const g of s.genres || []) genres.add(g);
     if (s.followed && s.dropped !== true && s.totalEpisodes && ws.length >= s.totalEpisodes) finished++;
     if (Number(s.rating) > 0) ratings++;
+    ratings += ratedEpisodes(s).length; // episode ratings count too
   }
   const decades = new Set();
   let cinema = 0;
