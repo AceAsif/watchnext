@@ -17,6 +17,8 @@ import CollectionsView from '../components/CollectionsView.jsx';
 import { progressLabel, nextLabel } from '../components/collectionsLogic.js';
 import { fmtDay } from '../components/CollectionsView.jsx';
 import Stars from '../components/Stars.jsx';
+import { ListsRow } from '../components/ListPicker.jsx';
+import { itemFromMovie } from '../components/listsLogic.js';
 import { groupMovies, groupOfIndex, viewingsLabel, viewingDay, watchedAtFor } from '../components/movieGroupsLogic.js';
 import ViewingDateEditor from '../components/ViewingDateEditor.jsx';
 import { NoteEditor } from '../components/NoteEditor.jsx';
@@ -439,6 +441,12 @@ export default function Movies() {
                 onRemove={() => setMovieNote(sel.index, {})}
               />
             </div>
+
+            {itemFromMovie(sel) && (
+              <div className="sd-mdet-sec">
+                <div className="sd-card"><ListsRow item={itemFromMovie(sel)} className="sd-row" /></div>
+              </div>
+            )}
 
             <div className="sd-mdet-sec">
               <span className="sd-lbl">Where you watched it</span>

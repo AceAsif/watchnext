@@ -7,6 +7,7 @@ import { setRatingIn, withEpRatings } from './epRatings.js';
 import { cleanRating } from '../components/starsLogic.js';
 import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
 import { setHidden, mergeHidden, sameHidden } from '../components/hiddenLogic.js';
+import * as Lists from '../components/listsLogic.js';
 import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
 import { cleanTombs, lostKeys, addTombs, liftPresent } from './movieTombsLogic.js';
 
@@ -20,6 +21,7 @@ const empty = () => ({
   movies: [],  // { name, watchedAt, runtimeMin }
   goals: {},   // yearly watch goals: { '2026': { episodes, movies, hours, at } } (see components/goalsLogic.js)
   hidden: {},  // Discover's "Not interested": { 'tv:1399': { on, at, name, … } } (see components/hiddenLogic.js)
+  lists: {},   // your own lists ("Ramadan watch"): { '<id>': { id, name, at, items: [...] } } (see components/listsLogic.js)
   seenLog: {}, // Discover's hit rate: titles it put on screen { 'tv:1399': { at, name } } (see components/hitLogic.js)
   settings: { tmdbKey: '' },
 });
@@ -87,6 +89,7 @@ let dirtyShows = new Set();
 let dirtyMovies = false;
 let dirtyGoals = false;
 let dirtyHidden = false;
+let dirtyLists = false;
 let dirtySeen = false;
 let deletedShows = new Set();
 
@@ -230,6 +233,10 @@ export function markGoalsDirty() {
   dirtyGoals = true;
 }
 
+export function markListsDirty() {
+  dirtyLists = true;
+}
+
 export function markHiddenDirty() {
   dirtyHidden = true;
 }
@@ -257,15 +264,17 @@ export function takeDirty() {
   const movies = dirtyMovies;
   const goals = dirtyGoals;
   const hidden = dirtyHidden;
+  const lists = dirtyLists;
   const seen = dirtySeen;
   const deletedIds = deletedShows;
   dirtyShows = new Set();
   dirtyMovies = false;
   dirtyGoals = false;
   dirtyHidden = false;
+  dirtyLists = false;
   dirtySeen = false;
   deletedShows = new Set();
-  return { showIds, movies, goals, hidden, seen, deletedIds };
+  return { showIds, movies, goals, hidden, lists, seen, deletedIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -825,6 +834,40 @@ export function applyRemoteHidden(remote) {
   return push;
 }
 
+// ---------------------------------------------------------------------------
+// Custom lists ("Ramadan watch", "Watch with friends"). All the rules live in
+// components/listsLogic.js; these just apply them, stamp the time and queue a sync.
+const nowIso = () => new Date().toISOString();
+function changeLists(fn) {
+  const before = state.lists;
+  const next = fn(Lists.sanitizeLists(before), nowIso());
+  if (Lists.sameLists(next, before)) return false;
+  update((s) => { s.lists = next; });
+  markListsDirty();
+  return true;
+}
+// Returns the new list's id (null if the name is empty or you have too many lists).
+export function createList(name) {
+  let id = null;
+  changeLists((l, now) => { const r = Lists.createList(l, name, now); id = r.id; return r.lists; });
+  return id;
+}
+export const renameList = (id, name) => changeLists((l, now) => Lists.renameList(l, id, name, now));
+export const deleteList = (id) => changeLists((l, now) => Lists.deleteList(l, id, now));
+export const addToList = (id, item) => changeLists((l, now) => Lists.addItem(l, id, item, now));
+export const removeFromList = (id, key) => changeLists((l, now) => Lists.removeItem(l, id, key, now));
+export const moveInList = (id, key, dir) => changeLists((l, now) => Lists.moveItem(l, id, key, dir, now));
+
+// Lists that arrived from the cloud: per list the newer change wins. Returns true when this
+// device holds something the cloud copy lacks (so it should push).
+export function applyRemoteLists(remote) {
+  const merged = Lists.mergeLists(remote, state.lists);
+  if (!Lists.sameLists(merged, state.lists)) update((s) => { s.lists = merged; });
+  const push = !Lists.sameLists(merged, remote);
+  if (push) markListsDirty();
+  return push;
+}
+
 // Discover put these titles on screen (items: [{ key, name }]). Only the first time counts: the
 // date a title was FIRST seen is kept. Returns true when something new was logged.
 export function recordDiscoverSeen(items, nowIso = new Date().toISOString()) {
@@ -861,9 +904,11 @@ export function restoreBackup(json) {
     s.movies = r.movies;
     s.goals = r.goals;
     s.hidden = r.hidden;
+    s.lists = r.lists;
     s.seenLog = r.seenLog;
   });
   if (r.goalsChanged) markGoalsDirty();
+  if (r.listsChanged) markListsDirty();
   if (r.hiddenChanged) markHiddenDirty();
   if (r.seenChanged) markSeenDirty();
   r.touchedIds.forEach(markShowDirty);
@@ -948,6 +993,7 @@ export function wipeLibrary() {
   dirtyMovies = false;
   dirtyGoals = false;
   dirtyHidden = false;
+  dirtyLists = false;
   dirtySeen = false;
   deletedShows = new Set();
 }

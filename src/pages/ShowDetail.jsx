@@ -42,6 +42,8 @@ import { ratingOf } from '../store/epRatings.js';
 import { starLabel } from '../components/starsLogic.js';
 import EpisodeRatings from '../components/EpisodeRatings.jsx';
 import Stars from '../components/Stars.jsx';
+import { ListsRow } from '../components/ListPicker.jsx';
+import { itemFromShow } from '../components/listsLogic.js';
 import AnimeSheet from '../components/AnimeSheet.jsx';
 import FinishCardSheet from '../components/FinishCardSheet.jsx';
 import { WhenSheet, FixDatesSheet } from '../components/WatchDateSheets.jsx';
@@ -656,6 +658,8 @@ export default function ShowDetail({ id, onBack }) {
             <Stars value={rating} onChange={(v) => setShowRating(id, v)} size={24} half />
           </span>
         </div>
+
+        <ListsRow item={itemFromShow(show)} />
 
         <button className="sd-row sd-sep" aria-haspopup="dialog" onClick={() => setSheet('platform')}>
           <span style={{ flexGrow: 1 }}>Where you watch</span>

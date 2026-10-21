@@ -8,6 +8,8 @@ import {
   movieStatus,
 } from '../store/db.js';
 import Discover from '../components/Discover.jsx';
+import ListsView from '../components/ListsView.jsx';
+import { liveCount } from '../components/listsLogic.js';
 import { isOnMyServices, servicesLabel, statusLine } from '../components/servicesLogic.js';
 import { useServicesPrefs, setServicesPrefs } from '../store/servicesPrefs.js';
 import useAvailability from '../components/useAvailability.js';
@@ -16,7 +18,7 @@ import { PageHead, MediaRow, Empty, CheckIcon } from '../components/LibraryUI.js
 
 export default function Watchlist({ openShow }) {
   const state = useStore();
-  const [tab, setTab] = useState('queue'); // 'queue' | 'discover'
+  const [tab, setTab] = useState('queue'); // 'queue' | 'lists' | 'discover'
 
   // A show can only be a watchlist item while it isn't followed yet —
   // once "Start watching" clears watchlist and sets followed, it belongs
@@ -62,7 +64,8 @@ export default function Watchlist({ openShow }) {
   const toggle = () => { setServicesPrefs({ watchlistOnly: !on }); if (!on && svc.mine.length === 0) setPick(true); };
 
   const count = shows.length + movies.length;
-  const TABS = [['queue', count ? `Queue · ${count}` : 'Queue'], ['discover', 'Discover']];
+  const nLists = liveCount(state.lists);
+  const TABS = [['queue', count ? `Queue · ${count}` : 'Queue'], ['lists', nLists ? `Lists · ${nLists}` : 'Lists'], ['discover', 'Discover']];
 
   return (
     <div className="sd-page">
@@ -88,6 +91,8 @@ export default function Watchlist({ openShow }) {
       <div style={{ marginTop: 18 }}>
         {tab === 'discover' ? (
           <Discover />
+        ) : tab === 'lists' ? (
+          <ListsView openShow={openShow} />
         ) : empty ? (
           <Empty title="Nothing queued up yet.">
             Search for a show or movie on the Shows or Movies tab and use “＋ Watchlist” to plan it for

@@ -31,7 +31,8 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, hasFirebaseConfig } from '../firebase.js';
-import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markGoalsDirty, markHiddenDirty, markSeenDirty, queueShowDelete, clearTombstone, clearAllTombstones, isTombstoned, resetAll, wipeLibrary, addWipeTombstones, applyRemoteGoals, applyRemoteHidden, applyRemoteSeen, getMovieTombs, setMovieTombs } from './db.js';
+import { getState, update, takeDirty, markShowDirty, markMoviesDirty, markGoalsDirty, markHiddenDirty, markSeenDirty, queueShowDelete, clearTombstone, clearAllTombstones, isTombstoned, resetAll, wipeLibrary, addWipeTombstones, applyRemoteGoals, applyRemoteHidden, applyRemoteSeen, getMovieTombs, setMovieTombs, applyRemoteLists, markListsDirty } from './db.js';
+import { sanitizeLists } from '../components/listsLogic.js';
 import { mergeRemoteMovies } from './movieTombsLogic.js';
 import { OWNER_KEY, readOwner, ownerRecord, libraryCounts, switchDecision } from './accountSwitch.js';
 import { sanitizeGoals } from '../components/goalsLogic.js';
@@ -84,6 +85,7 @@ function handleWipeDoc(forUid, data) {
 let unsubWipe = null;
 let unsubGoals = null;
 let unsubHidden = null;
+let unsubLists = null;
 let unsubSeen = null;
 
 // Show docs uploaded by a device that has seen a wipe carry `_wipeAt` (that wipe's
@@ -96,6 +98,7 @@ function splitCloudShow(data) {
 const goalsRef = (forUid) => doc(db, 'users', forUid, 'library', 'goals');
 // Discover's "Not interested" list: one doc, merged like goals (newest change per title wins).
 const hiddenRef = (forUid) => doc(db, 'users', forUid, 'library', 'hidden');
+const listsRef = (forUid) => doc(db, 'users', forUid, 'library', 'lists'); // your own lists, all in one doc
 // Discover's hit-rate log (titles it put on screen): one doc, a union across devices.
 const seenRef = (forUid) => doc(db, 'users', forUid, 'library', 'discover');
 
@@ -233,6 +236,16 @@ function startSync(newUid) {
         if (uid !== newUid) return;
         if (applyRemoteHidden(snap.exists() ? snap.data().hidden : {})) flush();
       });
+      // Your lists changed on another device: same wipe-first rule.
+      unsubLists = onSnapshot(listsRef(newUid), async (snap) => {
+        if (snap.metadata.hasPendingWrites) return;
+        try {
+          const w = await getDoc(doc(db, 'users', newUid, 'library', 'wipe'));
+          if (w.exists()) handleWipeDoc(newUid, w.data());
+        } catch (e) { /* offline: the cached answer is still good enough */ }
+        if (uid !== newUid) return;
+        if (applyRemoteLists(snap.exists() ? snap.data().lists : {})) flush();
+      });
       // Discover's hit log grew on another device: same wipe-first rule.
       unsubSeen = onSnapshot(seenRef(newUid), async (snap) => {
         if (snap.metadata.hasPendingWrites) return;
@@ -285,6 +298,8 @@ function stopSync() {
   unsubGoals = null;
   if (unsubHidden) unsubHidden();
   unsubHidden = null;
+  if (unsubLists) unsubLists();
+  unsubLists = null;
   if (unsubSeen) unsubSeen();
   unsubSeen = null;
   pulledOnce = false;
@@ -303,12 +318,13 @@ async function pullAndMerge(forUid) {
   const wipeSnap = await getDoc(doc(db, 'users', forUid, 'library', 'wipe'));
   if (wipeSnap.exists()) handleWipeDoc(forUid, wipeSnap.data());
 
-  const [showsSnap, moviesSnap, goalsSnap, hiddenSnap, seenSnap] = await Promise.all([
+  const [showsSnap, moviesSnap, goalsSnap, hiddenSnap, seenSnap, listsSnap] = await Promise.all([
     getDocs(collection(db, 'users', forUid, 'shows')),
     getDoc(doc(db, 'users', forUid, 'library', 'movies')),
     getDoc(goalsRef(forUid)),
     getDoc(hiddenRef(forUid)),
     getDoc(seenRef(forUid)),
+    getDoc(listsRef(forUid)),
   ]);
 
   update((s) => {
@@ -355,6 +371,7 @@ async function pullAndMerge(forUid) {
   // ones are queued to go up).
   applyRemoteGoals(goalsSnap.exists() ? goalsSnap.data().goals : {});
   applyRemoteHidden(hiddenSnap.exists() ? hiddenSnap.data().hidden : {});
+  applyRemoteLists(listsSnap.exists() ? listsSnap.data().lists : {});
   applyRemoteSeen(seenSnap.exists() ? seenSnap.data().log : {});
 
   // Push the merged result back up once, so both sides converge.
@@ -367,9 +384,9 @@ async function pullAndMerge(forUid) {
 
 async function flush() {
   if (!uid || applyingRemote || wiping) return;
-  const { showIds, movies, goals, hidden, seen, deletedIds } = takeDirty();
+  const { showIds, movies, goals, hidden, lists, seen, deletedIds } = takeDirty();
   const hasDeletes = deletedIds && deletedIds.size > 0;
-  if (showIds.size === 0 && !movies && !goals && !hidden && !seen && !hasDeletes) return;
+  if (showIds.size === 0 && !movies && !goals && !hidden && !lists && !seen && !hasDeletes) return;
 
   const state = getState();
   const seenWipeAt = syncMeta(uid).seenWipeAt; // lets the device that ran a wipe tell a restore from a stale push
@@ -390,6 +407,9 @@ async function flush() {
   if (goals) {
     batch.set(goalsRef(uid), { goals: sanitizeGoals(state.goals) });
   }
+  if (lists) {
+    batch.set(listsRef(uid), { lists: sanitizeLists(state.lists) });
+  }
   if (hidden) {
     batch.set(hiddenRef(uid), { hidden: sanitizeHidden(state.hidden) });
   }
@@ -408,6 +428,7 @@ async function flush() {
     if (movies) markMoviesDirty();
     if (goals) markGoalsDirty();
     if (hidden) markHiddenDirty();
+    if (lists) markListsDirty();
     if (seen) markSeenDirty();
   }
 }
@@ -441,6 +462,7 @@ export async function wipeEverywhere() {
         b.set(doc(db, 'users', forUid, 'library', 'movies'), { movies: [] });
         b.set(goalsRef(forUid), { goals: {} });
         b.set(hiddenRef(forUid), { hidden: {} });
+        b.set(listsRef(forUid), { lists: {} });
         b.set(seenRef(forUid), { log: {} });
         b.set(doc(db, 'users', forUid, 'library', 'wipe'), marker);
         await b.commit();

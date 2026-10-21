@@ -895,7 +895,9 @@
 .sd-gap10 { display: flex; flex-direction: column; gap: 10px; }
 
 /* Search box */
-.sd-searchbar { display: flex; gap: 8px; }
+.sd-searchbar { display: flex; gap: 8px; min-width: 0; }
+.sd-searchbar > .sd-field { flex: 1; min-width: 0; }
+.sd-searchbar > .sd-searchbtn { flex: none; }
 .sd-field {
   flex: 1 1 auto;
   min-width: 0;
@@ -1848,3 +1850,38 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-epr-dot { fill: var(--bg-raise); stroke: var(--amber); stroke-width: 2; }
 .sd-epr-dot.best { fill: var(--amber); }
 .sd-epr-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); padding: 0 6px; }
+
+/* ------------------------------------------------ Custom lists (Watchlist → Lists, "Lists ＋" rows) */
+.sd-listsrow { gap: 10px; }
+.sd-listsrow-val { min-width: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-size: 14px; }
+.sd-listsrow-plus { color: var(--amber); font-weight: 700; padding-right: 6px; }
+.sd-lpick { display: flex; flex-direction: column; gap: 14px; }
+.sd-lpick-row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px; cursor: pointer; }
+.sd-lpick-row input { width: 20px; height: 20px; accent-color: var(--amber); flex: none; }
+.sd-lpick-name { flex: 1; min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-lpick-n { font-size: 12px; color: var(--text-dim); }
+.sd-lpick-new { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sd-lpick-new .sd-field { flex: 1 1 200px; min-width: 0; }
+.sd-lpick-ideas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sd-lnew { display: flex; flex-direction: column; gap: 10px; }
+.sd-lgrid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+.sd-lcard { display: flex; align-items: center; gap: 14px; padding: 12px 14px; width: 100%; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.sd-lcard:hover { border-color: rgba(242, 163, 60, 0.5); }
+.sd-lcard:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sd-lcard-posters { display: flex; flex: none; }
+.sd-lcard-posters img, .sd-lcard-posters .ph { width: 34px; height: 51px; border-radius: 5px; object-fit: cover; border: 2px solid var(--bg-raise); margin-left: -12px; background: var(--line); }
+.sd-lcard-posters > :first-child { margin-left: 0; }
+.sd-lcard-posters .ph { display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--text-dim); }
+.sd-lcard-posters .ph.empty { width: 52px; font-size: 10px; font-weight: 400; }
+.sd-lcard-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.sd-lcard-name { font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-lcard-meta { font-size: 12px; color: var(--text-dim); margin: 0; }
+.sd-lback { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
+.sd-lhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sd-lhead-name { margin: 0; font-family: var(--font-display); font-size: 26px; font-weight: 800; overflow-wrap: anywhere; }
+.sd-lmove { display: inline-flex; gap: 2px; }
+.sd-lstat { font-size: 12px; }
+.sd-lstat.t-finished, .sd-lstat.t-watched { color: var(--teal); }
+.sd-lstat.t-watching { color: var(--amber); }
+.sd-ldelete { align-self: flex-start; color: var(--red); }
+.sd-lpick-ideas .sd-nchip { min-height: 36px; height: auto; padding: 6px 14px; font-size: 13px; font-weight: 500; font-family: var(--font-body); }
