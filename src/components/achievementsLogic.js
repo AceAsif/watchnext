@@ -7,7 +7,7 @@
 //
 // computeMetrics(state, { origins, collections }) -> numbers (see below)
 // buildBadges(metrics)                           -> [badge], see BADGES
-// badge: { id, icon, title, what, value, goals, level (0 = none yet), maxLevel, next,
+// badge: { id, title, what, value, goals, level (0 = none yet), maxLevel, next,
 //          pct (to next, 0–100), done (all levels), label, nextLabel, needs ('origins'|null) }
 
 import { watchedTitles, isAnime } from './originsLogic.js';
@@ -18,23 +18,23 @@ export const LEVEL_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', '
 
 const plural = (n, one, many) => `${n.toLocaleString('en-AU')} ${n === 1 ? one : many || one + 's'}`;
 
-// The badges, in display order. unit(n) -> "100 episodes".
+// The badges, in display order. unit(n) -> "100 episodes". Their pictures: badgeArt.js (by id).
 export const BADGES = [
-  { id: 'episodes', icon: '📺', title: 'Episode explorer', what: 'Episodes watched', goals: [100, 500, 1000, 2500, 5000, 10000], unit: (n) => plural(n, 'episode') },
-  { id: 'movies', icon: '🎬', title: 'Movie buff', what: 'Different films watched', goals: [10, 50, 100, 250, 500, 1000], unit: (n) => plural(n, 'film') },
-  { id: 'hours', icon: '⏳', title: 'Time traveller', what: 'Hours watched, shows and films', goals: [100, 500, 1000, 2500, 5000, 10000], unit: (n) => plural(n, 'hour') },
-  { id: 'finished', icon: '🏁', title: 'Finisher', what: 'Shows watched to the last episode', goals: [1, 10, 25, 50, 100, 200], unit: (n) => plural(n, 'show') },
-  { id: 'anime', icon: '🌸', title: 'Anime fan', what: 'Anime shows and films', goals: [1, 10, 25, 50, 100], unit: (n) => plural(n, 'anime', 'anime'), needs: 'origins' },
-  { id: 'languages', icon: '🗣️', title: 'Polyglot', what: 'Languages of the films you watched', goals: [3, 5, 10, 15, 20, 30], unit: (n) => plural(n, 'language'), needs: 'origins' },
-  { id: 'countries', icon: '🌍', title: 'Globetrotter', what: 'Countries your shows and films come from', goals: [5, 10, 20, 30, 50, 75], unit: (n) => plural(n, 'country', 'countries'), needs: 'origins' },
-  { id: 'genres', icon: '🎭', title: 'Genre hopper', what: 'Different genres watched', goals: [5, 10, 15, 19], unit: (n) => plural(n, 'genre') },
-  { id: 'decades', icon: '📼', title: 'Time machine', what: 'Decades your films were released in', goals: [3, 5, 7, 9], unit: (n) => plural(n, 'decade') },
-  { id: 'streak', icon: '🔥', title: 'On a roll', what: 'Longest run of days in a row with something watched', goals: [3, 7, 14, 30, 60, 100], unit: (n) => plural(n, 'day') },
-  { id: 'rewatch', icon: '🔁', title: 'Comfort watch', what: 'Films watched more than once', goals: [1, 5, 10, 25, 50], unit: (n) => plural(n, 'film') },
-  { id: 'cinema', icon: '🍿', title: 'Big screen', what: 'Films watched at the cinema', goals: [1, 10, 25, 50, 100], unit: (n) => plural(n, 'film') },
-  { id: 'critic', icon: '⭐', title: 'Critic', what: 'Ratings given', goals: [10, 50, 100, 250, 500], unit: (n) => plural(n, 'rating') },
-  { id: 'notes', icon: '📝', title: 'Note taker', what: 'Notes and reactions written', goals: [1, 10, 50, 100, 250], unit: (n) => plural(n, 'note') },
-  { id: 'collections', icon: '📚', title: 'Completionist', what: 'Movie collections fully watched', goals: [1, 5, 10, 25, 50], unit: (n) => plural(n, 'collection') },
+  { id: 'episodes', title: 'Episode explorer', what: 'Episodes watched', goals: [100, 500, 1000, 2500, 5000, 10000], unit: (n) => plural(n, 'episode') },
+  { id: 'movies', title: 'Movie buff', what: 'Different films watched', goals: [10, 50, 100, 250, 500, 1000], unit: (n) => plural(n, 'film') },
+  { id: 'hours', title: 'Time traveller', what: 'Hours watched, shows and films', goals: [100, 500, 1000, 2500, 5000, 10000], unit: (n) => plural(n, 'hour') },
+  { id: 'finished', title: 'Finisher', what: 'Shows watched to the last episode', goals: [1, 10, 25, 50, 100, 200], unit: (n) => plural(n, 'show') },
+  { id: 'anime', title: 'Anime fan', what: 'Anime shows and films', goals: [1, 10, 25, 50, 100], unit: (n) => plural(n, 'anime', 'anime'), needs: 'origins' },
+  { id: 'languages', title: 'Polyglot', what: 'Languages of the films you watched', goals: [3, 5, 10, 15, 20, 30], unit: (n) => plural(n, 'language'), needs: 'origins' },
+  { id: 'countries', title: 'Globetrotter', what: 'Countries your shows and films come from', goals: [5, 10, 20, 30, 50, 75], unit: (n) => plural(n, 'country', 'countries'), needs: 'origins' },
+  { id: 'genres', title: 'Genre hopper', what: 'Different genres watched', goals: [5, 10, 15, 19], unit: (n) => plural(n, 'genre') },
+  { id: 'decades', title: 'Time machine', what: 'Decades your films were released in', goals: [3, 5, 7, 9], unit: (n) => plural(n, 'decade') },
+  { id: 'streak', title: 'On a roll', what: 'Longest run of days in a row with something watched', goals: [3, 7, 14, 30, 60, 100], unit: (n) => plural(n, 'day') },
+  { id: 'rewatch', title: 'Comfort watch', what: 'Films watched more than once', goals: [1, 5, 10, 25, 50], unit: (n) => plural(n, 'film') },
+  { id: 'cinema', title: 'Big screen', what: 'Films watched at the cinema', goals: [1, 10, 25, 50, 100], unit: (n) => plural(n, 'film') },
+  { id: 'critic', title: 'Critic', what: 'Ratings given', goals: [10, 50, 100, 250, 500], unit: (n) => plural(n, 'rating') },
+  { id: 'notes', title: 'Note taker', what: 'Notes and reactions written', goals: [1, 10, 50, 100, 250], unit: (n) => plural(n, 'note') },
+  { id: 'collections', title: 'Completionist', what: 'Movie collections fully watched', goals: [1, 5, 10, 25, 50], unit: (n) => plural(n, 'collection') },
 ];
 
 const isWatchedMovie = (m) => !!m && (!m.status || m.status === 'watched');
@@ -139,7 +139,6 @@ export function badgeFor(def, value) {
   const pct = done ? 100 : Math.max(0, Math.min(99, Math.floor(((v - prev) / (next - prev)) * 100)));
   return {
     id: def.id,
-    icon: def.icon,
     title: def.title,
     what: def.what,
     value: v,

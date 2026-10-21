@@ -5,6 +5,7 @@ import { buildCollections } from './collectionsLogic.js';
 import { computeMetrics, buildBadges, badgeSummary, sortBadges } from './achievementsLogic.js';
 import { localISODate } from './showLogic.js';
 import { OriginsStatus } from './WorldView.jsx';
+import BadgeIcon from './BadgeIcon.jsx';
 
 // Stats → Badges. Every badge has levels (Bronze → Legend); the bar shows how far you are to
 // the next one. Recomputed from the library each time; nothing is stored.
@@ -32,7 +33,7 @@ export default function AchievementsView({ state }) {
         {badges.map((b) => (
           <article key={b.id} className={`sd-card ach ach-l${b.level}${b.done ? ' ach-done' : ''}`} data-badge={b.id} data-level={b.level}>
             <div className="ach-top">
-              <span className="ach-icon" aria-hidden="true">{b.icon}</span>
+              <span className="ach-icon"><BadgeIcon id={b.id} level={b.level} /></span>
               <div className="ach-head">
                 <h3 className="ach-title">{b.title}</h3>
                 <span className="ach-what">{b.what}</span>

@@ -164,6 +164,14 @@ await ok('earned badges come first and show their level; locked ones say how far
   assert.equal(r.find((x) => x.id === 'episodes').chip, 'Bronze');
   assert.equal(r.find((x) => x.id === 'movies').next, '5 films of 10 for Bronze');
 });
+await ok('every badge is drawn as a Gem hex: earned ones solid in the level colour, locked ones grey and dashed', async () => {
+  const r = await p.evaluate(() => [...document.querySelectorAll('[data-badge]')].map((b) => ({ lvl: +b.dataset.level, svg: !!b.querySelector('svg.ach-gem'), facets: b.querySelectorAll('svg.ach-gem path[d^="M42 46"]').length, dashed: !!b.querySelector('svg.ach-gem polygon[stroke-dasharray]'), emoji: /\p{Extended_Pictographic}/u.test(b.querySelector('.ach-top').textContent) })));
+  assert.ok(r.every((x) => x.svg && x.facets === 6 && !x.emoji));
+  assert.ok(r.filter((x) => x.lvl === 0).every((x) => x.dashed));
+  assert.ok(r.filter((x) => x.lvl > 0).every((x) => !x.dashed));
+  const gold = await p.evaluate(() => document.querySelector('[data-badge=episodes] svg.ach-gem path').getAttribute('fill'));
+  assert.equal(gold, 'rgb(205,127,50)'); // Bronze top facet
+});
 await ok('summary: badges earned and levels', async () => { assert.match(await p.evaluate(() => document.querySelector('.ach-sum').innerText), /\d+ of 15 badges[\s\S]*\d+ of \d+ levels/); });
 await ok('phone: no sideways scroll on Badges', async () => { assert.equal(await noSideways(p), false); });
 await p.screenshot({ path: `${OUT}/badges_phone.png`, fullPage: true });

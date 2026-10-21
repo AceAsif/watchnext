@@ -1774,11 +1774,8 @@ button.sd-coll-prow { cursor: pointer; }
 .ach-l1 { --lv: #cd7f32; } .ach-l2 { --lv: #c4ccd6; } .ach-l3 { --lv: #f5c518; }
 .ach-l4 { --lv: #7fd1c7; } .ach-l5 { --lv: #8ab4ff; } .ach-l6 { --lv: #e879f9; }
 .ach-top { display: flex; align-items: flex-start; gap: 12px; }
-.ach-icon {
-  flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
-  font-size: 22px; background: var(--bg); border: 2px solid var(--lv);
-}
-.ach-l0 .ach-icon { filter: grayscale(1); opacity: 0.55; border-style: dashed; }
+.ach-icon { flex: none; display: block; width: 56px; line-height: 0; }
+.ach-gem { display: block; }
 .ach-head { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .ach-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--text); }
 .ach-what { font-size: 12.5px; line-height: 1.4; color: var(--text-dim); }

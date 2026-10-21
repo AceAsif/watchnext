@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import * as A from '../../src/components/achievementsLogic.js';
 import { recordOrigin, emptyCache } from '../../src/components/originsLogic.js';
+import { BADGE_ICONS } from '../../src/components/badgeArt.js';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
 
 const eps = (count, day = '2024-03-0', min = 30) => Object.fromEntries(Array.from({ length: count }, (_, i) => [`1x${i + 1}`, { at: `${day}${(i % 3) + 1}T10:00:00Z`, min }]));
@@ -88,11 +89,12 @@ t('sortBadges: earned first (furthest along first), then the nearest to a first 
   ]);
   assert.deepEqual(s.map((x) => x.id), ['d', 'b', 'c', 'a']);
 });
-t('every badge has rising goals, an icon and a unit label', () => {
+t('every badge has rising goals, its own Gem hex icon and a unit label', () => {
   for (const b of A.BADGES) {
     assert.ok(b.goals.length >= 3 && b.goals.length <= A.LEVEL_NAMES.length, b.id);
     assert.ok(b.goals.every((g, i) => i === 0 || g > b.goals[i - 1]), b.id);
-    assert.ok(b.icon && b.title && b.what && b.unit(2).includes('2'), b.id);
+    assert.ok(Array.isArray(BADGE_ICONS[b.id]) && BADGE_ICONS[b.id].length > 0, b.id + ' has no icon');
+    assert.ok(b.title && b.what && b.unit(2).includes('2'), b.id);
   }
 });
 console.log(`\n${n} achievements tests passed`);
