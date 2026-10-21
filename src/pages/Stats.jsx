@@ -10,6 +10,8 @@ import { cardGoals } from '../components/goalsLogic.js';
 import { platformById } from '../components/PlatformPicker.jsx';
 import Heatmap from '../components/Heatmap.jsx';
 import YourTaste from '../components/YourTaste.jsx';
+import AchievementsView from '../components/AchievementsView.jsx';
+import WorldView from '../components/WorldView.jsx';
 import SyncingNote, { useLibrarySyncing } from '../components/SyncingNote.jsx';
 import { StatTile, TabBar, YearSelect, BarList, Section, Note } from '../components/StatsUI.jsx';
 import {
@@ -34,7 +36,7 @@ import { lovedShows, collectNotes, LOVE_WEIGHT, FUNNY_WEIGHT } from '../componen
 // come from the `base` computation below, unchanged; the pure de-skew helpers
 // (bulk-import smoothing, busiest day, heatmap grid) live in statsLogic.js.
 
-const TABS = ['Overview', 'Habits', 'Rankings', 'Breakdown'];
+const TABS = ['Overview', 'Habits', 'Rankings', 'Breakdown', 'Badges', 'World'];
 const plural = (n, one, many) => (n === 1 ? one : many || one + 's');
 
 // The Overview headline: "1 year 2 months 5 days" (big numbers, small units); zero parts are left out,
@@ -588,7 +590,15 @@ export default function Stats({ onOpenNotes }) {
     </div>
   );
 
-  const panels = { Overview: overview, Habits: habitsTab, Rankings: rankings, Breakdown: breakdown };
+  // Badges and World only mount while their tab is open (they look titles up on TMDB).
+  const panels = {
+    Overview: overview,
+    Habits: habitsTab,
+    Rankings: rankings,
+    Breakdown: breakdown,
+    Badges: tab === 'Badges' ? <AchievementsView state={state} /> : null,
+    World: tab === 'World' ? <WorldView state={state} /> : null,
+  };
 
   return (
     <div className="sd-page">

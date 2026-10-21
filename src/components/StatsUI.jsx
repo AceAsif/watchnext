@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Chevron } from './ui.jsx';
 import { barRows, labelWidthFor, valueWidthFor, nextTab } from './statsLogic.js';
 
@@ -26,6 +26,14 @@ export function StatTile({ value, unit, label, size = 'md', accent = false, plai
 // role="tabpanel" with id "stats-panel".
 export function TabBar({ tabs, value, onChange, label }) {
   const refs = useRef({});
+  // On a narrow phone the bar can scroll sideways: keep the chosen tab in view.
+  useEffect(() => {
+    const el = refs.current[value];
+    const bar = el && el.parentElement;
+    if (!bar || bar.scrollWidth <= bar.clientWidth) return;
+    const left = el.offsetLeft - bar.offsetLeft;
+    if (left < bar.scrollLeft || left + el.offsetWidth > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = Math.max(0, left - 8);
+  }, [value]);
   const onKeyDown = (e) => {
     const next = nextTab(tabs, value, e.key);
     if (!next) return;

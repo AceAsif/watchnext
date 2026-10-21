@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { movieDetails, movieCollection, hasKey } from '../api/tmdb.js';
 import { useCollectionsCache, updateCollectionsCache, getCollectionsCache } from '../store/collectionsCache.js';
+import { rememberOrigin } from '../store/originsCache.js';
 import {
   moviesToCheck,
   collectionsToFetch,
@@ -46,7 +47,7 @@ export default function useCollections(movies, active) {
     const jobs = [
       ...moviesToCheck(movies, c, now)
         .filter((id) => !failed.current.has('m' + id))
-        .map((id) => ({ key: 'm' + id, run: async () => { const d = await movieDetails(id); updateCollectionsCache((x) => recordMovie(x, d)); } })),
+        .map((id) => ({ key: 'm' + id, run: async () => { const d = await movieDetails(id); updateCollectionsCache((x) => recordMovie(x, d)); rememberOrigin('movie', d); } })),
       ...collectionsToFetch(movies, c, now)
         .filter((id) => !failed.current.has('c' + id))
         .map((id) => ({ key: 'c' + id, run: async () => { const d = await movieCollection(id); updateCollectionsCache((x) => recordCollection(x, d)); } })),
@@ -99,6 +100,7 @@ export function useCollectionForDetails(details) {
   const cid = details && !details.error && details.belongs_to_collection ? details.belongs_to_collection.id : null;
   useEffect(() => {
     if (!details || details.error || !details.id) return;
+    rememberOrigin('movie', details); // where it's from, for the World map (free: already fetched)
     updateCollectionsCache((x) => {
       const known = x.byMovie[details.id];
       const c = (details.belongs_to_collection && details.belongs_to_collection.id) || 0;
