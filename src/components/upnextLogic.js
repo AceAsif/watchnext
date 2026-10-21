@@ -113,8 +113,10 @@ export function buildUpNext(entries, today, h) {
     }
   }
 
+  const fav = (s) => (s && s.favourite === true ? 0 : 1);
   cont.sort(
     (a, b) =>
+      fav(a.show) - fav(b.show) || // favourites first, then most recently watched
       (h.lastWatchDate(b.show) || '').localeCompare(h.lastWatchDate(a.show) || '') ||
       a.show.name.localeCompare(b.show.name)
   );

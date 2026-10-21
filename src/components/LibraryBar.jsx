@@ -473,7 +473,7 @@ export function ShowTile({ show, seen, onOpen, sub, times = 0 }) {
         {done ? <span className="sd-ltile-done" aria-hidden="true"><CheckIcon size={14} sw={2.6} /></span> : null}
         {times >= 2 ? <span className="sd-ltile-times left" data-testid="times-chip" aria-hidden="true">{times}×</span> : null}
       </Art>
-      <span className="sd-ltile-name">{show.name}</span>
+      <span className="sd-ltile-name">{show.favourite === true ? <span className="sd-fav" aria-label="Favourite">♥ </span> : null}{show.name}</span>
       <span className="sd-ltile-row">
         <span className="meta">{dropped ? (seen ? `Dropped · ${seen} eps` : 'Dropped') : total ? `${seen} / ${total} eps` : seen ? `${seen} eps seen` : 'not started'}</span>
         {show.rating ? (

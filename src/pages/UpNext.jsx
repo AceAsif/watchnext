@@ -113,7 +113,7 @@ function ContinueRow({ id, show, next, today, first, onOpen, onMark }) {
       <button className="sd-open" onClick={onOpen}>
         <Poster path={show.poster} w={40} h={60} r={6} />
         <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>{show.name}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>{show.favourite === true ? <span className="sd-fav" aria-label="Favourite">♥ </span> : null}{show.name}</span>
           <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{line2}</span>
           {line3 && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{line3}</span>}
         </span>

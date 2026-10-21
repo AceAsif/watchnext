@@ -48,6 +48,10 @@ export function filterShows(entries, f, h) {
   });
 }
 
+// Favourites ("♥" on the show page) always come first, in whatever order the rest is sorted.
+export const isFavourite = (s) => !!s && s.favourite === true;
+export const favouritesFirst = (list, showOf = (x) => x[1]) => [...list.filter((x) => isFavourite(showOf(x))), ...list.filter((x) => !isFavourite(showOf(x)))];
+
 // Every comparator tie-breaks by name, so it is a total order: reversing it is
 // an exact "other direction" (Z→A; oldest first; lowest first).
 export function sortShows(list, sortBy, sortDir, h) {
@@ -76,7 +80,7 @@ export function sortShows(list, sortBy, sortDir, h) {
     out.sort((a, b) => a[1].name.localeCompare(b[1].name));
   }
   if (sortDir === 'desc') out.reverse();
-  return out;
+  return favouritesFirst(out); // whatever the sort, favourites stay at the top
 }
 
 // Status tab counts. They respect the platform + name filters (but not the

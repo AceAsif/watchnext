@@ -14,6 +14,7 @@ import {
   restoreWatchDates,
   setShowRating,
   setEpisodeRating,
+  setFavourite,
   setShowPlatform,
   setShowProviders,
   deleteShow,
@@ -106,6 +107,7 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
   const [err, setErr] = useState(null);
   const [expandDone, setExpandDone] = useState(false);
   const [noteEp, setNoteEp] = useState(null); // { n, name } of the episode whose note is open
+  const [aboutEp, setAboutEp] = useState(null); // episode number whose summary is showing (hidden until tapped: no spoilers)
 
   async function load() {
     if (eps || !show.tmdbId) return;
@@ -234,8 +236,24 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
                 E{pad2(ep.episode_number)}
               </span>
               <div style={{ flexGrow: 1, minWidth: 0, padding: '8px 0' }}>
-                <div style={{ fontSize: 14 }}>{ep.name || `Episode ${ep.episode_number}`}</div>
+                <button
+                  type="button"
+                  className="sd-ep-title"
+                  aria-expanded={aboutEp === ep.episode_number}
+                  aria-label={`${ep.name || `Episode ${ep.episode_number}`}: ${aboutEp === ep.episode_number ? 'hide' : 'show'} summary`}
+                  onClick={() => setAboutEp(aboutEp === ep.episode_number ? null : ep.episode_number)}
+                >
+                  {ep.name || `Episode ${ep.episode_number}`}
+                </button>
                 {sub && <div style={{ fontSize: 12, color: sub.color, marginTop: 2 }}>{sub.text}</div>}
+                {aboutEp === ep.episode_number && (
+                  <div className="sd-ep-about" data-testid="episode-summary">
+                    <p>{(ep.overview || '').trim() || 'TMDB has no summary for this episode yet.'}</p>
+                    {(ep.air_date || ep.runtime) ? (
+                      <span className="sd-mono">{[ep.air_date ? `Aired ${fmtDate(ep.air_date)}` : '', ep.runtime ? `${ep.runtime} min` : ''].filter(Boolean).join(' · ')}</span>
+                    ) : null}
+                  </div>
+                )}
               </div>
               {(on || note || epRating > 0) && (
                 <button
@@ -629,6 +647,18 @@ export default function ShowDetail({ id, onBack }) {
               {trailerLoading ? 'Loading…' : 'Trailer'}
             </button>
           )}
+          <button
+            className={'sd-btn sd-favbtn' + (show.favourite ? ' on' : '')}
+            style={{ width: 44, padding: 0 }}
+            aria-pressed={!!show.favourite}
+            aria-label={show.favourite ? 'Favourite (tap to remove)' : 'Add to favourites'}
+            title={show.favourite ? 'Favourite: stays at the top of Shows and Up Next' : 'Favourite: keep at the top of Shows and Up Next'}
+            onClick={() => setFavourite(id, !show.favourite)}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill={show.favourite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20.5s-7.5-4.6-9.3-9.4C1.5 7.9 3.6 4.5 7 4.5c2 0 3.4 1.1 5 3 1.6-1.9 3-3 5-3 3.4 0 5.5 3.4 4.3 6.6-1.8 4.8-9.3 9.4-9.3 9.4z" />
+            </svg>
+          </button>
           <button
             className="sd-btn"
             style={{ width: 44, padding: 0 }}

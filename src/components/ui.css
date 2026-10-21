@@ -1885,3 +1885,13 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-lstat.t-watching { color: var(--amber); }
 .sd-ldelete { align-self: flex-start; color: var(--red); }
 .sd-lpick-ideas .sd-nchip { min-height: 36px; height: auto; padding: 6px 14px; font-size: 13px; font-weight: 500; font-family: var(--font-body); }
+
+/* ------------------------------------------------ Favourites (♥) and episode summaries */
+.sd-favbtn.on { color: #ff6b81; border-color: rgba(255, 107, 129, 0.5); }
+.sd-fav { color: #ff6b81; }
+.sd-ep-title { display: block; width: 100%; padding: 0; border: none; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.sd-ep-title:hover { color: var(--amber); }
+.sd-ep-title:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 4px; }
+.sd-ep-about { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.sd-ep-about p { margin: 0; font-size: 13.5px; line-height: 1.55; color: #c3cad5; }
+.sd-ep-about .sd-mono { font-size: 11.5px; color: var(--text-dim); }

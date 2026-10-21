@@ -425,6 +425,19 @@ export function setShowDropped(id, dropped, at) {
 const RESUME = { dropped: false, droppedAt: null };
 const resumePatch = (show) => (show.dropped === true ? RESUME : {});
 
+// Favourite a show (♥): it stays at the top of Shows and of Up Next's "Continue watching".
+// Rides the show's own sync doc. Never stores `favourite: false` / undefined: removing it
+// deletes the field.
+export function setFavourite(id, on) {
+  update((s) => {
+    const show = s.shows[id];
+    if (!show) return;
+    const { favourite: _f, favAt: _a, ...rest } = show; // eslint-disable-line no-unused-vars
+    s.shows[id] = on ? { ...rest, favourite: true, favAt: new Date().toISOString() } : rest;
+  });
+  markShowDirty(id);
+}
+
 export function setShowRating(id, raw) {
   // rating: 0 or 0.5–5 in half steps (like movies and episodes). 0 clears it. ratedAt records when you rated it (for the
   // "Recently rated" list). Rides the existing per-show sync doc.
