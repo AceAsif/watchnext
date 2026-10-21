@@ -64,12 +64,12 @@ t('computeMetrics: the longest streak uses episodes and films together', () => {
 t('badgeFor: levels, progress to the next goal, labels', () => {
   const def = A.BADGES.find((b) => b.id === 'episodes');
   const zero = A.badgeFor(def, 0);
-  assert.equal(zero.level, 0); assert.equal(zero.pct, 0); assert.equal(zero.label, 'Not yet'); assert.equal(zero.nextLabel, '0 episodes of 100 for Bronze');
+  assert.equal(zero.level, 0); assert.equal(zero.pct, 0); assert.equal(zero.label, 'Not yet'); assert.equal(zero.nextLabel, 'Next: Bronze at 100 episodes · 100 to go');
   const b = A.badgeFor(def, 300);
   assert.equal(b.level, 1); assert.equal(b.levelName, 'Bronze'); assert.equal(b.next, 500); assert.equal(b.pct, 50);
-  assert.equal(b.label, 'Bronze · 100 episodes'); assert.equal(b.nextLabel, '300 episodes of 500 for Silver');
+  assert.equal(b.label, 'Bronze · 100 episodes'); assert.equal(b.nextLabel, 'Next: Silver at 500 episodes · 200 to go');
   const max = A.badgeFor(def, 50000);
-  assert.equal(max.done, true); assert.equal(max.level, 6); assert.equal(max.pct, 100); assert.equal(max.nextLabel, 'Every level reached');
+  assert.equal(max.done, true); assert.equal(max.level, 6); assert.equal(max.pct, 100); assert.equal(max.nextLabel, 'Legend reached · 50,000 episodes');
   assert.equal(A.badgeFor(def, 99).pct, 99); assert.equal(A.badgeFor(def, NaN).level, 0);
 });
 t('buildBadges + badgeSummary: one badge per definition, levels add up', () => {
@@ -82,7 +82,7 @@ t('buildBadges + badgeSummary: one badge per definition, levels add up', () => {
   assert.equal(badges.find((b) => b.id === 'episodes').level, 1);
   assert.equal(badges.find((b) => b.id === 'languages').level, 1); // 3 languages = Bronze
 });
-t('sortBadges: earned first (furthest along first), then the nearest to a first level', () => {
+t('sortBadges: highest level first (Legend, Diamond…), then the nearest to a first level', () => {
   const s = A.sortBadges([
     { id: 'a', level: 0, maxLevel: 5, pct: 10 }, { id: 'b', level: 1, maxLevel: 5, pct: 0 },
     { id: 'c', level: 0, maxLevel: 5, pct: 80 }, { id: 'd', level: 3, maxLevel: 5, pct: 0 },
@@ -91,10 +91,22 @@ t('sortBadges: earned first (furthest along first), then the nearest to a first 
 });
 t('every badge has rising goals, its own Gem hex icon and a unit label', () => {
   for (const b of A.BADGES) {
-    assert.ok(b.goals.length >= 3 && b.goals.length <= A.LEVEL_NAMES.length, b.id);
+    assert.equal(b.goals.length, A.LEVEL_NAMES.length, b.id + ': every badge has all six levels, so a colour means the same everywhere');
     assert.ok(b.goals.every((g, i) => i === 0 || g > b.goals[i - 1]), b.id);
     assert.ok(Array.isArray(BADGE_ICONS[b.id]) && BADGE_ICONS[b.id].length > 0, b.id + ' has no icon');
     assert.ok(b.title && b.what && b.unit(2).includes('2'), b.id);
   }
+});
+t('the next-level line never names a level you already have', () => {
+  for (const def of A.BADGES) for (const v of [0, def.goals[0], def.goals[2] + 1, def.goals[5]]) {
+    const b = A.badgeFor(def, v);
+    if (b.done) assert.match(b.nextLabel, /^Legend reached/);
+    else { assert.ok(b.nextLabel.startsWith('Next: ' + A.LEVEL_NAMES[b.level] + ' at '), b.nextLabel); assert.notEqual(A.LEVEL_NAMES[b.level], b.levelName); }
+  }
+});
+t('the old confusing case: Genre hopper at 19 genres is now Platinum of 6, not "every level reached"', () => {
+  const b = A.badgeFor(A.BADGES.find((x) => x.id === 'genres'), 19);
+  assert.equal(b.levelName, 'Platinum'); assert.equal(b.level, 4); assert.equal(b.done, false);
+  assert.equal(b.nextLabel, 'Next: Diamond at 20 genres · 1 to go');
 });
 console.log(`\n${n} achievements tests passed`);

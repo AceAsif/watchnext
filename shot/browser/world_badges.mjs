@@ -157,12 +157,15 @@ await ok('15 badges; levels follow the library', async () => {
   assert.equal(l.movies, 0); // 5 films, first level is 10
 });
 await ok('no extra TMDB lookups: Badges reuses what World already found', async () => { assert.equal(log.filter((x) => /^[mt]\d+$/.test(x)).length, 7); });
-await ok('earned badges come first and show their level; locked ones say how far to go', async () => {
+await ok('earned badges come first, highest level first; every line names the NEXT level and how many to go', async () => {
   const r = await p.evaluate(() => [...document.querySelectorAll('[data-badge]')].map((b) => ({ id: b.dataset.badge, lvl: +b.dataset.level, chip: (b.querySelector('.ach-chip') || {}).textContent || '', next: b.querySelector('.ach-next').textContent })));
   const firstLocked = r.findIndex((x) => x.lvl === 0);
   assert.ok(firstLocked > 0 && r.slice(firstLocked).every((x) => x.lvl === 0));
+  const earned = r.slice(0, firstLocked).map((x) => x.lvl);
+  assert.deepEqual(earned, earned.slice().sort((x, y) => y - x));
   assert.equal(r.find((x) => x.id === 'episodes').chip, 'Bronze');
-  assert.equal(r.find((x) => x.id === 'movies').next, '5 films of 10 for Bronze');
+  assert.equal(r.find((x) => x.id === 'movies').next, 'Next: Bronze at 10 films · 5 to go');
+  assert.equal(r.find((x) => x.id === 'episodes').next, 'Next: Silver at 500 episodes · 388 to go');
 });
 await ok('every badge is drawn as a Gem hex: earned ones solid in the level colour, locked ones grey and dashed', async () => {
   const r = await p.evaluate(() => [...document.querySelectorAll('[data-badge]')].map((b) => ({ lvl: +b.dataset.level, svg: !!b.querySelector('svg.ach-gem'), facets: b.querySelectorAll('svg.ach-gem path[d^="M42 46"]').length, dashed: !!b.querySelector('svg.ach-gem polygon[stroke-dasharray]'), emoji: /\p{Extended_Pictographic}/u.test(b.querySelector('.ach-top').textContent) })));

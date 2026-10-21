@@ -19,23 +19,25 @@ export const LEVEL_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', '
 
 const plural = (n, one, many) => `${n.toLocaleString('en-AU')} ${n === 1 ? one : many || one + 's'}`;
 
+// Every badge has the same six levels (Bronze → Legend), so a colour means the same on every
+// badge: Platinum is always level 4 of 6.
 // The badges, in display order. unit(n) -> "100 episodes". Their pictures: badgeArt.js (by id).
 export const BADGES = [
   { id: 'episodes', title: 'Episode explorer', what: 'Episodes watched', goals: [100, 500, 1000, 2500, 5000, 10000], unit: (n) => plural(n, 'episode') },
   { id: 'movies', title: 'Movie buff', what: 'Different films watched', goals: [10, 50, 100, 250, 500, 1000], unit: (n) => plural(n, 'film') },
   { id: 'hours', title: 'Time traveller', what: 'Hours watched, shows and films', goals: [100, 500, 1000, 2500, 5000, 10000], unit: (n) => plural(n, 'hour') },
   { id: 'finished', title: 'Finisher', what: 'Shows watched to the last episode', goals: [1, 10, 25, 50, 100, 200], unit: (n) => plural(n, 'show') },
-  { id: 'anime', title: 'Anime fan', what: 'Anime shows and films', goals: [1, 10, 25, 50, 100], unit: (n) => plural(n, 'anime', 'anime'), needs: 'origins' },
+  { id: 'anime', title: 'Anime fan', what: 'Anime shows and films', goals: [1, 5, 10, 25, 50, 100], unit: (n) => plural(n, 'anime', 'anime'), needs: 'origins' },
   { id: 'languages', title: 'Polyglot', what: 'Languages of the films you watched', goals: [3, 5, 10, 15, 20, 30], unit: (n) => plural(n, 'language'), needs: 'origins' },
   { id: 'countries', title: 'Globetrotter', what: 'Countries your shows and films come from', goals: [5, 10, 20, 30, 50, 75], unit: (n) => plural(n, 'country', 'countries'), needs: 'origins' },
-  { id: 'genres', title: 'Genre hopper', what: 'Different genres watched', goals: [5, 10, 15, 19], unit: (n) => plural(n, 'genre') },
-  { id: 'decades', title: 'Time machine', what: 'Decades your films were released in', goals: [3, 5, 7, 9], unit: (n) => plural(n, 'decade') },
+  { id: 'genres', title: 'Genre hopper', what: 'Different genres watched', goals: [3, 6, 10, 15, 20, 25], unit: (n) => plural(n, 'genre') },
+  { id: 'decades', title: 'Time machine', what: 'Decades your films were released in', goals: [2, 3, 4, 5, 7, 9], unit: (n) => plural(n, 'decade') },
   { id: 'streak', title: 'On a roll', what: 'Longest run of days in a row with something watched', goals: [3, 7, 14, 30, 60, 100], unit: (n) => plural(n, 'day') },
-  { id: 'rewatch', title: 'Comfort watch', what: 'Films watched more than once', goals: [1, 5, 10, 25, 50], unit: (n) => plural(n, 'film') },
-  { id: 'cinema', title: 'Big screen', what: 'Films watched at the cinema', goals: [1, 10, 25, 50, 100], unit: (n) => plural(n, 'film') },
-  { id: 'critic', title: 'Critic', what: 'Ratings given (shows, episodes and films)', goals: [10, 50, 100, 250, 500], unit: (n) => plural(n, 'rating') },
-  { id: 'notes', title: 'Note taker', what: 'Notes and reactions written', goals: [1, 10, 50, 100, 250], unit: (n) => plural(n, 'note') },
-  { id: 'collections', title: 'Completionist', what: 'Movie collections fully watched', goals: [1, 5, 10, 25, 50], unit: (n) => plural(n, 'collection') },
+  { id: 'rewatch', title: 'Comfort watch', what: 'Films watched more than once', goals: [1, 5, 10, 25, 50, 100], unit: (n) => plural(n, 'film') },
+  { id: 'cinema', title: 'Big screen', what: 'Films watched at the cinema', goals: [1, 5, 10, 25, 50, 100], unit: (n) => plural(n, 'film') },
+  { id: 'critic', title: 'Critic', what: 'Ratings given (shows, episodes and films)', goals: [10, 50, 100, 250, 500, 1000], unit: (n) => plural(n, 'rating') },
+  { id: 'notes', title: 'Note taker', what: 'Notes and reactions written', goals: [1, 10, 50, 100, 250, 500], unit: (n) => plural(n, 'note') },
+  { id: 'collections', title: 'Completionist', what: 'Movie collections fully watched', goals: [1, 5, 10, 25, 50, 100], unit: (n) => plural(n, 'collection') },
 ];
 
 const isWatchedMovie = (m) => !!m && (!m.status || m.status === 'watched');
@@ -153,7 +155,8 @@ export function badgeFor(def, value) {
     needs: def.needs || null,
     levelName: level ? LEVEL_NAMES[level - 1] : '',
     label: level ? `${LEVEL_NAMES[level - 1]} · ${def.unit(def.goals[level - 1])}` : 'Not yet',
-    nextLabel: done ? 'Every level reached' : `${def.unit(v)} of ${def.goals[level].toLocaleString('en-AU')} for ${LEVEL_NAMES[level]}`,
+    // "Next: Platinum at 50 anime · 9 to go" — the level you're working towards, never one you have.
+    nextLabel: done ? `Legend reached · ${def.unit(v)}` : `Next: ${LEVEL_NAMES[level]} at ${def.unit(def.goals[level])} · ${(def.goals[level] - v).toLocaleString('en-AU')} to go`,
   };
 }
 
@@ -169,11 +172,12 @@ export function badgeSummary(badges) {
   };
 }
 
-// Earned badges first (highest level share first), then the closest to their first level.
+// Highest level first (Legend, Diamond, Platinum…); within a level, the closest to the next one.
+// Badges not earned yet come last, closest to Bronze first.
 export function sortBadges(badges) {
   return badges.slice().sort((a, b) => {
     if (!!a.level !== !!b.level) return a.level ? -1 : 1;
-    if (a.level) return b.level / b.maxLevel - a.level / a.maxLevel || b.pct - a.pct;
+    if (a.level !== b.level) return b.level - a.level; // Legend first, then Diamond, Platinum…
     return b.pct - a.pct;
   });
 }
