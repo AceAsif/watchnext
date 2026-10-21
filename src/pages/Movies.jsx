@@ -11,13 +11,14 @@ import {
   movieStatus,
 } from '../store/db.js';
 import { FIX_RESULTS_MAX } from '../components/movieSearchLogic.js';
-import { searchMovies, movieDetails, hasKey, img, movieVideos, pickTrailer } from '../api/tmdb.js';
+import { searchMovies, movieDetails, movieDetailsWithCredits, hasKey, img, movieVideos, pickTrailer } from '../api/tmdb.js';
 import useCollections, { useCollectionForDetails } from '../components/useCollections.js';
 import CollectionsView from '../components/CollectionsView.jsx';
 import { progressLabel, nextLabel } from '../components/collectionsLogic.js';
 import { fmtDay } from '../components/CollectionsView.jsx';
 import Stars from '../components/Stars.jsx';
 import { ListsRow } from '../components/ListPicker.jsx';
+import CastCrew from '../components/CastCrew.jsx';
 import { itemFromMovie } from '../components/listsLogic.js';
 import { groupMovies, groupOfIndex, viewingsLabel, viewingDay, watchedAtFor } from '../components/movieGroupsLogic.js';
 import ViewingDateEditor from '../components/ViewingDateEditor.jsx';
@@ -78,7 +79,7 @@ export default function Movies() {
     setOpenIndex(m.index);
     if (!m.tmdbId || details[m.tmdbId]) return;
     try {
-      const d = await movieDetails(m.tmdbId);
+      const d = await movieDetailsWithCredits(m.tmdbId); // one request: details + cast for the sheet's Cast card
       setDetails((prev) => ({ ...prev, [m.tmdbId]: d }));
     } catch (err) {
       setDetails((prev) => ({ ...prev, [m.tmdbId]: { error: err.message } }));
@@ -242,6 +243,9 @@ export default function Movies() {
   const shown = useMemo(() => shownMovies(groups, libQuery, sortBy), [groups, libQuery, sortBy]);
 
   const sel = openIndex != null ? movies.find((m) => m.index === openIndex) : null;
+  // For the Cast card's "✓ In library" marks (a person's other titles you already have).
+  const trackedTv = useMemo(() => new Set(Object.values(state.shows).map((x) => x.tmdbId).filter(Boolean)), [state.shows]);
+  const trackedMovie = useMemo(() => new Set((state.movies || []).map((m) => m.tmdbId).filter(Boolean)), [state.movies]);
   const selGroup = sel ? groupOfIndex(groups, sel.index) : null;
   const d = sel && sel.tmdbId ? details[sel.tmdbId] : null;
   const fixing = sel && fixIndex === sel.index;
@@ -428,6 +432,12 @@ export default function Movies() {
                 ) : (
                   <p className="sd-mdet-over">Loading collection…</p>
                 )}
+              </div>
+            ) : null}
+
+            {sel.tmdbId && hasKey() && d && !d.error ? (
+              <div className="sd-mdet-sec sd-mdet-cast" data-testid="movie-cast">
+                <CastCrew key={sel.tmdbId} kind="movie" tmdbId={sel.tmdbId} details={d} trackedTv={trackedTv} trackedMovie={trackedMovie} />
               </div>
             ) : null}
 

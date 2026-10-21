@@ -44,14 +44,44 @@ export function summarizeCredits(details) {
   return { cast, created, groups, directors, crewTotal: (ac.crew || []).length };
 }
 
+// TMDB /movie/{id}?append_to_response=credits  →  the same shape as summarizeCredits, so the
+// one Cast & crew card works for films too. A film's crew has one job per entry (no episode
+// counts); people are grouped the same way, in TMDB's billing order.
+export function summarizeMovieCredits(details) {
+  const cr = (details && details.credits) || {};
+  const cast = (cr.cast || [])
+    .slice()
+    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+    .map((c) => ({ id: c.id, name: c.name, profile: c.profile_path || null, character: c.character || '' }));
+  const GROUPS = [
+    { title: 'Directors', jobs: ['Director'] },
+    { title: 'Writers', jobs: ['Writer', 'Screenplay', 'Story', 'Novel', 'Characters'] },
+    { title: 'Producers', jobs: ['Producer', 'Executive Producer'] },
+    { title: 'Music', jobs: ['Original Music Composer', 'Music'] },
+  ];
+  const groups = GROUPS.map((g) => {
+    const byId = new Map();
+    for (const c of cr.crew || []) {
+      if (!c || !g.jobs.includes(c.job)) continue;
+      const p = byId.get(c.id) || { id: c.id, name: c.name, profile: c.profile_path || null, jobs: [], eps: 0 };
+      if (!p.jobs.includes(c.job)) p.jobs.push(c.job);
+      byId.set(c.id, p);
+    }
+    return { title: g.title, people: [...byId.values()] };
+  }).filter((g) => g.people.length > 0);
+  const directors = (groups.find((g) => g.title === 'Directors') || { people: [] }).people;
+  return { cast, created: [], groups, directors, crewTotal: (cr.crew || []).length };
+}
+
 // A person's other work: acting + crew credits merged to one row per title,
 // the show we're already on dropped, better-known work first.
-export function mergeCredits(combined, excludeTvId) {
+export function mergeCredits(combined, excludeTvId, excludeMovieId) {
   const byKey = new Map();
   const push = (c, role) => {
     if (!c || !c.id || !c.media_type) return;
     if (c.media_type !== 'tv' && c.media_type !== 'movie') return;
     if (c.media_type === 'tv' && c.id === excludeTvId) return;
+    if (c.media_type === 'movie' && c.id === excludeMovieId) return;
     const key = c.media_type + ':' + c.id;
     const existing = byKey.get(key);
     if (existing) {

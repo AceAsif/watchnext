@@ -65,8 +65,8 @@ const noSideways = (p) => p.evaluate(() => document.documentElement.scrollWidth 
 console.log('A. WATCHLIST → LISTS');
 let p = await open();
 await tab(p, 'Watchlist'); await wait(300);
-await ok('Watchlist has a Lists tab between Queue and Discover', async () => {
-  assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('.sd-tabs2 [role=tab]')].map((b) => b.textContent)), ['Queue', 'Lists', 'Discover']);
+await ok('Watchlist has a Lists tab after Queue', async () => {
+  assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('.sd-tabs2 [role=tab]')].map((b) => b.textContent)), ['Queue', 'Lists', 'New', 'Discover']);
 });
 await p.evaluate(() => [...document.querySelectorAll('.sd-tabs2 [role=tab]')].find((b) => b.textContent === 'Lists').click()); await wait(250);
 await ok('no lists yet: a friendly empty message and idea chips (Ramadan watch, Watch with friends…)', async () => {

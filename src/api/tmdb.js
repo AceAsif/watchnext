@@ -158,6 +158,16 @@ export function tvDetailsWithCredits(tmdbId) {
   return get(`/tv/${tmdbId}`, { append_to_response: 'aggregate_credits' });
 }
 
+// A film's details + cast & crew in ONE request, for the movie sheet's Cast card.
+export function movieDetailsWithCredits(tmdbId) {
+  return get(`/movie/${tmdbId}`, { append_to_response: 'credits' });
+}
+
+// The streaming providers TMDB knows for TV in a region (ids mostly match the movie list's).
+export function tvProviderList(region = 'AU') {
+  return get('/watch/providers/tv', { watch_region: region });
+}
+
 // Everything a person is credited in (TV + film), for the "what else are they
 // in" panel. Returns { cast:[...], crew:[...] }; each entry has media_type,
 // id, title|name, poster_path, character|job, first_air_date|release_date,

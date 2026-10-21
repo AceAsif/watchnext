@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { img, tvDetailsWithCredits, personCombinedCredits } from '../api/tmdb.js';
+import { img, tvDetailsWithCredits, movieDetailsWithCredits, personCombinedCredits } from '../api/tmdb.js';
 import { Avatar, Chevron, Sheet } from './ui.jsx';
-import { summarizeCredits, mergeCredits } from './creditsLogic.js';
+import { summarizeCredits, summarizeMovieCredits, mergeCredits } from './creditsLogic.js';
 
-// Cast & crew card for the show page.
+// Cast & crew card for the show page and (kind="movie") the movie sheet.
 //   card:   avatar stack + first names → "See all" cast sheet
 //           "Created by" row
 //           "Full crew · N directors" → crew sheet
@@ -12,7 +12,7 @@ import { summarizeCredits, mergeCredits } from './creditsLogic.js';
 // One TMDB request loads details + credits together (see tvDetailsWithCredits).
 
 // ---------------------------------------------------------------- person sheet
-function PersonSheet({ person, excludeTvId, trackedTv, trackedMovie, onClose }) {
+function PersonSheet({ person, excludeTvId, excludeMovieId, trackedTv, trackedMovie, onClose }) {
   const [credits, setCredits] = useState(null);
   const [err, setErr] = useState(null);
 
@@ -21,7 +21,7 @@ function PersonSheet({ person, excludeTvId, trackedTv, trackedMovie, onClose }) 
     setCredits(null);
     setErr(null);
     personCombinedCredits(person.id)
-      .then((d) => alive && setCredits(mergeCredits(d, excludeTvId)))
+      .then((d) => alive && setCredits(mergeCredits(d, excludeTvId, excludeMovieId)))
       .catch((e) => alive && setErr(e.message));
     return () => {
       alive = false;
@@ -82,7 +82,9 @@ function PersonSheet({ person, excludeTvId, trackedTv, trackedMovie, onClose }) 
 }
 
 // ---------------------------------------------------------------- the card
-export default function CastCrew({ tmdbId, trackedTv, trackedMovie }) {
+// details: a film's /movie response that already has `credits` (the movie sheet fetched it), so no
+// second request is made.
+export default function CastCrew({ tmdbId, trackedTv, trackedMovie, kind = 'tv', details = null }) {
   const [data, setData] = useState(null); // summarizeCredits() output
   const [err, setErr] = useState(null);
   const [sheet, setSheet] = useState(null); // 'cast' | 'crew' | null
@@ -92,13 +94,17 @@ export default function CastCrew({ tmdbId, trackedTv, trackedMovie }) {
     let alive = true;
     setData(null);
     setErr(null);
-    tvDetailsWithCredits(tmdbId)
-      .then((d) => alive && setData(summarizeCredits(d)))
+    if (kind === 'movie' && details) {
+      setData(summarizeMovieCredits(details));
+      return undefined;
+    }
+    (kind === 'movie' ? movieDetailsWithCredits(tmdbId) : tvDetailsWithCredits(tmdbId))
+      .then((d) => alive && setData(kind === 'movie' ? summarizeMovieCredits(d) : summarizeCredits(d)))
       .catch((e) => alive && setErr(e.message));
     return () => {
       alive = false;
     };
-  }, [tmdbId]);
+  }, [tmdbId, kind]);
 
   const openPerson = (p, sub) => setPerson({ id: p.id, name: p.name, sub: sub || '' });
 
@@ -275,7 +281,8 @@ export default function CastCrew({ tmdbId, trackedTv, trackedMovie }) {
       {person && (
         <PersonSheet
           person={person}
-          excludeTvId={tmdbId}
+          excludeTvId={kind === 'tv' ? tmdbId : null}
+          excludeMovieId={kind === 'movie' ? tmdbId : null}
           trackedTv={trackedTv}
           trackedMovie={trackedMovie}
           onClose={() => setPerson(null)}

@@ -1895,3 +1895,23 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-ep-about { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
 .sd-ep-about p { margin: 0; font-size: 13.5px; line-height: 1.55; color: #c3cad5; }
 .sd-ep-about .sd-mono { font-size: 11.5px; color: var(--text-dim); }
+
+/* ------------------------------------------------ Watchlist → New (new on my services) */
+.sd-newon-head { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; }
+.sd-newon-head .sd-note { flex: 1 1 200px; }
+.sd-newon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 10px; }
+.sd-newon-card { display: flex; gap: 12px; padding: 10px; }
+.sd-newon-open { flex: none; padding: 0; border: none; background: none; cursor: pointer; border-radius: 8px; }
+.sd-newon-open:disabled { cursor: default; }
+.sd-newon-open img, .sd-newon-open .ph { display: block; width: 64px; height: 96px; border-radius: 8px; object-fit: cover; background: var(--line); }
+.sd-newon-open .ph { display: grid; place-items: center; font-weight: 700; color: var(--text-dim); }
+.sd-newon-open:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sd-newon-body { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.sd-newon-name { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.sd-newon-svc { font-size: 12.5px; font-weight: 600; color: var(--amber); }
+.sd-newon-meta { font-size: 12px; color: var(--text-dim); }
+.sd-newon-lib { font-size: 12px; color: var(--teal); }
+.sd-newon-lib.t-queued, .sd-newon-lib.t-library { color: var(--text-dim); }
+.sd-newon-body .sd-btn { margin-top: 4px; }
+/* Four Watchlist tabs on a phone */
+@media (max-width: 440px) { .sd-tabs2 button { padding: 0 4px; font-size: 12.5px; } }
