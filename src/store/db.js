@@ -4,6 +4,7 @@ import { cleanRegion } from '../components/regionLogic.js';
 import { blockedByWipe } from './wipeLogic.js';
 import { setNoteIn, withNotes, withMovieNote } from './notes.js';
 import { setRatingIn, withEpRatings } from './epRatings.js';
+import { cleanRating } from '../components/starsLogic.js';
 import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
 import { setHidden, mergeHidden, sameHidden } from '../components/hiddenLogic.js';
 import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
@@ -415,9 +416,10 @@ export function setShowDropped(id, dropped, at) {
 const RESUME = { dropped: false, droppedAt: null };
 const resumePatch = (show) => (show.dropped === true ? RESUME : {});
 
-export function setShowRating(id, rating) {
-  // rating: 0–5. 0 clears it. ratedAt records when you rated it (for the
+export function setShowRating(id, raw) {
+  // rating: 0 or 0.5–5 in half steps (like movies and episodes). 0 clears it. ratedAt records when you rated it (for the
   // "Recently rated" list). Rides the existing per-show sync doc.
+  const rating = cleanRating(raw);
   update((s) => {
     const show = s.shows[id];
     if (show) {

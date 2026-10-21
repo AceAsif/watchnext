@@ -1,6 +1,7 @@
 import { IMG_W, IMG_PAD, COLORS as C, initialOf } from './yearImageLogic.js';
 import { DISPLAY, BODY, rr, newCard, kit, drawCover, drawFooter } from './cardKit.js';
 import { wrapTitle, planFinishImage } from './finishCardLogic.js';
+import { starFill } from './starsLogic.js';
 
 // Draw the "You finished <show>" card (1080x1350) and return the canvas. `f` comes
 // from finishFacts(); `loadImg(url)` resolves to a loaded <img> or null.
@@ -44,7 +45,17 @@ export async function renderFinishImage(f, { loadImg, posterUrl }) {
   }
   if (plan.starsY != null) {
     ctx.font = `400 46px ${BODY}`;
-    for (let i = 0; i < 5; i++) { ctx.fillStyle = i < f.rating ? C.amber : '#2c3442'; ctx.fillText('★', plan.col.x + i * 56, plan.starsY); }
+    for (let i = 0; i < 5; i++) {
+      const x = plan.col.x + i * 56;
+      const fill = starFill(f.rating, i + 1);
+      ctx.fillStyle = fill === 'full' ? C.amber : '#2c3442';
+      ctx.fillText('★', x, plan.starsY);
+      if (fill === 'half') { // the left half in amber over the grey star
+        const w = ctx.measureText('★').width;
+        ctx.save(); ctx.beginPath(); ctx.rect(x, plan.starsY - 60, w / 2, 80); ctx.clip();
+        ctx.fillStyle = C.amber; ctx.fillText('★', x, plan.starsY); ctx.restore();
+      }
+    }
   }
 
   if (plan.datesLine) {

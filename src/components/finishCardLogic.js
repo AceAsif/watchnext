@@ -9,6 +9,10 @@
 import { BATCH_MIN, fmtDay } from './statsLogic.js';
 import { localDate } from './csvExport.js';
 import { IMG_W, IMG_H, IMG_PAD, fitText } from './yearImageLogic.js';
+import { cleanRating, starFill } from './starsLogic.js';
+
+// 4.5 -> "★★★★½", 3 -> "★★★☆☆" (for the share text).
+export const starText = (r) => [1, 2, 3, 4, 5].map((n) => ({ full: '★', half: '½', empty: '☆' })[starFill(r, n)]).join('');
 
 const ONGOING = new Set(['returning series', 'in production', 'planned', 'pilot']);
 export const isOngoing = (show) => ONGOING.has(String((show && show.status) || '').trim().toLowerCase());
@@ -61,7 +65,7 @@ export function finishFacts(show, bulk) {
     poster: (show && show.poster) || null,
     episodes: entries.length,
     hours: Math.round(minutes / 60),
-    rating: Math.min(5, Math.max(0, Math.round(Number(show && show.rating) || 0))),
+    rating: cleanRating(show && show.rating), // 0 or 0.5–5 in half steps
     finishedDate: okDates ? last : '',
     startedDate: startCredible ? first : '',
     days: startCredible ? dayNum(last) - dayNum(first) + 1 : null,
@@ -86,7 +90,7 @@ export function finishShareLine(f) {
     `I just finished ${f.name} on WatchNext:`,
     `${f.episodes.toLocaleString()} ${f.episodes === 1 ? 'episode' : 'episodes'}, ${f.hours.toLocaleString()} ${f.hours === 1 ? 'hour' : 'hours'}.`,
     f.days != null && f.days > 1 ? `Took ${f.days.toLocaleString()} days.` : '',
-    f.rating ? `${'★'.repeat(f.rating)}${'☆'.repeat(5 - f.rating)}` : '',
+    f.rating ? starText(f.rating) : '',
   ].filter(Boolean).join(' ');
 }
 

@@ -127,6 +127,25 @@ await openShow(p);
 await ok('after a reload the ratings and the card are still there', async () => { assert.match(await card(), /2 rated · avg ★4\.8/); });
 await p.close();
 
+console.log('E. WHOLE-SHOW RATING IN HALF STARS');
+p = await open();
+await openShow(p);
+const showStar = async (n, half) => { const h = (await p.$$('[data-testid=show-rating] .stars button'))[n - 1]; const box = await h.boundingBox(); await p.mouse.click(box.x + (half ? box.width * 0.2 : box.width * 0.8), box.y + box.height / 2); await wait(250); };
+const showRating = () => p.evaluate(() => JSON.parse(localStorage.getItem('watchnext-state-v1')).shows['tmdb:1'].rating || 0);
+await showStar(4, true);
+await ok('tapping the left half of the 4th star rates the show 3.5', async () => {
+  assert.equal(await showRating(), 3.5);
+  assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('[data-testid=show-rating] .stars svg')].map((s) => s.querySelector('clipPath') ? 'half' : s.querySelector('path[fill=currentColor]') ? 'full' : 'empty')), ['full', 'full', 'full', 'half', 'empty']);
+});
+await showStar(5, false);
+await ok('the right half of the 5th star gives 5', async () => { assert.equal(await showRating(), 5); });
+await showStar(5, false);
+await ok('tapping the current rating again clears it', async () => { assert.equal(await showRating(), 0); });
+await showStar(3, true);
+await p.reload({ waitUntil: 'networkidle0' }); await wait(400); await openShow(p);
+await ok('2.5 is kept after a reload', async () => { assert.equal(await showRating(), 2.5); });
+await p.close();
+
 console.log('D. DESKTOP');
 p = await open({ w: 1280, h: 900 });
 await openShow(p);

@@ -41,6 +41,7 @@ import { reactionById } from '../store/notes.js';
 import { ratingOf } from '../store/epRatings.js';
 import { starLabel } from '../components/starsLogic.js';
 import EpisodeRatings from '../components/EpisodeRatings.jsx';
+import Stars from '../components/Stars.jsx';
 import AnimeSheet from '../components/AnimeSheet.jsx';
 import FinishCardSheet from '../components/FinishCardSheet.jsx';
 import { WhenSheet, FixDatesSheet } from '../components/WatchDateSheets.jsx';
@@ -80,13 +81,6 @@ const CheckIcon = ({ size = 16, w = 2.4 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M5 12.5l4.5 4.5L19 7.5" />
-  </svg>
-);
-const StarIcon = ({ on }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinejoin="round"
-    fill={on ? 'var(--amber)' : 'none'} stroke={on ? 'var(--amber)' : 'var(--sd-line-strong)'}
-    aria-hidden="true">
-    <path d="M12 17.3l-6.2 3.7 1.6-7.1L2 9.2l7.2-.6L12 2l2.8 6.6 7.2.6-5.4 4.7 1.6 7.1z" />
   </svg>
 );
 
@@ -657,19 +651,9 @@ export default function ShowDetail({ id, onBack }) {
       <section className="sd-card">
         <div className="sd-row" style={{ justifyContent: 'space-between', paddingRight: 8, cursor: 'default' }}>
           <span>Your rating</span>
-          <span role="radiogroup" aria-label="Your rating" style={{ display: 'flex' }}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                className="sd-star"
-                role="radio"
-                aria-checked={n === rating}
-                aria-label={`${n} star${n > 1 ? 's' : ''}`}
-                onClick={() => setShowRating(id, n === rating ? 0 : n)}
-              >
-                <StarIcon on={n <= rating} />
-              </button>
-            ))}
+          {/* Half stars: tap the left half of a star for x.5; tap your current rating again to clear it. */}
+          <span className="sd-showstars" data-testid="show-rating">
+            <Stars value={rating} onChange={(v) => setShowRating(id, v)} size={24} half />
           </span>
         </div>
 
