@@ -5,7 +5,7 @@
 import {
   libraryEntries, needFeatures, featuresFromDetails, buildProfile, pickSeeds, topPerson, topKeyword,
   topGenres, genreIdsFor, candidateFrom, mergeCandidates, buildRows, titleKey, MAX_SEEDS,
-  pickAnimeSeed, ownedAnimeKeys, animeCandidate, timeContext,
+  pickAnimeSeed, ownedAnimeKeys, animeCandidate, timeContext, gemQueries,
 } from './tasteLogic.js';
 import { hiddenList } from './hiddenLogic.js';
 import { myProviderIds } from './movieNightLogic.js';
@@ -126,6 +126,13 @@ export async function runDiscover({ state, hidden, cache, api, mine = [], region
       const via = { type: 'seed', key: `anime:${animeSeed.anilistId}`, name: animeSeed.name, w: animeSeed.w * animeSeed.d };
       const list = await call(() => api.animeRecs(animeSeed.anilistId));
       lists.push((Array.isArray(list) ? list : []).map((m) => animeCandidate(m, via)));
+    });
+  }
+  // Hidden gems: highly rated but little-known titles in your genres (and your other language).
+  for (const q of gemQueries(prof)) {
+    jobs.push(async () => {
+      const r = results(await call(() => api.discover(q.kind, q.params)));
+      lists.push(r.map((x) => candidateFrom(x, q.kind, q.via)));
     });
   }
   jobs.push(async () => {

@@ -73,14 +73,15 @@ async function open(state, { services = ['netflix'], w = 390, h = 844, seed = tr
     if (u.includes('fonts.googleapis.com')) return r.respond({ status: 200, contentType: 'text/css', body: fontsCss });
     if (u.includes('image.tmdb.org')) return r.respond({ status: 200, contentType: 'image/png', body: PNG });
     if (u.startsWith('https://graphql.anilist.co')) { // the anime row: AniList recommendations
+      if (r.method() === 'OPTIONS') return r.respond({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'content-type, accept' }, body: '' });
       const body = JSON.parse(r.postData() || '{}'); log.push({ p: 'anilist', id: body.variables && body.variables.id });
-      if (!anilist) return r.respond({ status: 500, contentType: 'application/json', body: '{}' });
-      return r.respond({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ data: { Media: { recommendations: { nodes: anilist.map((m) => ({ rating: 50, mediaRecommendation: m })) } } } }) });
+      if (!anilist) return r.respond({ status: 500, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type, accept' }, body: '{}' });
+      return r.respond({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type, accept' }, body: JSON.stringify({ data: { Media: { recommendations: { nodes: anilist.map((m) => ({ rating: 50, mediaRecommendation: m })) } } } }) });
     }
     if (!u.includes('api.themoviedb.org')) return r.abort();
     const url = new URL(u); const p = url.pathname.replace('/3/', ''); const q = Object.fromEntries(url.searchParams); delete q.api_key;
     await wait(slow);
-    const json = (b, status = 200) => r.respond({ status, contentType: 'application/json', body: JSON.stringify(b) });
+    const json = (b, status = 200) => r.respond({ status, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(b) });
     let m;
     if ((m = /^(tv|movie)\/(\d+)$/.exec(p))) {
       const k = `${m[1]}/${m[2]}`;
@@ -133,8 +134,16 @@ await ok('the first visit shows "Learning your taste… N of 5" with a progress 
 });
 await p.screenshot({ path: `${OUT}/rows_phone.png`, fullPage: true });
 const rows1 = await rowsOf(p);
-await ok('rows: Top picks, then "Because you…" rows for your 3 strongest titles, More from a creator, a keyword row, On your services, Something different', async () => {
-  assert.deepEqual(rows1.map((r) => r.type), ['top', 'seed', 'seed', 'seed', 'person', 'keyword', 'services', 'different']);
+await ok('Hidden gems: its own row, every card highly rated with few votes, and the line says so ("★ 7.6 · 1.5k votes · Mystery")', async () => {
+  const g = rows1.find((r) => r.type === 'gems');
+  assert.equal(g.title, 'Hidden gems'); assert.ok(g.items.length >= 4);
+  assert.ok(g.items.every((c) => /^★ \d\.\d · [\d.k]+ votes/.test(c.why)), g.items.map((c) => c.why).join(' | '));
+  const gemCalls = log.filter((l) => l.p === 'discover' && l.q.sort_by === 'vote_average.desc');
+  assert.deepEqual(gemCalls.map((l) => `${l.kind}:${l.q.with_original_language || ''}`).sort(), ['movie:', 'movie:de', 'tv:', 'tv:de'], 'per kind: your genres, plus German (you watch Dark)');
+  assert.ok(gemCalls.every((l) => l.q['vote_average.gte'] === '7.3' && Number(l.q['vote_count.lte']) <= 3000));
+});
+await ok('rows: Top picks, then "Because you…" rows for your 3 strongest titles, More from a creator, a keyword row, On your services, Hidden gems, Something different', async () => {
+  assert.deepEqual(rows1.map((r) => r.type), ['top', 'seed', 'seed', 'seed', 'person', 'keyword', 'services', 'gems', 'different']);
   assert.deepEqual(rows1.slice(0, 4).map((r) => r.title), ['Top picks for you', 'Because you rated Dark 5★', 'Because you watched The OA', 'Because you rated Arrival 4★']);
   const teen = new Set(RECS['tv/103'].map((x) => 'tv:' + x.id));
   assert.ok(rows1.flatMap((r) => r.items).some((c) => teen.has(c.key)), '13 Reasons Why (dropped after 2 seasons) still counts as liked, so its suggestions are in the mix');
@@ -143,7 +152,7 @@ await ok('rows: Top picks, then "Because you…" rows for your 3 strongest title
 });
 await ok('every card has a poster, a match % and a why-line; top picks say which title they come from', async () => {
   for (const r of rows1) for (const c of r.items) { assert.match(c.match, /^\d{1,2}% match$/); assert.ok(c.why.length > 0, c.name); }
-  assert.ok(rows1[0].items.every((c) => /^Because you liked |^You watch a lot of /.test(c.why)), rows1[0].items.map((c) => c.why).join(' | '));
+  assert.ok(rows1[0].items.every((c) => /^Because you liked |^You watch a lot of |^Highly rated$/.test(c.why)), rows1[0].items.map((c) => c.why).join(' | '));
 });
 await ok('never suggested: titles you have (13 Reasons Why), posterless ones, a genre you dropped after 1 episode (Reality Trash); the themed rows never repeat a title', async () => {
   const all = rows1.flatMap((r) => r.items); const names = all.map((c) => c.name);

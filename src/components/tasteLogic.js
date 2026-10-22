@@ -402,6 +402,7 @@ export function whyLine(prof, c, rowType) {
     if (g) return `You watch a lot of ${genreLabel(g)}`;
     return 'Highly rated';
   }
+  if (rowType === 'gems') return gemLine(prof, c);
   if (rowType === 'different') return c.g.length ? `${genreLabel(c.g[0])} · rated ${c.vote.toFixed(1)}` : `Rated ${c.vote.toFixed(1)}`;
   // the row title already says why for seed rows; elsewhere a liked title is the best reason
   if (rowType !== 'seed' && rowType !== 'anime' && seed) return `Because you liked ${shortName(seed.name)}`;
@@ -409,6 +410,41 @@ export function whyLine(prof, c, rowType) {
   if (g) parts.push(genreLabel(g));
   if (c.year) parts.push(String(c.year));
   return parts.join(' · ') || (c.kind === 'tv' ? 'Show' : 'Movie');
+}
+
+// ------------------------------------------------------------------ hidden gems
+// Highly rated but not famous: enough votes to trust the score, few enough that most people
+// haven't heard of it. TV gets lower vote limits (shows collect far fewer votes than films).
+export const GEM = { minVote: 7.3, tv: { minVotes: 60, maxVotes: 1500 }, movie: { minVotes: 120, maxVotes: 3000 } };
+export const isGem = (c) => {
+  const lim = GEM[c.kind === 'tv' ? 'tv' : 'movie'];
+  return c.vote >= GEM.minVote && c.votes >= lim.minVotes && c.votes <= lim.maxVotes;
+};
+// Your favourite language other than English, when it's a real part of what you watch (≥ 10%).
+export function topOtherLanguage(prof) {
+  const best = Object.entries((prof && prof.l) || {}).filter(([k, v]) => k !== 'en' && v >= 0.1).sort((a, b) => b[1] - a[1])[0];
+  return best ? best[0] : null;
+}
+// The /discover queries that find gems in your genres (and your other language, if you have one).
+// -> [{ kind, params, via }]
+export function gemQueries(prof) {
+  const out = [];
+  const genres = topGenres(prof, 3);
+  const lang = topOtherLanguage(prof);
+  for (const kind of ['tv', 'movie']) {
+    const lim = GEM[kind];
+    const base = { sort_by: 'vote_average.desc', 'vote_average.gte': GEM.minVote, 'vote_count.gte': lim.minVotes, 'vote_count.lte': lim.maxVotes, include_adult: 'false' };
+    const g = genreIdsFor(kind, genres);
+    out.push({ kind, params: { ...base, ...(g.length ? { with_genres: g.join('|') } : null) }, via: { type: 'gem' } });
+    if (lang) out.push({ kind, params: { ...base, with_original_language: lang }, via: { type: 'gem', lang } });
+  }
+  return out;
+}
+// The card line for a gem: "★ 8.1 · 840 votes · Crime" (1,500 votes → "1.5k").
+export function gemLine(prof, c) {
+  const g = bestGenre(prof, c) || c.g[0];
+  const votes = c.votes >= 1000 ? `${(Math.round(c.votes / 100) / 10).toString()}k` : String(c.votes); // short: cards are narrow
+  return [`★ ${c.vote.toFixed(1)}`, `${votes} votes`, g ? genreLabel(g) : null].filter(Boolean).join(' · ');
 }
 
 // ------------------------------------------------------------------ 5. rows
@@ -480,6 +516,9 @@ export function buildRows({ pool, prof, seeds = [], person = null, keyword = nul
   if (person) take(`person:${person.id}`, 'person', `More from ${person.name}`, person.role === 'c' ? 'A creator behind titles you liked' : 'In several titles you liked', scoredMain.filter((c) => c.via.some((v) => v.type === 'person')));
   if (keyword) take(`keyword:${keyword.id}`, 'keyword', `Your kind of story: ${keyword.name}`, 'A theme that keeps coming up in what you like', scoredMain.filter((c) => c.via.some((v) => v.type === 'keyword')));
   if (servicesOn) take('services', 'services', 'On your services', 'Your kind of thing, streaming on what you pay for', scoredMain.filter((c) => c.via.some((v) => v.type === 'services')));
+  // Hidden gems: highly rated, less famous, and your kind of thing (in genres you like, never one
+  // you've shown you dislike). Ranked half on how well it fits you, half on how good it is.
+  take('gems', 'gems', 'Hidden gems', 'Highly rated, less famous, and your kind of thing', scoredMain.filter((c) => isGem(c) && c.taste > 0 && genreFit(prof, c) > 0 && !c.g.some((k) => (prof.g[k] || 0) < 0)), 12, (c) => 0.5 * c.taste + 0.5 * quality(c));
   // Something different: well-rated, trending titles in genres you don't usually watch — but
   // never a genre you've shown you dislike.
   const different = (c) => c.via.some((v) => v.type === 'trending') && !c.g.some((k) => (prof.g[k] || 0) < 0) && genreFit(prof, c) < 0.35 && quality(c) >= 0.4;
