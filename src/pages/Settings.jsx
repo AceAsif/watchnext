@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { findDuplicateMovies } from '../components/duplicateMoviesLogic.js';
 import { useStore } from '../store/useStore.js';
-import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount, setDiscoverHidden, getActivity, subscribeActivity, undoActivity } from '../store/db.js';
+import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount, setDiscoverHidden, getActivity, subscribeActivity, undoActivity, restoreFirstDates } from '../store/db.js';
+import { planFirstDates, epCode as fdCode } from '../components/firstDatesLogic.js';
+import { fmtDay } from '../components/statsLogic.js';
 import { hiddenList } from '../components/hiddenLogic.js';
 import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
 import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud, wipeEverywhere } from '../store/cloud.js';
@@ -38,6 +40,7 @@ import {
   HiddenCard,
   ActivityCard,
   UndoAnywayDialog,
+  FirstDatesSheet,
   BackupCard,
   BackupNudge,
   ServicesCard,
@@ -69,6 +72,32 @@ export default function Settings() {
   const lbRef = useRef();
   const lb = useLetterboxd();
   const restoreRef = useRef();
+  const datesRef = useRef();
+  const [datesPlan, setDatesPlan] = useState(null);
+  function onDatesFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const json = JSON.parse(reader.result);
+        if (!isBackupFile(json)) throw new Error('That isn’t a WatchNext backup file.');
+        const plan = planFirstDates(getState().shows, json).map((p) => ({ ...p, eps: p.eps.map((x) => ({ ...x, code: fdCode(x.key) })) }));
+        if (!plan.length) say('Nothing to bring back: this backup has no earlier first watch dates than you have now.');
+        else setDatesPlan(plan);
+      } catch (err) {
+        say('Couldn’t read that backup: ' + err.message, 'err');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  }
+  function applyDates() {
+    const n = restoreFirstDates(datesPlan);
+    setDatesPlan(null);
+    say(`Brought back ${n} first watch date${n === 1 ? '' : 's'}. You can undo it in Your recent changes.`);
+  }
+  const fmtWhen = (iso) => fmtDay(localISODate(new Date(iso)));
   const bannerRef = useRef();
   const copyTimer = useRef();
   const cloudUser = useSyncExternalStore(subscribeCloudUser, getCloudUser);
@@ -289,7 +318,7 @@ export default function Settings() {
         <DuplicatesCard groups={dups.groups} titles={dups.titles} extra={dups.extra} />
         <HiddenCard rows={hiddenList(state.hidden)} onShowAgain={(e) => setDiscoverHidden(e, false)} />
         <ActivityCard log={activity} state={state} onUndo={undoEntry} />
-        <BackupCard lastLine={lastBackupLine(bk, new Date())} onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} />
+        <BackupCard lastLine={lastBackupLine(bk, new Date())} onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} datesRef={datesRef} onDatesFile={onDatesFile} />
         <CsvCard onExport={exportCsv} />
         <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} onAskEverywhere={() => setConfirm({ type: 'everywhere' })} />
       </div>
@@ -325,6 +354,7 @@ export default function Settings() {
           onCancel={() => setConfirm(null)}
         />
       )}
+      {datesPlan && <FirstDatesSheet plan={datesPlan} fmt={fmtWhen} onApply={applyDates} onClose={() => setDatesPlan(null)} />}
       {askUndo && <UndoAnywayDialog entry={askUndo} onConfirm={() => undoEntry(askUndo, 'changed', true)} onCancel={() => setAskUndo(null)} />}
       {confirm && confirm.type === 'everywhere' && signedIn && (
         <WipeDialog busy={wiping} onConfirm={confirmWipeEverywhere} onCancel={() => setConfirm(null)} />

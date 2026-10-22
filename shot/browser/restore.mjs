@@ -167,7 +167,7 @@ await p.close();
 console.log('5. BACKUP CARD layout');
 p = await open({ state: RICH() });
 const bc = await p.evaluate(() => { const c = [...document.querySelectorAll('.sd-setcard')].find((x) => x.querySelector('h2').textContent === 'Backup'); const btns = [...c.querySelectorAll('.sd-setbtn')].map((b) => [b.textContent.trim(), Math.round(b.getBoundingClientRect().height), Math.round(b.getBoundingClientRect().width)]); return { text: c.textContent, btns }; });
-ok('copy now tells the truth ("can be restored here") and offers both buttons at 44px', () => { assert.match(bc.text, /A backup file can be restored here, on any device\./); assert.match(bc.text, /never deletes or overwrites what you already have/); assert.deepEqual(bc.btns.map((b) => b[0]), ['Download backup', 'Restore from backup']); assert.ok(bc.btns.every((b) => b[1] >= 44)); });
+ok('copy now tells the truth ("can be restored here") and offers both buttons at 44px', () => { assert.match(bc.text, /A backup file can be restored here, on any device\./); assert.match(bc.text, /never deletes or overwrites what you already have/); assert.deepEqual(bc.btns.map((b) => b[0]), ['Download backup', 'Restore from backup', 'Bring back first watch dates']); assert.ok(bc.btns.every((b) => b[1] >= 44)); });
 assert.ok(await noOverflow(p)); checks++; console.log('  PASS no horizontal overflow');
 const fields = await p.evaluate(() => [...document.querySelectorAll('.sd-keyfield')].map((f) => Math.round(f.getBoundingClientRect().height)));
 ok('REGRESSION: the TMDB key box is a full 44px tall on a phone (it had collapsed to a sliver)', () => assert.deepEqual(fields, [44]));

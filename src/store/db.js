@@ -14,6 +14,7 @@ import { localISODate } from '../components/showLogic.js';
 import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
 import { cleanTombs, lostKeys, addTombs, liftPresent } from './movieTombsLogic.js';
 import * as Activity from '../components/activityLogic.js';
+import { applyToShow as applyFirstDates } from '../components/firstDatesLogic.js';
 
 // Simple localStorage-backed store with a subscribe API.
 // Single-user app, so no backend needed: everything lives in the browser.
@@ -1297,6 +1298,25 @@ function undoActivity__raw(entryId, force = false) {
   if (r.touched.hidden) markHiddenDirty();
   return { ok: true };
 }
+// Bring back first watch dates from a backup (components/firstDatesLogic.js).
+// plan: planFirstDates(...). Returns how many episodes changed. Undo: Settings → Activity.
+function restoreFirstDates__raw(plan) {
+  const now = new Date().toISOString();
+  let changed = 0;
+  update((s) => {
+    for (const p of plan || []) {
+      const show = s.shows[p.id];
+      if (!show) continue;
+      const next = applyFirstDates(show, p.eps, now);
+      for (const e of p.eps) if (next.watched[e.key] !== show.watched[e.key]) changed++;
+      s.shows[p.id] = next;
+    }
+  });
+  for (const p of plan || []) markShowDirty(p.id);
+  return changed;
+}
+export const restoreFirstDates = logged(restoreFirstDates__raw, (args, b, a, n) => `Brought back ${n} first watch date${n === 1 ? '' : 's'} from a backup`);
+
 export const undoActivity = logged(undoActivity__raw, ([id]) => {
   const e = activity.find((x) => x.id === id);
   return `Undid “${e ? e.what : 'a change'}”`;

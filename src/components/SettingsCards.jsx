@@ -417,6 +417,37 @@ export function UndoAnywayDialog({ entry, onConfirm, onCancel }) {
   );
 }
 
+// The dates a backup would bring back, before anything changes.
+export function FirstDatesSheet({ plan, fmt, onApply, onClose }) {
+  const total = plan.reduce((n, p) => n + p.eps.length, 0);
+  return (
+    <Sheet open title="Bring back first watch dates?" subtitle={`${total} episode${total === 1 ? '' : 's'} in ${plan.length} show${plan.length === 1 ? '' : 's'}`} onClose={onClose}>
+      <p className="sd-setp">The backup has an earlier first watch date for these episodes. The date shown now becomes the “last watched” date, and your watch counts stay the same.</p>
+      <div className="sd-fd-list" data-testid="first-dates">
+        {plan.map((p) => (
+          <section key={p.id} className="sd-fd-show">
+            <div className="sd-fd-name">{p.name}</div>
+            <ul>
+              {p.eps.map((e) => (
+                <li key={e.key}>
+                  <span className="sd-mono code">{e.code}</span>
+                  <span className="to">{fmt(e.to)}</span>
+                  <span className="from">now {fmt(e.from)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+      <div className="sd-confirm-acts">
+        <button type="button" className="sd-setbtn primary" onClick={onApply}>Bring back {total} date{total === 1 ? '' : 's'}</button>
+        <button type="button" className="sd-setbtn" autoFocus onClick={onClose}>Cancel</button>
+      </div>
+      <p className="sd-when-hint">You can undo this in Settings → Your recent changes.</p>
+    </Sheet>
+  );
+}
+
 // ---------------------------------------------------------------- Backup + danger zone
 // Which country streaming availability is checked for (kept on this device).
 export function RegionCard({ region, onChange }) {
@@ -469,7 +500,7 @@ export function BackupNudge({ copy, onBackup, onLater }) {
   );
 }
 
-export function BackupCard({ onDownload, onRestore, restoreRef, onRestoreFile, lastLine }) {
+export function BackupCard({ onDownload, onRestore, restoreRef, onRestoreFile, lastLine, datesRef, onDatesFile }) {
   return (
     <SetCard icon={I.drive} label="Your data" title="Backup">
       <p className="sd-setp">
@@ -483,6 +514,16 @@ export function BackupCard({ onDownload, onRestore, restoreRef, onRestoreFile, l
         <button type="button" className="sd-setbtn" onClick={onRestore}>{I.upload} Restore from backup</button>
       </div>
       <div className="sd-setinfo">{I.info}<span>Restoring adds what’s missing and never deletes or overwrites what you already have.</span></div>
+      {datesRef && (
+        <div className="sd-firstdates">
+          <p className="sd-setp">
+            <b>Bring back first watch dates.</b> If an episode’s first watch date was replaced by a later one (the old +1
+            button did this), choose a backup made before that. You’ll see every date it would bring back before anything changes.
+          </p>
+          <input ref={datesRef} type="file" accept="application/json" onChange={onDatesFile} style={{ display: 'none' }} aria-label="Backup file with your first watch dates" />
+          <button type="button" className="sd-setbtn" onClick={() => datesRef.current.click()}>{I.upload} Bring back first watch dates</button>
+        </div>
+      )}
       <div className="sd-setnote">{I.lock}Your TMDB key is not included in the file.</div>
     </SetCard>
   );
