@@ -102,10 +102,13 @@ export function endRewatch(show, nowIso) {
 // After a tick: is the round complete (every aired episode done)?
 export const roundComplete = (show, today) => isRewatching(show) && rewatchProgress(show, today).left === 0 && rewatchProgress(show, today).total > 0;
 
-// The latest day you watched anything of the show, rewatch ticks included.
+// The latest day you watched anything of the show, rewatch ticks and +1 watches included.
 export function latestWatch(show) {
   let latest = null;
-  for (const w of Object.values((show && show.watched) || {})) if (w && w.at && (!latest || w.at > latest)) latest = w.at;
+  for (const w of Object.values((show && show.watched) || {})) {
+    if (!w) continue;
+    for (const at of [w.at, w.last]) if (typeof at === 'string' && at && (!latest || at > latest)) latest = at;
+  }
   for (const at of Object.values(doneMap(show))) if (typeof at === 'string' && (!latest || at > latest)) latest = at;
   return latest;
 }

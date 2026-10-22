@@ -54,4 +54,17 @@ t('rating and notes are untouched by a rewatch and its undo', () => {
 t('no undefined is ever written (Firestore rejects it)', () => {
   assert.ok(!JSON.stringify(D.getState()).includes('undefined'));
 });
+t('+1 keeps the FIRST watch date and saves the new one as `last`', () => {
+  const prev = D.logEpisodeRewatch('tmdb:1', 5, 1, 50);
+  const e = w('tmdb:1', '5x1');
+  assert.equal(e.at, '2026-06-01T10:00:00.000Z', 'first date unchanged');
+  assert.ok(typeof e.last === 'string' && e.last > e.at, 'latest viewing stored separately');
+  D.undoEpisodeRewatch('tmdb:1', 5, 1, prev);
+  assert.ok(!('last' in w('tmdb:1', '5x1')), 'undo removes `last` again');
+});
+t('the show counts as recently watched after a +1 (lastWatchDate sees `last`)', () => {
+  const prev = D.logEpisodeRewatch('tmdb:1', 5, 2, 50);
+  assert.equal(D.lastWatchDate(D.getState().shows['tmdb:1']).slice(0, 10), new Date().toISOString().slice(0, 10));
+  D.undoEpisodeRewatch('tmdb:1', 5, 2, prev);
+});
 console.log(`\n${n} tests passed`);

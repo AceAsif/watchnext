@@ -244,7 +244,8 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
           const code = `S${season.n}E${ep.episode_number}`;
           let sub = null;
           if (w && w.at && !(w.firstInRewatch && inRound)) {
-            sub = { text: `Watched ${fmtDate(w.at.slice(0, 10))}${n > 1 ? ` · ${n}×` : ''}${inRound ? ` · rewatched ${fmtDate(localISODate(new Date(rdone[k])))}` : ''}`, color: 'var(--text-dim)' };
+            const lastDay = !inRound && typeof w.last === 'string' && w.last ? localISODate(new Date(w.last)) : '';
+            sub = { text: `Watched ${fmtDate(localISODate(new Date(w.at)))}${n > 1 ? ` · ${n}×` : ''}${lastDay ? ` · last ${fmtDate(lastDay)}` : ''}${inRound ? ` · rewatched ${fmtDate(localISODate(new Date(rdone[k])))}` : ''}`, color: 'var(--text-dim)' };
           } else if (inRound) {
             sub = { text: `Watched ${fmtDate(localISODate(new Date(rdone[k])))}`, color: 'var(--text-dim)' };
           } else if (!w && ep.air_date && ep.air_date > today) {

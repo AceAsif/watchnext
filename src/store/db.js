@@ -705,8 +705,8 @@ export function restoreWatchDates(id, prev) {
 // its own array entry with its own date) — so Episodes watched / Hours of TV /
 // Most watched shows all correctly include every rewatch (they already read
 // `n`), but Habits/the activity heatmap only see the most recent watch date,
-// since that's all a single map entry can hold. `at` is bumped to now so
-// "Watched <date>" on the episode row reflects the latest viewing.
+// since that's all a single map entry can hold. `at` (the FIRST watch) is never changed;
+// the latest viewing goes in `last`, shown as "· last <date>" on the episode row.
 // Returns a copy of the entry as it was BEFORE this watch (null when there was none), so the
 // caller can offer Undo through undoEpisodeRewatch.
 // ---------------------------------------------------------------------------
@@ -752,7 +752,7 @@ export function logEpisodeRewatch(id, season, episode, runtimeMin) {
     const existing = map[k];
     prev = existing ? { ...existing } : null;
     map[k] = existing
-      ? { ...existing, at: new Date().toISOString(), n: (existing.n || 1) + 1, min: runtimeMin || existing.min }
+      ? { ...existing, last: new Date().toISOString(), n: (existing.n || 1) + 1, min: runtimeMin || existing.min } // `at` (first watch) is kept
       : { at: new Date().toISOString(), min: runtimeMin || show.runtimeMin || null, n: 1 };
     s.shows[id] = { ...show, watched: map, ...resumePatch(show) };
   });
