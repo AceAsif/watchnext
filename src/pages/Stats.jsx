@@ -5,6 +5,7 @@ import { movieStatus } from '../store/db.js';
 import Stars from '../components/Stars.jsx';
 import YearInReview from '../components/YearInReview.jsx';
 import MonthInReview from '../components/MonthInReview.jsx';
+import MonthVsLastYear from '../components/MonthVsLastYear.jsx';
 import GoalsCard from '../components/GoalsCard.jsx';
 import { cardGoals } from '../components/goalsLogic.js';
 import { platformById } from '../components/PlatformPicker.jsx';
@@ -414,6 +415,7 @@ export default function Stats({ onOpenNotes }) {
         <GoalsCard year={goalYear} goals={state.goals} actualsOf={actualsOf} today={todayIso} streak={{ current: base.currentStreak, longest: base.longestStreak }} />
         {review && <YearInReview data={review} years={base.years} onYear={setReviewYear} />}
         <MonthInReview shows={state.shows} movies={state.movies} />
+        <MonthVsLastYear shows={state.shows} movies={state.movies} />
       </div>
     </div>
   );
