@@ -91,4 +91,12 @@ t('an EMPTY backup is valid and changes nothing', () => { const r = mergeBackup(
 t('OLD backups that still contain the TMDB key: the key is ignored on restore (never copied into state)', () => {
   const old = JSON.parse(JSON.stringify(ORIGINAL)); const r = mergeBackup(EMPTY(), old); assert.ok(!('settings' in r)); assert.ok(!JSON.stringify(r).includes('SECRET'));
 });
+t('an OLDER backup missing a field this device has as blank (droppedAt: null, nextAir: null, platform: "") restores without crashing', () => {
+  const local = { shows: { a: { name: 'A', droppedAt: null, nextAir: null, platform: '', providersFree: [], watched: { '1x1': { at: '2026-10-11T00:00:00Z', n: 2 } } } }, movies: [] };
+  const back = { shows: { a: { name: 'A', watched: { '1x1': { at: '2022-06-04T10:26:40', n: 1 }, '1x2': { at: '2022-06-05T10:00:00' } } } }, movies: [] };
+  const r = mergeBackup(local, back);
+  assert.equal(r.shows.a.name, 'A'); assert.equal(r.shows.a.watched['1x1'].at, '2026-10-11T00:00:00Z', 'never overwrites');
+  assert.equal(r.summary.watchesAdded, 1);
+  assert.ok(!JSON.stringify(r.shows).includes('undefined'));
+});
 console.log(`\n${n} backup tests passed`);

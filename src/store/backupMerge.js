@@ -45,7 +45,8 @@ function mergeShow(local, back) {
   const out = {};
   for (const k of new Set([...Object.keys(back), ...Object.keys(local)])) {
     if (BAD_KEYS.has(k)) continue;
-    out[k] = blank(local[k]) ? clone(back[k]) : local[k]; // local wins unless blank
+    // local wins unless blank; a field only this device has (e.g. droppedAt: null on a newer record) is kept as is
+    out[k] = blank(local[k]) && back[k] !== undefined ? clone(back[k]) : local[k];
   }
 
   // watched episodes: union. Both have it -> keep yours, but never lose a rewatch count.
