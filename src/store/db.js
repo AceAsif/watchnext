@@ -8,6 +8,7 @@ import { cleanRating } from '../components/starsLogic.js';
 import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
 import { setHidden, mergeHidden, sameHidden } from '../components/hiddenLogic.js';
 import * as Lists from '../components/listsLogic.js';
+import * as People from '../components/peopleLogic.js';
 import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
 import { cleanTombs, lostKeys, addTombs, liftPresent } from './movieTombsLogic.js';
 
@@ -21,6 +22,7 @@ const empty = () => ({
   movies: [],  // { name, watchedAt, runtimeMin }
   goals: {},   // yearly watch goals: { '2026': { episodes, movies, hours, at } } (see components/goalsLogic.js)
   hidden: {},  // Discover's "Not interested": { 'tv:1399': { on, at, name, … } } (see components/hiddenLogic.js)
+  people: {},  // people you follow: { '<TMDB person id>': { id, name, on, at, dismissed } } (see components/peopleLogic.js)
   lists: {},   // your own lists ("Ramadan watch"): { '<id>': { id, name, at, items: [...] } } (see components/listsLogic.js)
   seenLog: {}, // Discover's hit rate: titles it put on screen { 'tv:1399': { at, name } } (see components/hitLogic.js)
   settings: { tmdbKey: '' },
@@ -90,6 +92,7 @@ let dirtyMovies = false;
 let dirtyGoals = false;
 let dirtyHidden = false;
 let dirtyLists = false;
+let dirtyPeople = false;
 let dirtySeen = false;
 let deletedShows = new Set();
 
@@ -233,6 +236,10 @@ export function markGoalsDirty() {
   dirtyGoals = true;
 }
 
+export function markPeopleDirty() {
+  dirtyPeople = true;
+}
+
 export function markListsDirty() {
   dirtyLists = true;
 }
@@ -265,6 +272,7 @@ export function takeDirty() {
   const goals = dirtyGoals;
   const hidden = dirtyHidden;
   const lists = dirtyLists;
+  const people = dirtyPeople;
   const seen = dirtySeen;
   const deletedIds = deletedShows;
   dirtyShows = new Set();
@@ -272,9 +280,10 @@ export function takeDirty() {
   dirtyGoals = false;
   dirtyHidden = false;
   dirtyLists = false;
+  dirtyPeople = false;
   dirtySeen = false;
   deletedShows = new Set();
-  return { showIds, movies, goals, hidden, lists, seen, deletedIds };
+  return { showIds, movies, goals, hidden, lists, people, seen, deletedIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -881,6 +890,28 @@ export function applyRemoteLists(remote) {
   return push;
 }
 
+// ---------------------------------------------------------------------------
+// People you follow (actors, directors, writers). Rules in components/peopleLogic.js.
+function changePeople(fn) {
+  const before = state.people;
+  const next = fn(People.sanitizePeople(before), new Date().toISOString());
+  if (People.samePeople(next, before)) return false;
+  update((s) => { s.people = next; });
+  markPeopleDirty();
+  return true;
+}
+// person: { id, name, profile }
+export const followPerson = (person, on = true) => changePeople((p, now) => People.setFollow(p, person, on, now));
+// Close one title in the "new from people you follow" banner.
+export const dismissPersonTitle = (personId, titleKey) => changePeople((p, now) => People.dismiss(p, personId, titleKey, now));
+export function applyRemotePeople(remote) {
+  const merged = People.mergePeople(remote, state.people);
+  if (!People.samePeople(merged, state.people)) update((s) => { s.people = merged; });
+  const push = !People.samePeople(merged, remote);
+  if (push) markPeopleDirty();
+  return push;
+}
+
 // Discover put these titles on screen (items: [{ key, name }]). Only the first time counts: the
 // date a title was FIRST seen is kept. Returns true when something new was logged.
 export function recordDiscoverSeen(items, nowIso = new Date().toISOString()) {
@@ -918,8 +949,10 @@ export function restoreBackup(json) {
     s.goals = r.goals;
     s.hidden = r.hidden;
     s.lists = r.lists;
+    s.people = r.people;
     s.seenLog = r.seenLog;
   });
+  if (r.peopleChanged) markPeopleDirty();
   if (r.goalsChanged) markGoalsDirty();
   if (r.listsChanged) markListsDirty();
   if (r.hiddenChanged) markHiddenDirty();
@@ -1007,6 +1040,7 @@ export function wipeLibrary() {
   dirtyGoals = false;
   dirtyHidden = false;
   dirtyLists = false;
+  dirtyPeople = false;
   dirtySeen = false;
   deletedShows = new Set();
 }

@@ -1915,3 +1915,25 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-newon-body .sd-btn { margin-top: 4px; }
 /* Four Watchlist tabs on a phone */
 @media (max-width: 440px) { .sd-tabs2 button { padding: 0 4px; font-size: 12.5px; } }
+
+/* ------------------------------------------------ Follow a person + "New from people you follow" */
+.sd-follow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
+.sd-follow .sd-note { flex: 1 1 180px; }
+.sd-pnews { display: flex; flex-direction: column; margin: 14px 0 18px; }
+.sd-pnews-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 16px 8px; }
+.sd-pnews-empty { padding: 0 16px 14px; }
+.sd-pnews-row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.sd-pnews-row img, .sd-pnews-row .ph { flex: none; width: 40px; height: 60px; border-radius: 6px; object-fit: cover; background: var(--line); }
+.sd-pnews-row .ph { display: grid; place-items: center; font-weight: 700; color: var(--text-dim); }
+.sd-pnews-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sd-pnews-name { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.sd-pnews-who { font-size: 12.5px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-pnews-when { font-size: 12px; color: var(--teal); }
+.sd-pnews-when.up { color: var(--amber); }
+.sd-pnews-acts { flex: none; display: flex; align-items: center; gap: 6px; }
+.sd-pnews-more { align-self: flex-start; margin: 4px 16px 12px; }
+@media (max-width: 440px) {
+  .sd-pnews-row { flex-wrap: wrap; row-gap: 8px; }
+  .sd-pnews-body { flex: 1 1 calc(100% - 56px); }
+  .sd-pnews-acts { margin-left: 52px; }
+}

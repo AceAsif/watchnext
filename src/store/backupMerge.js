@@ -19,6 +19,7 @@ import { mergeEpRatings } from './epRatings.js';
 import { fillGoals } from '../components/goalsLogic.js';
 import { fillHidden } from '../components/hiddenLogic.js';
 import { fillLists } from '../components/listsLogic.js';
+import { fillPeople } from '../components/peopleLogic.js';
 import { mergeLog, sameLog } from '../components/hitLogic.js';
 
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -116,7 +117,7 @@ export function mergeBackup(local, backup) {
 
   const shows = { ...local.shows };
   const touchedIds = [];
-  const summary = { showsAdded: 0, showsUpdated: 0, watchesAdded: 0, moviesAdded: 0, notesAdded: 0, goalsAdded: 0, hiddenAdded: 0, listsAdded: 0, skipped: 0 };
+  const summary = { showsAdded: 0, showsUpdated: 0, watchesAdded: 0, moviesAdded: 0, notesAdded: 0, goalsAdded: 0, hiddenAdded: 0, listsAdded: 0, peopleAdded: 0, skipped: 0 };
 
   for (const [id, back] of Object.entries(backup.shows)) {
     if (BAD_KEYS.has(id) || !isObj(back)) {
@@ -210,10 +211,13 @@ export function mergeBackup(local, backup) {
   // your own lists: add the ones this device has never had (never overwrites one you have)
   const li = fillLists(local.lists, backup.lists);
   summary.listsAdded = li.added;
+  // people you follow: add the ones this device has no record of (never overwrites)
+  const pe = fillPeople(local.people, backup.people);
+  summary.peopleAdded = pe.added;
 
   // Discover's hit-rate log: every title either side has seen, earliest date kept (never shrinks)
   const seenLog = mergeLog(local.seenLog, backup.seenLog);
   const seenChanged = !sameLog(seenLog, local.seenLog);
 
-  return { shows, movies, goals: g.goals, goalsChanged: g.added > 0, hidden: h.hidden, hiddenChanged: h.added > 0, lists: li.lists, listsChanged: li.added > 0, seenLog, seenChanged, touchedIds, moviesChanged, summary };
+  return { shows, movies, goals: g.goals, goalsChanged: g.added > 0, hidden: h.hidden, hiddenChanged: h.added > 0, lists: li.lists, listsChanged: li.added > 0, people: pe.people, peopleChanged: pe.added > 0, seenLog, seenChanged, touchedIds, moviesChanged, summary };
 }

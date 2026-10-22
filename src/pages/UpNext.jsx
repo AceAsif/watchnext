@@ -13,6 +13,7 @@ import {
 import { hasKey, fetchUpcomingEpisodes } from '../api/tmdb.js';
 import CalendarGrid from '../components/CalendarGrid.jsx';
 import TonightSheet from '../components/TonightSheet.jsx';
+import PeopleNews from '../components/PeopleNews.jsx';
 import { Chevron } from '../components/ui.jsx';
 import { Poster, EpisodeRow } from '../components/AgendaEpisode.jsx';
 import { localISODate } from '../components/showLogic.js';
@@ -241,6 +242,9 @@ export default function UpNext({ openShow }) {
           dates.
         </Notice>
       )}
+
+      {/* New films / shows from people you follow (hidden when you follow nobody) */}
+      <PeopleNews state={state} openShow={openShow} />
 
       {/* Phone: the two sections stack. Desktop: side by side (ui.css). */}
       <div className={'sd-cols sd-cols-un' + (solo ? ' sd-cols-solo' : '')}>

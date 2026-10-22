@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { img, tvDetailsWithCredits, movieDetailsWithCredits, personCombinedCredits } from '../api/tmdb.js';
 import { Avatar, Chevron, Sheet } from './ui.jsx';
 import { summarizeCredits, summarizeMovieCredits, mergeCredits } from './creditsLogic.js';
+import { useStore } from '../store/useStore.js';
+import { followPerson } from '../store/db.js';
+import { isFollowing } from './peopleLogic.js';
 
 // Cast & crew card for the show page and (kind="movie") the movie sheet.
 //   card:   avatar stack + first names → "See all" cast sheet
@@ -10,6 +13,26 @@ import { summarizeCredits, summarizeMovieCredits, mergeCredits } from './credits
 //   sheets: cast grid, crew list, and (tapping anyone) that person's other
 //           titles with anything already in the library flagged.
 // One TMDB request loads details + credits together (see tvDetailsWithCredits).
+
+// ---------------------------------------------------------------- follow a person
+// Following someone puts their new films and shows on Up Next ("New from people you follow").
+function FollowRow({ person }) {
+  const state = useStore();
+  const on = isFollowing(state.people, person.id);
+  return (
+    <div className="sd-follow" data-testid="follow-row">
+      <span className="sd-note">{on ? 'You’ll see their new films and shows on Up Next.' : 'Follow to see their new films and shows on Up Next.'}</span>
+      <button
+        type="button"
+        className={'sd-btn sm' + (on ? ' teal' : ' primary')}
+        aria-pressed={on}
+        onClick={() => followPerson({ id: person.id, name: person.name, profile: person.profile || null }, !on)}
+      >
+        {on ? 'Following ✓' : 'Follow'}
+      </button>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------- person sheet
 function PersonSheet({ person, excludeTvId, excludeMovieId, trackedTv, trackedMovie, onClose }) {
@@ -30,6 +53,7 @@ function PersonSheet({ person, excludeTvId, excludeMovieId, trackedTv, trackedMo
 
   return (
     <Sheet open title={person.name} subtitle={person.sub || 'Other titles'} onClose={onClose}>
+      <FollowRow person={person} />
       {err && <p className="muted">Couldn’t load credits: {err}</p>}
       {!credits && !err && <p className="muted">Loading credits…</p>}
       {credits && credits.length === 0 && <p className="muted">No other titles found.</p>}
@@ -106,7 +130,7 @@ export default function CastCrew({ tmdbId, trackedTv, trackedMovie, kind = 'tv',
     };
   }, [tmdbId, kind]);
 
-  const openPerson = (p, sub) => setPerson({ id: p.id, name: p.name, sub: sub || '' });
+  const openPerson = (p, sub) => setPerson({ id: p.id, name: p.name, profile: p.profile || null, sub: sub || '' });
 
   // ---- loading / error: keep the card's footprint so the page doesn't jump
   if (err || !data) {
