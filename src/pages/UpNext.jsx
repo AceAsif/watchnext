@@ -6,6 +6,8 @@ import {
   lastWatchDate,
   setShowUpcoming,
   markEpisode,
+  markRewatchEpisode,
+  replaceShow,
   episodesLeft,
   hoursLeft,
   paceFinish,
@@ -17,6 +19,7 @@ import PeopleNews from '../components/PeopleNews.jsx';
 import { Chevron } from '../components/ui.jsx';
 import { Poster, EpisodeRow } from '../components/AgendaEpisode.jsx';
 import { localISODate } from '../components/showLogic.js';
+import { roundLabel } from '../components/rewatchModeLogic.js';
 import {
   buildUpNext,
   groupAgenda,
@@ -70,7 +73,7 @@ function Notice({ children, accent }) {
 }
 
 // ---------------------------------------------------------------- continue row
-function ContinueRow({ id, show, next, today, first, onOpen, onMark }) {
+function ContinueRow({ id, show, next, today, first, onOpen, onMark, rewatch = false }) {
   const left = episodesLeft(show);
   const hrs = hoursLeft(show);
   const finish = paceFinish(show);
@@ -84,8 +87,9 @@ function ContinueRow({ id, show, next, today, first, onOpen, onMark }) {
     line2 = (
       <>
         <span className="sd-mono" style={{ color: 'var(--amber)' }}>{codeOf(next.season, next.episode)}</span>
-        {left > 0 ? ` · ${left} to go` : ''}
-        {left > 0 && hrs > 0 ? ` · ~${hrs} h` : ''}
+        {!rewatch && left > 0 ? ` · ${left} to go` : ''}
+        {!rewatch && left > 0 && hrs > 0 ? ` · ~${hrs} h` : ''}
+        {rewatch ? ' · rewatching' : ''}
       </>
     );
   } else {
@@ -98,7 +102,9 @@ function ContinueRow({ id, show, next, today, first, onOpen, onMark }) {
     );
   }
   // Line 3: the pace-based finish estimate, else the last episode watched.
-  const line3 = finish
+  const line3 = rewatch
+    ? `↻ ${roundLabel(show, today)}`
+    : finish
     ? `≈ done by ${shortDate(finish.date, today)} at your pace`
     : next && lastCode
       ? `Last watched ${lastCode}`
@@ -123,7 +129,7 @@ function ContinueRow({ id, show, next, today, first, onOpen, onMark }) {
         <button
           className="sd-markbtn"
           aria-label={`Mark ${show.name} ${codeOf(next.season, next.episode)} watched`}
-          onClick={() => onMark(id, show, next)}
+          onClick={() => onMark(id, show, next, rewatch)}
         >
           <CheckIcon />
         </button>
@@ -162,22 +168,29 @@ export default function UpNext({ openShow }) {
   const empty = Object.keys(state.shows).length === 0;
   const upcomingCount = items.length;
 
-  function markNext(id, show, next) {
+  function markNext(id, show, next, rewatch = false) {
     // The same button points at the following episode the instant this one is
     // marked, so ignore a fast double-tap rather than mark two episodes.
     const now = Date.now();
     if (isRepeatTap(lastTap.current[id], now)) return;
     lastTap.current[id] = now;
 
-    markEpisode(id, next.season, next.episode, show.runtimeMin, true);
-    setToast({ id, name: show.name, season: next.season, episode: next.episode, runtimeMin: show.runtimeMin });
+    if (rewatch) {
+      const before = state.shows[id];
+      const r = markRewatchEpisode(id, next.season, next.episode, true, show.runtimeMin);
+      setToast({ id, name: show.name, season: next.season, episode: next.episode, before, finished: r.finished });
+    } else {
+      markEpisode(id, next.season, next.episode, show.runtimeMin, true);
+      setToast({ id, name: show.name, season: next.season, episode: next.episode, runtimeMin: show.runtimeMin });
+    }
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => alive.current && setToast(null), TOAST_MS);
   }
 
   function undo() {
     if (!toast) return;
-    markEpisode(toast.id, toast.season, toast.episode, toast.runtimeMin, false);
+    if (toast.before) replaceShow(toast.id, toast.before); // a rewatch tick: put the show back as it was
+    else markEpisode(toast.id, toast.season, toast.episode, toast.runtimeMin, false);
     // Re-marking right after an undo is deliberate, so don't let the
     // double-tap guard swallow it.
     delete lastTap.current[toast.id];
@@ -263,8 +276,9 @@ export default function UpNext({ openShow }) {
             )}
           </div>
           <div className="sd-card">
-            {contShown.map(({ id, show, next }, i) => (
+            {contShown.map(({ id, show, next, rewatch }, i) => (
               <ContinueRow
+                rewatch={!!rewatch}
                 key={id}
                 id={id}
                 show={show}
@@ -361,7 +375,7 @@ export default function UpNext({ openShow }) {
         <div className="sd-toast" role="status">
           <span className="sd-ell" style={{ flex: 1 }}>
             <span className="sd-mono" style={{ color: 'var(--amber)' }}>{codeOf(toast.season, toast.episode)}</span>{' '}
-            marked watched · {toast.name}
+            {toast.finished ? 'rewatch finished 🎉' : toast.before ? 'rewatched' : 'marked watched'} · {toast.name}
           </span>
           <button className="sd-linkbtn" style={{ height: 44, padding: '0 14px', fontSize: 14 }} onClick={undo}>
             Undo

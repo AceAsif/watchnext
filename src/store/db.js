@@ -9,6 +9,8 @@ import { setGoal, mergeGoals, sameGoals } from '../components/goalsLogic.js';
 import { setHidden, mergeHidden, sameHidden } from '../components/hiddenLogic.js';
 import * as Lists from '../components/listsLogic.js';
 import * as People from '../components/peopleLogic.js';
+import * as Rewatch from '../components/rewatchModeLogic.js';
+import { localISODate } from '../components/showLogic.js';
 import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
 import { cleanTombs, lostKeys, addTombs, liftPresent } from './movieTombsLogic.js';
 
@@ -312,12 +314,9 @@ export function lastWatched(show) {
   return best; // [season, episode] or null
 }
 
+// Includes episodes ticked in a rewatch round, so a show you're rewatching counts as recent.
 export function lastWatchDate(show) {
-  let latest = null;
-  for (const w of Object.values(show.watched || {})) {
-    if (w.at && (!latest || w.at > latest)) latest = w.at;
-  }
-  return latest;
+  return Rewatch.latestWatch(show);
 }
 
 // --- "time left to finish" helpers (pure functions of a show record) ---
@@ -710,6 +709,39 @@ export function restoreWatchDates(id, prev) {
 // "Watched <date>" on the episode row reflects the latest viewing.
 // Returns a copy of the entry as it was BEFORE this watch (null when there was none), so the
 // caller can offer Undo through undoEpisodeRewatch.
+// ---------------------------------------------------------------------------
+// Rewatch mode (components/rewatchModeLogic.js): watch a show again from the start, keeping
+// the dates you first watched each episode.
+// Put a show record back exactly as it was (Undo for a rewatch tick, which may also have ended the round).
+export function replaceShow(id, record) {
+  if (!record || !state.shows[id]) return;
+  update((s) => { s.shows[id] = record; });
+  markShowDirty(id);
+}
+export function startRewatch(id) {
+  update((s) => { if (s.shows[id]) s.shows[id] = Rewatch.startRewatch(s.shows[id], new Date().toISOString()); });
+  markShowDirty(id);
+}
+export function endRewatch(id) {
+  update((s) => { if (s.shows[id]) s.shows[id] = Rewatch.endRewatch(s.shows[id], new Date().toISOString()); });
+  markShowDirty(id);
+}
+// Tick / untick an episode in the round. When that completes the round, it ends by itself.
+// Returns { finished: true } when it did.
+export function markRewatchEpisode(id, season, episode, on = true, runtimeMin = null) {
+  let finished = false;
+  update((s) => {
+    const show = s.shows[id];
+    if (!show) return;
+    const now = new Date().toISOString();
+    let next = Rewatch.markInRound(show, season, episode, on, now, runtimeMin);
+    if (on && Rewatch.roundComplete(next, localISODate())) { next = Rewatch.endRewatch(next, now); finished = true; }
+    s.shows[id] = next;
+  });
+  markShowDirty(id);
+  return { finished };
+}
+
 export function logEpisodeRewatch(id, season, episode, runtimeMin) {
   let prev = null;
   update((s) => {

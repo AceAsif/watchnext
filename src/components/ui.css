@@ -1937,3 +1937,9 @@ button.sd-coll-prow { cursor: pointer; }
   .sd-pnews-body { flex: 1 1 calc(100% - 56px); }
   .sd-pnews-acts { margin-left: 52px; }
 }
+
+/* ------------------------------------------------ Rewatch mode (show page) */
+.sd-rwbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(86, 200, 181, 0.45); background: rgba(86, 200, 181, 0.08); }
+.sd-rwbar-txt { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text-dim); }
+.sd-rwbar-txt b { font-size: 15px; color: var(--teal); }
+.sd-rwpast { font-size: 12px; color: var(--teal); }

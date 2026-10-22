@@ -15,6 +15,9 @@ import {
   setShowRating,
   setEpisodeRating,
   setFavourite,
+  startRewatch,
+  endRewatch,
+  markRewatchEpisode,
   setShowPlatform,
   setShowProviders,
   deleteShow,
@@ -43,6 +46,7 @@ import { ratingOf } from '../store/epRatings.js';
 import { starLabel } from '../components/starsLogic.js';
 import EpisodeRatings from '../components/EpisodeRatings.jsx';
 import Stars from '../components/Stars.jsx';
+import { isRewatching, doneMap, rewatchNext, roundLabel, rewatchLog } from '../components/rewatchModeLogic.js';
 import { ListsRow } from '../components/ListPicker.jsx';
 import { itemFromShow } from '../components/listsLogic.js';
 import AnimeSheet from '../components/AnimeSheet.jsx';
@@ -128,7 +132,18 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
   const barColor = done ? 'var(--teal)' : 'var(--amber)';
   const watched = show.watched || {};
   const today = isoToday();
-  const fold = eps ? leadingWatchedFold(eps.map((e) => e.episode_number), watched, season.n) : 0;
+  // Rewatch mode: ticks show THIS round's progress; the first watch dates stay as they are.
+  const rw = isRewatching(show);
+  const rdone = doneMap(show);
+  const fold = eps ? leadingWatchedFold(eps.map((e) => e.episode_number), rw ? rdone : watched, season.n) : 0;
+  const roundSeasonDone = rw && !!eps && eps.length > 0 && eps.every((ep) => rdone[epKey(season.n, ep.episode_number)]);
+  const markSeasonInRound = (on) => {
+    for (const ep of eps || []) {
+      const k = epKey(season.n, ep.episode_number);
+      if (on && !rdone[k] && (watched[k] || !ep.air_date || ep.air_date <= today)) markRewatchEpisode(id, season.n, ep.episode_number, true, ep.runtime);
+      if (!on && rdone[k]) markRewatchEpisode(id, season.n, ep.episode_number, false);
+    }
+  };
 
   return (
     <div className="sd-sep" style={{ background: open ? 'var(--bg-card)' : 'transparent' }}>
@@ -177,12 +192,18 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
 
       {open && eps && !upcoming && eps.length > 0 && (
         <div className="sd-ep" style={{ minHeight: 44 }}>
-          <button
-            className="sd-linkbtn"
-            onClick={() => (done ? markSeason(id, season.n, eps, false) : setWhenOpen(true))}
-          >
-            {done ? 'Unmark season' : 'Mark season watched'}
-          </button>
+          {rw ? (
+            <button className="sd-linkbtn" onClick={() => markSeasonInRound(!roundSeasonDone)}>
+              {roundSeasonDone ? 'Untick season in this rewatch' : 'Mark season rewatched'}
+            </button>
+          ) : (
+            <button
+              className="sd-linkbtn"
+              onClick={() => (done ? markSeason(id, season.n, eps, false) : setWhenOpen(true))}
+            >
+              {done ? 'Unmark season' : 'Mark season watched'}
+            </button>
+          )}
         </div>
       )}
       {whenOpen && (
@@ -216,14 +237,17 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
         eps.slice(expandDone ? 0 : fold).map((ep) => {
           const k = epKey(season.n, ep.episode_number);
           const w = watched[k];
-          const on = !!w;
+          const inRound = rw && !!rdone[k];
+          const on = rw ? inRound : !!w;
           const n = w && w.n ? w.n : 0;
           const isNext = !!next && next.season === season.n && next.episode === ep.episode_number;
           const code = `S${season.n}E${ep.episode_number}`;
           let sub = null;
-          if (on && w.at) {
-            sub = { text: `Watched ${fmtDate(w.at.slice(0, 10))}${n > 1 ? ` · ${n}×` : ''}`, color: 'var(--text-dim)' };
-          } else if (!on && ep.air_date && ep.air_date > today) {
+          if (w && w.at && !(w.firstInRewatch && inRound)) {
+            sub = { text: `Watched ${fmtDate(w.at.slice(0, 10))}${n > 1 ? ` · ${n}×` : ''}${inRound ? ` · rewatched ${fmtDate(localISODate(new Date(rdone[k])))}` : ''}`, color: 'var(--text-dim)' };
+          } else if (inRound) {
+            sub = { text: `Watched ${fmtDate(localISODate(new Date(rdone[k])))}`, color: 'var(--text-dim)' };
+          } else if (!w && ep.air_date && ep.air_date > today) {
             sub = { text: `Airs ${fmtDate(ep.air_date)}`, color: 'var(--amber)' };
           }
           const note = (show.notes || {})[k];
@@ -273,7 +297,7 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
                   )}
                 </button>
               )}
-              {on && (
+              {on && !rw && (
                 <button
                   className="sd-rewatch"
                   title={n > 1 ? `Watched ${n} times · tap to log another watch` : 'Log another watch of this episode'}
@@ -291,8 +315,11 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
               <button
                 className={'sd-check' + (on ? ' on' : isNext ? ' next' : '')}
                 aria-pressed={on}
-                aria-label={`Mark ${code} ${on ? 'unwatched' : 'watched'}`}
-                onClick={() => { resumes(!on); if (!on) added(1); markEpisode(id, season.n, ep.episode_number, ep.runtime, !on); }}
+                aria-label={rw ? `${on ? 'Untick' : 'Mark'} ${code} ${on ? 'in this rewatch' : 'rewatched'}` : `Mark ${code} ${on ? 'unwatched' : 'watched'}`}
+                onClick={() => {
+                  if (rw) { markRewatchEpisode(id, season.n, ep.episode_number, !on, ep.runtime); return; }
+                  resumes(!on); if (!on) added(1); markEpisode(id, season.n, ep.episode_number, ep.runtime, !on);
+                }}
               >
                 <span>{on && <CheckIcon size={16} w={3} />}</span>
               </button>
@@ -500,7 +527,9 @@ export default function ShowDetail({ id, onBack }) {
   const total = show.totalEpisodes || 0;
   const pct = total ? Math.min(100, Math.round((seen / total) * 100)) : 0;
   const finished = total > 0 && seen >= total;
-  const next = nextToMark(show, today);
+  const rewatching = isRewatching(show);
+  const next = rewatching ? rewatchNext(show, today) : nextToMark(show, today);
+  const pastRounds = rewatchLog(show);
   const platform = platformById(show.platform);
   // What was cached for a different region (the Region setting changed) is not shown as this region's answer.
   const stream = recordRegion(show) === region ? show : { ...show, providers: [], providersFree: [], providersSynced: undefined, providersLink: '' };
@@ -605,18 +634,33 @@ export default function ShowDetail({ id, onBack }) {
               </span>
             )}
           </div>
-          {finish && (
+          {finish && !rewatching && (
             <div className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>
               ≈ finish by {fmtDate(finish.date)} at your recent pace
             </div>
           )}
         </div>
 
+        {rewatching && (
+          <div className="sd-rwbar" data-testid="rewatch-bar">
+            <span className="sd-rwbar-txt"><b>↻ {roundLabel(show, today)}</b><span>Your first watch dates are kept.</span></span>
+            <button type="button" className="sd-btn sm" onClick={() => { if (confirm('End this rewatch? What you have rewatched so far is kept.')) endRewatch(id); }}>End rewatch</button>
+          </div>
+        )}
+        {!rewatching && pastRounds.length > 0 && (
+          <div className="sd-mono sd-rwpast" data-testid="rewatch-past">
+            ↻ Rewatched {pastRounds.length}× · last {pastRounds[pastRounds.length - 1].eps} episodes, finished {fmtDate(localISODate(new Date(pastRounds[pastRounds.length - 1].finished)))}
+          </div>
+        )}
+
         {next && (
           <button
             className="sd-btn primary"
             style={{ width: '100%', height: 52, fontSize: 15 }}
-            onClick={() => { noteResumed(); noteAdded(1); markEpisode(id, next.season, next.episode, null, true); }}
+            onClick={() => {
+              if (rewatching) { markRewatchEpisode(id, next.season, next.episode, true, null); return; }
+              noteResumed(); noteAdded(1); markEpisode(id, next.season, next.episode, null, true);
+            }}
           >
             <CheckIcon size={18} />
             <span>
@@ -624,7 +668,7 @@ export default function ShowDetail({ id, onBack }) {
               <span className="sd-mono" style={{ fontWeight: 600 }}>
                 S{pad2(next.season)}·E{pad2(next.episode)}
               </span>{' '}
-              watched
+              {rewatching ? 'rewatched' : 'watched'}
             </span>
           </button>
         )}
@@ -936,6 +980,19 @@ export default function ShowDetail({ id, onBack }) {
               {show.dropped === true ? 'Resume watching' : 'Drop this show'}
             </span>
           </button>
+          {(rewatching || seen > 0) && (
+            <button
+              className="sd-row sd-sep"
+              data-testid="rewatch-row"
+              onClick={() => {
+                setSheet(null);
+                if (rewatching) { if (confirm('End this rewatch? What you have rewatched so far is kept.')) endRewatch(id); }
+                else startRewatch(id);
+              }}
+            >
+              <span style={{ flexGrow: 1, color: 'var(--sd-text-2)' }}>{rewatching ? 'End this rewatch' : 'Start a rewatch (keeps your first watch dates)'}</span>
+            </button>
+          )}
           {watchedList(show).length > 0 && (
             <button className="sd-row sd-sep" data-testid="fix-dates-row" onClick={() => { setSheet(null); setFixOpen(true); }}>
               <span style={{ flexGrow: 1, color: 'var(--sd-text-2)' }}>Fix watch dates…</span>

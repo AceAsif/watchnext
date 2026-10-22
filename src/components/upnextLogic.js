@@ -3,6 +3,7 @@
 // with plain node. The two store helpers it needs are passed in.
 
 import { nextToMark } from './showLogic.js';
+import { isRewatching, rewatchNext } from './rewatchModeLogic.js';
 
 export const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -90,7 +91,11 @@ export function buildUpNext(entries, today, h) {
 
     const seen = h.watchedCount(show);
     const total = show.totalEpisodes;
-    if (seen > 0 && (!total || seen < total)) {
+    if (isRewatching(show)) {
+      // Rewatching: the next episode of the ROUND, even on a show you've finished.
+      const next = rewatchNext(show, today);
+      if (next) cont.push({ id, show, next, rewatch: true });
+    } else if (seen > 0 && (!total || seen < total)) {
       const next = nextToMark(show, today);
       const hasSeasons = (show.seasons || []).some((se) => se.n >= 1 && se.count > 0);
       if (next || !hasSeasons) cont.push({ id, show, next });
