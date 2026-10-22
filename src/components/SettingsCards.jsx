@@ -6,6 +6,7 @@ import { orphanIntro, orphanMeta, deleteAllIntro } from './settingsLogic.js';
 import { ServicesPicker, FREE_NOTE } from './ServicesUI.jsx';
 import { REGIONS } from './regionLogic.js';
 import { duplicatesIntro, dupTag, dayLabel, removeHint } from './duplicateMoviesLogic.js';
+import { status as activityStatus, whenText } from './activityLogic.js';
 import { WIPE_WORD, confirmOk, wipeIntro, wipeEffects, wipeBackupLine } from '../store/wipeLogic.js';
 
 // The Settings cards (Claude Design, Direction A). Purely presentational: the
@@ -22,6 +23,7 @@ const I = {
   cloud: <Svg><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 7.97L17 18z" /></Svg>,
   key: <Svg><circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M16 7l3 3" /></Svg>,
   upload: <Svg><path d="M12 16V4M7 9l5-5 5 5M4 20h16" /></Svg>,
+  clock: <Svg><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>,
   broom: <Svg><path d="M4 20l5-9 7 4-5 9zM13 5l2-3 3 5" /></Svg>,
   drive: <Svg><path d="M4 8l2-4h12l2 4v10H4zM4 8h16M8 14h.01" /></Svg>,
   lock: <Svg size={15}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></Svg>,
@@ -354,6 +356,64 @@ export function HiddenCard({ rows, onShowAgain }) {
         ))}
       </ul>
     </SetCard>
+  );
+}
+
+// ---------------------------------------------------------------- Activity log with Undo
+const ACT_PREVIEW = 8;
+const KIND_LABEL = { show: 'Show', movie: 'Movie', list: 'List', hidden: 'Discover' };
+export function ActivityCard({ log, state, onUndo }) {
+  const [all, setAll] = useState(false);
+  const rows = all ? log : log.slice(0, ACT_PREVIEW);
+  return (
+    <SetCard icon={I.clock} label="Activity" title="Your recent changes" pill={log.length ? <Pill tone="teal">{log.length}</Pill> : null} id="activity">
+      <p className="sd-setp">
+        Your last 50 changes, newest first. Undo puts that one change back exactly as it was. Kept on this device only;
+        an undo syncs to your other devices like any change.
+      </p>
+      {log.length === 0 ? (
+        <p className="sd-setp" data-testid="activity-empty">Nothing yet. When you tick an episode, rate something or delete a title, it shows up here.</p>
+      ) : (
+        <ul className="sd-orphs sd-act" data-testid="activity">
+          {rows.map((e) => {
+            const st = activityStatus(e, state);
+            return (
+              <li key={e.id} data-entry={e.id} data-status={st}>
+                <div className="who">
+                  <div className="nm" title={e.title}>{e.title}</div>
+                  <div className="mt">{e.what}</div>
+                  <div className="mt sd-act-when">{whenText(e.at)} · {KIND_LABEL[e.kind] || 'Change'}</div>
+                </div>
+                {st === 'undone' ? (
+                  <span className="sd-act-done">Undone</span>
+                ) : (
+                  <button type="button" className="sd-setbtn" aria-label={`Undo ${e.what} — ${e.title}`} onClick={() => onUndo(e, st)}>Undo</button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {log.length > ACT_PREVIEW && (
+        <button type="button" className="sd-setbtn sd-act-more" onClick={() => setAll((v) => !v)}>{all ? 'Show fewer' : `Show all ${log.length}`}</button>
+      )}
+    </SetCard>
+  );
+}
+
+// Undo a change you changed again later: say what else goes back, then ask.
+export function UndoAnywayDialog({ entry, onConfirm, onCancel }) {
+  return (
+    <Sheet open title="Undo this change?" role="alertdialog" variant="confirm" onClose={onCancel} action={<span />}>
+      <p className="sd-setp" data-testid="undo-anyway">
+        You changed <b>{entry.title}</b> again after “{entry.what}”. Undoing it puts back how it was before this change,
+        so your later change to the same thing goes back too.
+      </p>
+      <div className="sd-confirm-acts">
+        <button type="button" className="sd-setbtn solid-danger" onClick={onConfirm}>Undo anyway</button>
+        <button type="button" className="sd-setbtn" autoFocus onClick={onCancel}>Cancel</button>
+      </div>
+    </Sheet>
   );
 }
 

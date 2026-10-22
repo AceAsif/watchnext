@@ -208,7 +208,7 @@ t('Stats completion keeps dropped shows out of Finished / Watching / Not started
   assert.match(s, /if \(show\.dropped === true\) dropped\+\+;[^\n]*\n\s*else if \(total && seen >= total\) finished\+\+;/);
 });
 t('db.js: setShowDropped writes explicit booleans and null (never undefined) and marks the show dirty', () => {
-  const s = src('store/db.js'); const i = s.indexOf('export function setShowDropped');
+  const s = src('store/db.js'); const i = s.indexOf('function setShowDropped__raw');
   const body = s.slice(i, s.indexOf('\n}\n', i));
   assert.match(body, /dropped: !!dropped/); assert.match(body, /: null/); assert.match(body, /markShowDirty\(id\)/); assert.doesNotMatch(body, /undefined/);
 });

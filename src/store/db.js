@@ -13,6 +13,7 @@ import * as Rewatch from '../components/rewatchModeLogic.js';
 import { localISODate } from '../components/showLogic.js';
 import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
 import { cleanTombs, lostKeys, addTombs, liftPresent } from './movieTombsLogic.js';
+import * as Activity from '../components/activityLogic.js';
 
 // Simple localStorage-backed store with a subscribe API.
 // Single-user app, so no backend needed: everything lives in the browser.
@@ -219,6 +220,7 @@ export function clearTombstone(id) {
 // tombstones record what the PREVIOUS account deleted; left in place they would delete the
 // same shows from the new account's cloud copy. Returns how many were cleared.
 export function clearAllTombstones() {
+  clearActivity(); // the log belongs to the previous account
   const n = tombstones.size + wipeTombs.size + movieTombs.length;
   if (movieTombs.length) { movieTombs = []; persistMovieTombs(); }
   if (tombstones.size) { tombstones = new Set(); persistTombstones(); }
@@ -402,7 +404,7 @@ export function setTmdbKey(key) {
   });
 }
 
-export function toggleFollow(id) {
+function toggleFollow__raw(id) {
   update((s) => {
     const show = s.shows[id];
     if (show) s.shows[id] = { ...show, followed: !show.followed };
@@ -416,7 +418,7 @@ export function toggleFollow(id) {
 // (null, never undefined — Firestore rejects undefined). Watch history,
 // ratings and notes are untouched, and the show stays in the library.
 // `at` (optional ISO string) lets Undo put the ORIGINAL drop date back.
-export function setShowDropped(id, dropped, at) {
+function setShowDropped__raw(id, dropped, at) {
   update((s) => {
     const show = s.shows[id];
     if (!show) return;
@@ -436,7 +438,7 @@ const resumePatch = (show) => (show.dropped === true ? RESUME : {});
 // Favourite a show (♥): it stays at the top of Shows and of Up Next's "Continue watching".
 // Rides the show's own sync doc. Never stores `favourite: false` / undefined: removing it
 // deletes the field.
-export function setFavourite(id, on) {
+function setFavourite__raw(id, on) {
   update((s) => {
     const show = s.shows[id];
     if (!show) return;
@@ -446,7 +448,7 @@ export function setFavourite(id, on) {
   markShowDirty(id);
 }
 
-export function setShowRating(id, raw) {
+function setShowRating__raw(id, raw) {
   // rating: 0 or 0.5–5 in half steps (like movies and episodes). 0 clears it. ratedAt records when you rated it (for the
   // "Recently rated" list). Rides the existing per-show sync doc.
   const rating = cleanRating(raw);
@@ -461,7 +463,7 @@ export function setShowRating(id, raw) {
   markShowDirty(id);
 }
 
-export function setShowPlatform(id, platform) {
+function setShowPlatform__raw(id, platform) {
   // platform: a PlatformPicker id, or '' to clear. Rides the per-show doc.
   update((s) => {
     const show = s.shows[id];
@@ -549,7 +551,7 @@ export function setShowAnime(id, anime) {
   markShowDirty(id);
 }
 
-export function deleteShow(id) {
+function deleteShow__raw(id) {
   // True delete: remove the record from local state now, and from Firestore on
   // the next sync flush (see cloud.js). Unlike unfollow, which only hides a
   // show, this leaves no lingering record behind on any device.
@@ -564,7 +566,7 @@ export function deleteShow(id) {
 // `followed` — a show can be queued without being in the library yet.
 // ---------------------------------------------------------------------------
 
-export function addShowToWatchlist(details) {
+function addShowToWatchlist__raw(details) {
   // details: TMDB /tv/{id} response. Same dedupe pattern as addShowFromTmdb:
   // if this show already exists (e.g. imported under a tvdb: key, or already
   // followed), flag the existing record instead of creating a duplicate.
@@ -591,7 +593,7 @@ export function addShowToWatchlist(details) {
   markShowDirty(id);
 }
 
-export function toggleWatchlist(id) {
+function toggleWatchlist__raw(id) {
   update((s) => {
     const show = s.shows[id];
     if (show) s.shows[id] = { ...show, watchlist: !show.watchlist };
@@ -599,7 +601,7 @@ export function toggleWatchlist(id) {
   markShowDirty(id);
 }
 
-export function startWatchingShow(id) {
+function startWatchingShow__raw(id) {
   // Promote a watchlist show into the library (Up Next / Shows tab).
   update((s) => {
     const show = s.shows[id];
@@ -608,7 +610,7 @@ export function startWatchingShow(id) {
   markShowDirty(id);
 }
 
-export function markEpisode(id, season, episode, runtimeMin, watched = true) {
+function markEpisode__raw(id, season, episode, runtimeMin, watched = true) {
   update((s) => {
     const show = s.shows[id];
     if (!show) return;
@@ -629,7 +631,7 @@ export function markEpisode(id, season, episode, runtimeMin, watched = true) {
 // date (`fixedAt`) so it beats a plain "now" stamp from another device when synced.
 const validIso = (s) => typeof s === 'string' && s !== '' && !isNaN(Date.parse(s));
 
-export function markSeason(id, season, episodes, watched = true, at) {
+function markSeason__raw(id, season, episodes, watched = true, at) {
   const when = watched && validIso(at) ? at : null;
   update((s) => {
     const show = s.shows[id];
@@ -658,7 +660,7 @@ export function markSeason(id, season, episodes, watched = true, at) {
 // Returns { key: previous values } for the entries it changed so the caller can offer
 // Undo. Every corrected entry is stamped `fixedAt`, which makes the correction win
 // over an older copy of the same episode on another device (see watchedMerge.js).
-export function setWatchDates(id, keys, at) {
+function setWatchDates__raw(id, keys, at) {
   const prev = {};
   if (!validIso(at)) return prev;
   update((s) => {
@@ -718,17 +720,17 @@ export function replaceShow(id, record) {
   update((s) => { s.shows[id] = record; });
   markShowDirty(id);
 }
-export function startRewatch(id) {
+function startRewatch__raw(id) {
   update((s) => { if (s.shows[id]) s.shows[id] = Rewatch.startRewatch(s.shows[id], new Date().toISOString()); });
   markShowDirty(id);
 }
-export function endRewatch(id) {
+function endRewatch__raw(id) {
   update((s) => { if (s.shows[id]) s.shows[id] = Rewatch.endRewatch(s.shows[id], new Date().toISOString()); });
   markShowDirty(id);
 }
 // Tick / untick an episode in the round. When that completes the round, it ends by itself.
 // Returns { finished: true } when it did.
-export function markRewatchEpisode(id, season, episode, on = true, runtimeMin = null) {
+function markRewatchEpisode__raw(id, season, episode, on = true, runtimeMin = null) {
   let finished = false;
   update((s) => {
     const show = s.shows[id];
@@ -742,7 +744,7 @@ export function markRewatchEpisode(id, season, episode, on = true, runtimeMin = 
   return { finished };
 }
 
-export function logEpisodeRewatch(id, season, episode, runtimeMin) {
+function logEpisodeRewatch__raw(id, season, episode, runtimeMin) {
   let prev = null;
   update((s) => {
     const show = s.shows[id];
@@ -781,7 +783,7 @@ export function undoEpisodeRewatch(id, season, episode, prev) {
   return done;
 }
 
-export function addShowFromTmdb(details) {
+function addShowFromTmdb__raw(details) {
   // details: TMDB /tv/{id} response
   // If a show with this TMDB id already exists (e.g. imported from TV Time
   // under a tvdb: key and synced), follow that record instead of duplicating.
@@ -871,7 +873,7 @@ export function applyRemoteGoals(remote) {
 // Discover's "Not interested": hide a suggested title (on=true) or show it again (on=false).
 // item: { kind: 'tv'|'movie', id, name, poster, year, g }. Stamped so the newest choice wins
 // between devices, like goals.
-export function setDiscoverHidden(item, on) {
+function setDiscoverHidden__raw(item, on) {
   update((s) => {
     s.hidden = setHidden(s.hidden, item, on, new Date().toISOString());
   });
@@ -901,15 +903,15 @@ function changeLists(fn) {
   return true;
 }
 // Returns the new list's id (null if the name is empty or you have too many lists).
-export function createList(name) {
+function createList__raw(name) {
   let id = null;
   changeLists((l, now) => { const r = Lists.createList(l, name, now); id = r.id; return r.lists; });
   return id;
 }
-export const renameList = (id, name) => changeLists((l, now) => Lists.renameList(l, id, name, now));
-export const deleteList = (id) => changeLists((l, now) => Lists.deleteList(l, id, now));
-export const addToList = (id, item) => changeLists((l, now) => Lists.addItem(l, id, item, now));
-export const removeFromList = (id, key) => changeLists((l, now) => Lists.removeItem(l, id, key, now));
+const renameList__raw = (id, name) => changeLists((l, now) => Lists.renameList(l, id, name, now));
+const deleteList__raw = (id) => changeLists((l, now) => Lists.deleteList(l, id, now));
+const addToList__raw = (id, item) => changeLists((l, now) => Lists.addItem(l, id, item, now));
+const removeFromList__raw = (id, key) => changeLists((l, now) => Lists.removeItem(l, id, key, now));
 export const moveInList = (id, key, dir) => changeLists((l, now) => Lists.moveItem(l, id, key, dir, now));
 
 // Lists that arrived from the cloud: per list the newer change wins. Returns true when this
@@ -1056,6 +1058,7 @@ export function importLetterboxd(entries) {
 }
 
 export function resetAll() {
+  clearActivity();
   state = empty();
   if (movieTombs.length) { movieTombs = []; persistMovieTombs(); }
   commit();
@@ -1065,6 +1068,7 @@ export function resetAll() {
 // keep this device's own settings (its TMDB key), and drop any queued uploads so
 // nothing stale is pushed back up. Tombstones are left alone.
 export function wipeLibrary() {
+  clearActivity();
   state = { ...empty(), settings: state.settings };
   commit();
   dirtyShows = new Set();
@@ -1088,7 +1092,7 @@ export function wipeLibrary() {
 // exactly as before.
 export const movieStatus = (m) => m.status || 'watched';
 
-export function addMovieWatched(details, force = false) {
+function addMovieWatched__raw(details, force = false) {
   // details: TMDB /movie/{id} response
   // force = true logs another watch (a rewatch) as its own dated entry.
   update((s) => {
@@ -1123,7 +1127,7 @@ export function addMovieWatched(details, force = false) {
   markMoviesDirty();
 }
 
-export function addMovieToWatchlist(details) {
+function addMovieToWatchlist__raw(details) {
   // details: TMDB /movie/{id} response. Queued, not watched — no watchedAt.
   update((s) => {
     const already = s.movies.some((m) => m.tmdbId === details.id);
@@ -1145,7 +1149,7 @@ export function addMovieToWatchlist(details) {
   markMoviesDirty();
 }
 
-export function markPlannedMovieWatched(index) {
+function markPlannedMovieWatched__raw(index) {
   update((s) => {
     s.movies = s.movies.map((m, i) =>
       i === index
@@ -1159,7 +1163,7 @@ export function markPlannedMovieWatched(index) {
 // Episode note/reaction. Stored in show.notes (a map keyed "SxE"), NOT in
 // show.watched, so un-marking an episode never deletes what you wrote. An empty
 // note removes the key (and the whole map when it was the last) — never undefined.
-export function setEpisodeNote(showId, epKey, input) {
+function setEpisodeNote__raw(showId, epKey, input) {
   if (!state.shows[showId]) return;
   update((s) => {
     const show = s.shows[showId];
@@ -1170,7 +1174,7 @@ export function setEpisodeNote(showId, epKey, input) {
 // Episode rating (0.5–5, half stars; 0 removes it). Stored in show.epRatings keyed "SxE",
 // beside notes and NOT inside show.watched, so un-marking an episode keeps its rating.
 // `title` is remembered so "Best episode" can name it without asking TMDB again.
-export function setEpisodeRating(showId, epKey, rating, title) {
+function setEpisodeRating__raw(showId, epKey, rating, title) {
   if (!state.shows[showId]) return;
   update((s) => {
     const show = s.shows[showId];
@@ -1180,13 +1184,13 @@ export function setEpisodeRating(showId, epKey, rating, title) {
 }
 // Movie thoughts live on the watch entry itself (react + note), so each viewing
 // — including a rewatch — has its own. Rides the existing movies sync doc.
-export function setMovieNote(index, input) {
+function setMovieNote__raw(index, input) {
   update((s) => {
     s.movies = s.movies.map((m, i) => (i === index ? withMovieNote(m, input) : m));
   });
   markMoviesDirty();
 }
-export function setMovieRating(index, rating) {
+function setMovieRating__raw(index, rating) {
   // rating: 0–5. 0 clears it. ratedAt records when you rated it. Rides the
   // existing movies sync doc.
   update((s) => {
@@ -1199,7 +1203,7 @@ export function setMovieRating(index, rating) {
   markMoviesDirty();
 }
 
-export function setMoviePlatform(index, platform) {
+function setMoviePlatform__raw(index, platform) {
   update((s) => {
     s.movies = s.movies.map((m, i) =>
       i === index ? { ...m, platform: platform || '' } : m
@@ -1208,16 +1212,125 @@ export function setMoviePlatform(index, platform) {
   markMoviesDirty();
 }
 
-export function removeMovie(index) {
+function removeMovie__raw(index) {
   update((s) => {
     s.movies = s.movies.filter((_, i) => i !== index);
   });
   markMoviesDirty();
 }
 
-export function updateMovie(index, patch) {
+function updateMovie__raw(index, patch) {
   update((s) => {
     s.movies = s.movies.map((m, i) => (i === index ? { ...m, ...patch } : m));
   });
   markMoviesDirty();
 }
+
+// ---------------------------------------------------------------------------
+// Activity log with Undo (Settings → Activity). Rules in components/activityLogic.js.
+// Every change you make through the functions wrapped below is recorded (only what
+// changed); background refreshes, sync from other devices, imports and restores are not.
+// Kept on THIS device only. An undo is itself a normal change, so it syncs like any other.
+let activity = (() => {
+  try { return Activity.cleanLog(JSON.parse(localStorage.getItem(Activity.LOG_KEY))); } catch (e) { return []; }
+})();
+const activityListeners = new Set();
+function saveActivity() {
+  for (let tries = 0; tries < 4; tries++) {
+    try { localStorage.setItem(Activity.LOG_KEY, JSON.stringify(activity)); break; } catch (e) {
+      activity = activity.slice(0, Math.floor(activity.length / 2)); // storage full: keep the newer half
+    }
+  }
+  activityListeners.forEach((fn) => fn(activity));
+}
+export const getActivity = () => activity;
+export function subscribeActivity(fn) {
+  activityListeners.add(fn);
+  return () => activityListeners.delete(fn);
+}
+export function clearActivity() {
+  if (!activity.length) return;
+  activity = [];
+  saveActivity();
+}
+
+let logDepth = 0;
+// Wrap a change so it is recorded. `label` is the text ("Watched S1E2"), or a function of
+// (args, stateBefore, stateAfter, result). A change made inside another one is part of it.
+function logged(fn, label) {
+  return (...args) => {
+    if (logDepth) return fn(...args);
+    const before = state;
+    logDepth++;
+    let r;
+    try { r = fn(...args); } finally { logDepth--; }
+    if (state !== before) {
+      try {
+        const what = typeof label === 'function' ? label(args, before, state, r) : label;
+        const e = Activity.makeEntry(what, before, state, new Date().toISOString());
+        if (e) { activity = Activity.addEntry(activity, e); saveActivity(); }
+      } catch (err) {
+        console.error('Activity log failed', err); // never let the log break a change
+      }
+    }
+    return r;
+  };
+}
+
+// Undo one entry. force: undo even though you changed the same thing again later.
+// -> { ok: true } | { ok: false, reason: 'gone' | 'undone' | 'changed' }
+function undoActivity__raw(entryId, force = false) {
+  const e = activity.find((x) => x.id === entryId);
+  if (!e) return { ok: false, reason: 'gone' };
+  const st = Activity.status(e, state);
+  if (st === 'undone') return { ok: false, reason: 'undone' };
+  if (st === 'changed' && !force) return { ok: false, reason: 'changed' };
+  const r = Activity.undo(state, e, new Date().toISOString());
+  update((s) => { s.shows = r.shows; s.movies = r.movies; s.lists = r.lists; s.hidden = r.hidden; });
+  for (const id of r.touched.shows) {
+    if (r.touched.revived.has(id)) { clearTombstone(id); deletedShows.delete(id); }
+    markShowDirty(id);
+  }
+  for (const id of r.touched.deleted) markShowDeleted(id);
+  if (r.touched.movies) markMoviesDirty();
+  if (r.touched.lists) markListsDirty();
+  if (r.touched.hidden) markHiddenDirty();
+  return { ok: true };
+}
+export const undoActivity = logged(undoActivity__raw, ([id]) => {
+  const e = activity.find((x) => x.id === id);
+  return `Undid “${e ? e.what : 'a change'}”`;
+});
+export const toggleFollow = logged(toggleFollow__raw, ([id], b, a) => (a.shows[id] && a.shows[id].followed ? 'Followed' : 'Unfollowed'));
+export const setShowDropped = logged(setShowDropped__raw, ([, d]) => (d ? 'Dropped the show' : 'Back to watching'));
+export const setFavourite = logged(setFavourite__raw, ([, on]) => (on ? 'Added to favourites ♥' : 'Removed from favourites'));
+export const setShowRating = logged(setShowRating__raw, ([id], b, a) => (a.shows[id] && a.shows[id].rating ? `Rated ${a.shows[id].rating}★` : 'Removed your rating'));
+export const setShowPlatform = logged(setShowPlatform__raw, ([, p]) => (p ? 'Changed where you watch' : 'Cleared where you watch'));
+export const deleteShow = logged(deleteShow__raw, 'Deleted from library');
+export const addShowToWatchlist = logged(addShowToWatchlist__raw, 'Added to watchlist');
+export const toggleWatchlist = logged(toggleWatchlist__raw, ([id], b, a) => (a.shows[id] && a.shows[id].watchlist ? 'Added to watchlist' : 'Removed from watchlist'));
+export const startWatchingShow = logged(startWatchingShow__raw, 'Started watching');
+export const markEpisode = logged(markEpisode__raw, ([, s, e, , w = true]) => `${w ? 'Watched' : 'Unwatched'} ${Activity.epCode(s, e)}`);
+export const markSeason = logged(markSeason__raw, ([, s, eps, w = true]) => `${w ? 'Marked' : 'Unmarked'} season ${s}${eps && eps.length ? ` (${eps.length} episode${eps.length === 1 ? '' : 's'})` : ''}`);
+export const setWatchDates = logged(setWatchDates__raw, ([, keys]) => `Changed the watch date of ${(keys || []).length === 1 ? Activity.epCodeOfKey(keys[0]) : `${(keys || []).length} episodes`}`);
+export const startRewatch = logged(startRewatch__raw, 'Started a rewatch');
+export const endRewatch = logged(endRewatch__raw, 'Ended the rewatch');
+export const markRewatchEpisode = logged(markRewatchEpisode__raw, ([, s, e, on = true]) => (on ? `Rewatched ${Activity.epCode(s, e)}` : `Unticked ${Activity.epCode(s, e)} in the rewatch`));
+export const logEpisodeRewatch = logged(logEpisodeRewatch__raw, ([, s, e]) => `+1 watch of ${Activity.epCode(s, e)}`);
+export const addShowFromTmdb = logged(addShowFromTmdb__raw, 'Added to library');
+export const setDiscoverHidden = logged(setDiscoverHidden__raw, ([, on]) => (on ? 'Not interested (Discover)' : 'Shown again in Discover'));
+export const createList = logged(createList__raw, 'Created the list');
+export const renameList = logged(renameList__raw, 'Renamed the list');
+export const deleteList = logged(deleteList__raw, 'Deleted the list');
+export const addToList = logged(addToList__raw, ([, item]) => `Added ${(item && item.name) || 'a title'}`);
+export const removeFromList = logged(removeFromList__raw, ([id, key], b) => { const l = (b.lists || {})[id]; const it = l && (l.items || []).find((x) => x.key === key); return `Removed ${(it && it.name) || 'a title'}`; });
+export const addMovieWatched = logged(addMovieWatched__raw, 'Logged as watched');
+export const addMovieToWatchlist = logged(addMovieToWatchlist__raw, 'Added to watchlist');
+export const markPlannedMovieWatched = logged(markPlannedMovieWatched__raw, 'Watched (from your watchlist)');
+export const setEpisodeNote = logged(setEpisodeNote__raw, ([, k]) => `Note on ${Activity.epCodeOfKey(k)}`);
+export const setEpisodeRating = logged(setEpisodeRating__raw, ([, k, r]) => (r ? `Rated ${Activity.epCodeOfKey(k)} ${r}★` : `Removed rating of ${Activity.epCodeOfKey(k)}`));
+export const setMovieNote = logged(setMovieNote__raw, 'Edited the note');
+export const setMovieRating = logged(setMovieRating__raw, ([, r]) => (r ? `Rated ${r}★` : 'Removed your rating'));
+export const setMoviePlatform = logged(setMoviePlatform__raw, 'Changed where you watched');
+export const removeMovie = logged(removeMovie__raw, 'Deleted');
+export const updateMovie = logged(updateMovie__raw, 'Edited (date or details)');

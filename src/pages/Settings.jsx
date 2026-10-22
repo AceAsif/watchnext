@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { findDuplicateMovies } from '../components/duplicateMoviesLogic.js';
 import { useStore } from '../store/useStore.js';
-import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount, setDiscoverHidden } from '../store/db.js';
+import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount, setDiscoverHidden, getActivity, subscribeActivity, undoActivity } from '../store/db.js';
 import { hiddenList } from '../components/hiddenLogic.js';
 import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
 import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud, wipeEverywhere } from '../store/cloud.js';
@@ -36,6 +36,8 @@ import {
   CleanupCard,
   DuplicatesCard,
   HiddenCard,
+  ActivityCard,
+  UndoAnywayDialog,
   BackupCard,
   BackupNudge,
   ServicesCard,
@@ -73,6 +75,16 @@ export default function Settings() {
   const cloudOn = isCloudAvailable();
 
   const say = (text, kind = 'ok') => setMsg({ text, kind });
+  const activity = useSyncExternalStore(subscribeActivity, getActivity);
+  const [askUndo, setAskUndo] = useState(null); // an entry changed again later: confirm first
+  function undoEntry(e, st, force = false) {
+    if (st === 'changed' && !force) { setAskUndo(e); return; }
+    setAskUndo(null);
+    const r = undoActivity(e.id, force);
+    if (r.ok) say(`Undone: ${e.what} — ${e.title}`);
+    else if (r.reason === 'undone') say('That change was already undone.');
+    else say('Couldn’t undo that change.', 'err');
+  }
 
   const svc = useServicesPrefs();
 
@@ -276,6 +288,7 @@ export default function Settings() {
         <CleanupCard rows={orphans} onAskDelete={(id) => setConfirm({ type: 'show', id })} />
         <DuplicatesCard groups={dups.groups} titles={dups.titles} extra={dups.extra} />
         <HiddenCard rows={hiddenList(state.hidden)} onShowAgain={(e) => setDiscoverHidden(e, false)} />
+        <ActivityCard log={activity} state={state} onUndo={undoEntry} />
         <BackupCard lastLine={lastBackupLine(bk, new Date())} onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} />
         <CsvCard onExport={exportCsv} />
         <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} onAskEverywhere={() => setConfirm({ type: 'everywhere' })} />
@@ -312,6 +325,7 @@ export default function Settings() {
           onCancel={() => setConfirm(null)}
         />
       )}
+      {askUndo && <UndoAnywayDialog entry={askUndo} onConfirm={() => undoEntry(askUndo, 'changed', true)} onCancel={() => setAskUndo(null)} />}
       {confirm && confirm.type === 'everywhere' && signedIn && (
         <WipeDialog busy={wiping} onConfirm={confirmWipeEverywhere} onCancel={() => setConfirm(null)} />
       )}
