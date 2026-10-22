@@ -1950,3 +1950,15 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-act .sd-act-when { font-family: var(--font-mono); font-size: 11.5px; margin-top: 2px; opacity: 0.8; }
 .sd-act-done { flex: none; font-size: 12.5px; color: var(--text-dim); padding: 6px 10px; border: 1px dashed var(--line); border-radius: 999px; }
 .sd-act-more { margin-top: 12px; }
+
+/* Watchlist → Queue: total time to finish everything */
+.sd-wltime { padding: 16px 18px; margin-bottom: 18px; display: flex; flex-direction: column; gap: 6px; }
+.sd-wltime-big { font-family: var(--font-display); font-size: 22px; font-weight: 800; line-height: 1.2; }
+.sd-wltime-on { font-family: inherit; font-size: 14px; font-weight: 600; color: var(--teal); }
+.sd-wltime-sub { font-size: 14px; color: var(--text-dim); }
+.sd-wltime-parts { font-size: 12.5px; color: var(--text-dim); display: flex; flex-direction: column; gap: 2px; }
+.sd-wltime-note { font-size: 12.5px; color: var(--text-dim); font-style: italic; }
+.sd-wltime-sort { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.sd-wl-len { font-family: var(--font-mono); font-size: 12px; }
+.sd-wlsort { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; }
+.sd-wlsort[aria-pressed='true'] { border-color: var(--teal); color: var(--teal); background: rgba(78, 205, 196, 0.08); }

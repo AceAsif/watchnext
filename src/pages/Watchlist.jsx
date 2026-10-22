@@ -16,10 +16,53 @@ import { useServicesPrefs, setServicesPrefs } from '../store/servicesPrefs.js';
 import useAvailability from '../components/useAvailability.js';
 import { ServicesToggle, ServicesStatus, ServicesSheet } from '../components/ServicesUI.jsx';
 import { PageHead, MediaRow, Empty, CheckIcon } from '../components/LibraryUI.jsx';
+import { localISODate } from '../components/showLogic.js';
+import { fmtDay } from '../components/statsLogic.js';
+import { showTime, movieTime, watchlistTotal, yourPace, finishEstimate, headline, paceText, fmtLength, fmtShort, SORTS } from '../components/watchlistTimeLogic.js';
+
+const SORT_KEY = 'watchnext-wl-sort';
+const loadSort = () => { try { return localStorage.getItem(SORT_KEY) === 'short' ? 'short' : 'az'; } catch (e) { return 'az'; } };
+
+// "≈ 23 days to finish everything" — the queue's total viewing time and when you'd be done.
+function TotalTime({ shows, movies, state, filtered, sort, onSort }) {
+  const today = localISODate();
+  const tot = useMemo(() => watchlistTotal(shows, movies, today), [shows, movies, today]);
+  const pace = useMemo(() => yourPace(state), [state.shows, state.movies]); // eslint-disable-line react-hooks/exhaustive-deps
+  const est = finishEstimate(tot.minutes, pace, today);
+  const parts = [
+    tot.shows ? `Shows ${fmtLength(tot.showMin)} · ${tot.eps.toLocaleString('en-AU')} episode${tot.eps === 1 ? '' : 's'}` : null,
+    tot.movies ? `Movies ${fmtLength(tot.movieMin)} · ${tot.movies}` : null,
+  ].filter(Boolean);
+  const notes = [
+    tot.coming ? `+${tot.coming} episode${tot.coming === 1 ? '' : 's'} not out yet` : null,
+    tot.guessed ? `${tot.guessed} title${tot.guessed === 1 ? ' has' : 's have'} no runtime yet, so a typical length is used` : null,
+    pace ? null : 'Watch a few more days and this uses your own pace',
+  ].filter(Boolean);
+  return (
+    <section className="sd-card sd-wltime" data-testid="watchlist-time">
+      <div className="sd-wltime-big">{headline(est)}{filtered ? <span className="sd-wltime-on"> · on your services</span> : null}</div>
+      {est.days > 0 && (
+        <div className="sd-wltime-sub">
+          {fmtLength(tot.minutes)} of viewing, {paceText(est)}{est.days <= 3650 ? ` · done around ${fmtDay(est.date)}` : ''}
+        </div>
+      )}
+      {parts.length > 0 && <div className="sd-wltime-parts sd-mono">{parts.map((x) => <div key={x}>{x}</div>)}</div>}
+      {notes.length > 0 && <div className="sd-wltime-note">{notes.join(' · ')}</div>}
+      <div className="sd-wltime-sort" role="group" aria-label="Sort the watchlist">
+        {SORTS.map(([id, label]) => (
+          <button key={id} type="button" className="sd-wlsort" aria-pressed={sort === id} onClick={() => onSort(id)}>{label}</button>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export default function Watchlist({ openShow }) {
   const state = useStore();
   const [tab, setTab] = useState('queue'); // 'queue' | 'lists' | 'new' | 'discover'
+  const [sort, setSortState] = useState(loadSort);
+  const setSort = (v) => { setSortState(v); try { localStorage.setItem(SORT_KEY, v); } catch (e) { /* private mode: not remembered */ } };
+  const today = localISODate();
 
   // A show can only be a watchlist item while it isn't followed yet —
   // once "Start watching" clears watchlist and sets followed, it belongs
@@ -29,16 +72,16 @@ export default function Watchlist({ openShow }) {
     const list = Object.entries(state.shows).filter(
       ([, s]) => s.watchlist && !s.followed
     );
-    list.sort((a, b) => a[1].name.localeCompare(b[1].name));
+    list.sort((a, b) => (sort === 'short' ? showTime(a[1], today).minutes - showTime(b[1], today).minutes : 0) || a[1].name.localeCompare(b[1].name));
     return list;
-  }, [state.shows]);
+  }, [state.shows, sort, today]);
 
   const movies = useMemo(() => {
     return state.movies
       .map((m, index) => ({ ...m, index }))
       .filter((m) => movieStatus(m) === 'planned')
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [state.movies]);
+      .sort((a, b) => (sort === 'short' ? movieTime(a).minutes - movieTime(b).minutes : 0) || (a.name || '').localeCompare(b.name || ''));
+  }, [state.movies, sort]);
 
   const empty = shows.length === 0 && movies.length === 0;
 
@@ -108,6 +151,8 @@ export default function Watchlist({ openShow }) {
               : 'Free-to-watch services count too. You can change which services you pay for any time.'}
           </Empty>
         ) : (
+          <>
+          <TotalTime shows={showsShown.map(([, s]) => s)} movies={moviesShown} state={state} filtered={on} sort={sort} onSort={setSort} />
           <div className="sd-cols-2 sd-stackv">
             {showsShown.length > 0 && (
               <section className="sd-sec2">
@@ -138,6 +183,7 @@ export default function Watchlist({ openShow }) {
                       {show.genres && show.genres.length ? (
                         <span className="sd-mrow-meta">{show.genres.slice(0, 3).join(' · ')}</span>
                       ) : null}
+                      {(() => { const t = showTime(show, today); return t.eps ? <span className="sd-mrow-meta sd-wl-len">{t.eps} ep{t.eps === 1 ? '' : 's'} · {t.guessed ? '~' : ''}{fmtShort(t.minutes)}</span> : null; })()}
                       {on && servicesLabel(show, mine, svc.region) ? <span className="sd-mrow-meta sd-svc-meta">{servicesLabel(show, mine, svc.region)}</span> : null}
                     </MediaRow>
                   ))}
@@ -179,7 +225,7 @@ export default function Watchlist({ openShow }) {
                       }
                     >
                       <span className="sd-mrow-name">{m.name}</span>
-                      {m.year ? <span className="sd-mrow-meta">{m.year}</span> : null}
+                      <span className="sd-mrow-meta">{[m.year, (movieTime(m).guessed ? '~' : '') + fmtShort(movieTime(m).minutes)].filter(Boolean).join(' · ')}</span>
                       {on && servicesLabel(m, mine, svc.region) ? <span className="sd-mrow-meta sd-svc-meta">{servicesLabel(m, mine, svc.region)}</span> : null}
                     </MediaRow>
                   ))}
@@ -187,6 +233,7 @@ export default function Watchlist({ openShow }) {
               </section>
             )}
           </div>
+          </>
         )}
       </div>
     </div>
