@@ -4,7 +4,7 @@
 // worker each release — which skips waiting, claims clients and purges the
 // old app cache. Result: new code loads on the next visit with no manual
 // cache clearing. Left as the literal placeholder for local `npm run deploy`.
-const BUILD = '2f8bab62bcb67c7b2e95bd231baa0209df99dcbb';
+const BUILD = '10a41e014775384331f8c1e798de7ff279d7c737';
 const APP_CACHE = 'watchnext-app-' + BUILD;
 const IMG_CACHE = 'watchnext-img'; // stable across deploys — posters never change
 
