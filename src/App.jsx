@@ -13,6 +13,7 @@ import OfflineBanner from './components/OfflineBanner.jsx';
 import AccountSwitchSheet from './components/AccountSwitchSheet.jsx';
 import AccountChip from './components/AccountChip.jsx';
 import BadgeNote from './components/BadgeNote.jsx';
+import { useKeyboardShortcuts, ShortcutsSheet } from './components/KeyboardShortcuts.jsx';
 import { newNotesMemo } from './components/notesSearchLogic.js';
 
 const TABS = [
@@ -93,6 +94,39 @@ export default function App() {
 
   const openShow = (id) => setShowOpen(id);
   const closeShow = () => setShowOpen(null);
+  const [keysOpen, setKeysOpen] = useState(false);
+
+  // Same as tapping a tab in the tab bar.
+  const goTab = (id) => {
+    setTab(id);
+    if (id === 'stats' && statsStart.tab !== 'Overview') setStatsStart((s) => ({ tab: 'Overview', n: s.n + 1 }));
+    closeShow();
+    setSearching(false);
+    setNotesOpen(false);
+  };
+  const openSearch = () => {
+    setSearching(true);
+    setShowOpen(null);
+  };
+
+  // Computer keyboard shortcuts: "/" search, 1–6 tabs, Esc back, "?" the list.
+  useKeyboardShortcuts(
+    {
+      search: () => {
+        if (!searching) return openSearch();
+        const box = document.querySelector('input[type="search"]');
+        if (box) { box.focus(); box.select(); }
+      },
+      tab: goTab,
+      back: () => {
+        if (searching) setSearching(false);
+        else if (showOpen) closeShow();
+        else if (notesOpen) setNotesOpen(false);
+      },
+      help: () => setKeysOpen(true),
+    },
+    searching || !!showOpen || notesOpen,
+  );
 
   return (
     <div className="app">
@@ -106,12 +140,9 @@ export default function App() {
         </span>
         <button
           className="sd-ib masthead-search"
-          onClick={() => {
-            setSearching(true);
-            setShowOpen(null);
-          }}
+          onClick={openSearch}
           aria-label="Search shows and movies"
-          title="Search"
+          title="Search (/)"
           style={{ color: searching ? 'var(--amber)' : 'var(--text)' }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
@@ -142,20 +173,16 @@ export default function App() {
       )}
 
       <AccountSwitchSheet />
+      <ShortcutsSheet open={keysOpen} onClose={() => setKeysOpen(false)} />
       <BadgeNote onOpen={() => { setStatsStart((s) => ({ tab: 'Badges', n: s.n + 1 })); setTab('stats'); closeShow(); setSearching(false); setNotesOpen(false); }} />
 
       <nav className="tabbar" aria-label="Main">
-        {TABS.map((t) => (
+        {TABS.map((t, i) => (
           <button
             key={t.id}
             className={tab === t.id && !showOpen && !searching ? 'active' : ''}
-            onClick={() => {
-              setTab(t.id);
-              if (t.id === 'stats' && statsStart.tab !== 'Overview') setStatsStart((s) => ({ tab: 'Overview', n: s.n + 1 }));
-              closeShow();
-              setSearching(false);
-              setNotesOpen(false);
-            }}
+            title={`${t.label} (${i + 1})`}
+            onClick={() => goTab(t.id)}
           >
             {t.icon}
             {t.label}
