@@ -34,6 +34,7 @@ const I = {
   download: <Svg><path d="M12 4v12M7 11l5 5 5-5M4 20h16" /></Svg>,
   trash: <Svg><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6" /></Svg>,
   x: <Svg size={16}><path d="M6 6l12 12M18 6L6 18" /></Svg>,
+  eye: <Svg><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><path d="M4 20L20 4" /></Svg>,
   warn: <Svg size={16}><path d="M12 3l10 18H2zM12 10v5M12 18h.01" /></Svg>,
 };
 
@@ -464,6 +465,23 @@ export function RegionCard({ region, onChange }) {
         </select>
       </label>
       <div className="sd-setnote">{I.lock}Kept on this device only. Titles are re-checked for the new region as you open them.</div>
+    </SetCard>
+  );
+}
+
+// Spoiler shield: hide titles and summaries of episodes you haven't watched (kept on this device).
+export function SpoilerCard({ on, onChange }) {
+  return (
+    <SetCard icon={I.eye} label="Spoilers" title="Spoiler shield" pill={on ? <Pill dot>On</Pill> : null} className={on ? 'on' : ''} id="spoilers">
+      <p className="sd-setp">
+        Hides the titles and summaries of episodes you haven’t watched yet, on show pages, Up Next and the calendar. They
+        show as “Episode 6” instead. Tap an episode, then “Show anyway”, to see one.
+      </p>
+      <label className="sd-signout-opt">
+        <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} data-testid="spoiler-toggle" />
+        <span>Hide episode titles and summaries until I’ve watched them</span>
+      </label>
+      <div className="sd-setnote">{I.lock}Kept on this device only. Turn it on on each phone or computer you use.</div>
     </SetCard>
   );
 }

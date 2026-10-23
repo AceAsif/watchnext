@@ -1,6 +1,7 @@
 import React from 'react';
 import { img } from '../api/tmdb.js';
 import { codeOf } from './upnextLogic.js';
+import { useSpoilerShield, isShielded } from './spoilerShield.js';
 
 // Small pieces shared by the Up Next agenda list and the calendar's selected-day
 // list, so both views look the same. Styling lives in ui.css (sd-*).
@@ -17,7 +18,10 @@ export function Poster({ path, w, h, r = 5 }) {
 
 // One upcoming episode: poster, show name, "S06·E03  Episode title". Tapping
 // opens the show. `it` is { id, show, s, e, name, date }.
+// With Spoiler shield on, the title of an episode you haven't watched is left out.
 export function EpisodeRow({ it, onOpen, divider }) {
+  const shield = useSpoilerShield();
+  const hidden = isShielded(shield, it.show, it.s, it.e);
   return (
     <button
       className="sd-open"
@@ -34,7 +38,7 @@ export function EpisodeRow({ it, onOpen, divider }) {
         <span style={{ fontSize: 14, fontWeight: 600, overflowWrap: 'anywhere' }}>{it.show.name}</span>
         <span style={{ fontSize: 12, color: 'var(--text-dim)', overflowWrap: 'anywhere' }}>
           <span className="sd-mono" style={{ color: 'var(--amber)' }}>{codeOf(it.s, it.e)}</span>
-          {it.name ? ` ${it.name}` : ''}
+          {it.name && !hidden ? ` ${it.name}` : ''}
         </span>
       </span>
     </button>

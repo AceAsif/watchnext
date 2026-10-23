@@ -9,6 +9,7 @@ import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
 import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud, wipeEverywhere } from '../store/cloud.js';
 import { wipeDoneText, wipeFailText } from '../store/wipeLogic.js';
 import { useServicesPrefs, toggleMyService, setServicesPrefs } from '../store/servicesPrefs.js';
+import { useSpoilerShield, setSpoilerShield } from '../components/spoilerShield.js';
 import {
   loadMeta, saveMeta, libraryCount, withSince, nudgeStatus, nudgeCopy, afterBackup, afterSnooze, lastBackupLine,
 } from '../components/backupNudgeLogic.js';
@@ -44,6 +45,7 @@ import {
   BackupCard,
   BackupNudge,
   ServicesCard,
+  SpoilerCard,
   RegionCard,
   CsvCard,
   WipeDialog,
@@ -62,6 +64,7 @@ const IMPORT_COMMAND = 'python tools/convert_tvtime.py gdpr-data.zip -o tvtime_i
 
 export default function Settings() {
   const state = useStore();
+  const shield = useSpoilerShield();
   const savedKey = state.settings.tmdbKey || '';
   const [key, setKey] = useState(savedKey);
   const [msg, setMsg] = useState(null); // { text, kind: 'ok' | 'err' }
@@ -305,6 +308,7 @@ export default function Settings() {
         <KeyCard status={keyStatus(savedKey, key)} value={key} onChange={setKey} onSave={saveKey} />
         <RegionCard region={svc.region} onChange={(r) => setServicesPrefs({ region: r })} />
         <ServicesCard mine={svc.mine} onToggle={toggleMyService} region={svc.region} />
+        <SpoilerCard on={shield} onChange={setSpoilerShield} />
         <ImportCard
           command={IMPORT_COMMAND}
           copied={copied}

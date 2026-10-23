@@ -58,6 +58,7 @@ import { normalizeProviders } from '../components/servicesLogic.js';
 import { isFinishedShow, becomesFinished } from '../components/finishCardLogic.js';
 import { looksLikeAnime, altTitles, summaryLine } from '../components/animeLogic.js';
 import { Bar, Chevron, Sheet } from '../components/ui.jsx';
+import { useSpoilerShield, isShielded, epTitle } from '../components/spoilerShield.js';
 import {
   epKey,
   seasonInfo,
@@ -113,6 +114,8 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
   const [expandDone, setExpandDone] = useState(false);
   const [noteEp, setNoteEp] = useState(null); // { n, name } of the episode whose note is open
   const [aboutEp, setAboutEp] = useState(null); // episode number whose summary is showing (hidden until tapped: no spoilers)
+  const shield = useSpoilerShield();
+  const [revealed, setRevealed] = useState(() => new Set()); // episodes shown anyway (until you leave the page)
 
   async function load() {
     if (eps || !show.tmdbId) return;
@@ -243,6 +246,8 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
           const n = w && w.n ? w.n : 0;
           const isNext = !!next && next.season === season.n && next.episode === ep.episode_number;
           const code = `S${season.n}E${ep.episode_number}`;
+          const hidden = isShielded(shield, show, season.n, ep.episode_number) && !revealed.has(ep.episode_number);
+          const title = epTitle(ep.name, ep.episode_number, hidden);
           let sub = null;
           if (w && w.at && !(w.firstInRewatch && inRound)) {
             const lastDay = !inRound && typeof w.last === 'string' && w.last ? localISODate(new Date(w.last)) : '';
@@ -266,15 +271,22 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
                   type="button"
                   className="sd-ep-title"
                   aria-expanded={aboutEp === ep.episode_number}
-                  aria-label={`${ep.name || `Episode ${ep.episode_number}`}: ${aboutEp === ep.episode_number ? 'hide' : 'show'} summary`}
+                  aria-label={`${title}: ${aboutEp === ep.episode_number ? 'hide' : 'show'} summary`}
                   onClick={() => setAboutEp(aboutEp === ep.episode_number ? null : ep.episode_number)}
                 >
-                  {ep.name || `Episode ${ep.episode_number}`}
+                  {hidden ? <span className="sd-ep-shielded" data-testid="shielded-title">{title}</span> : title}
                 </button>
                 {sub && <div style={{ fontSize: 12, color: sub.color, marginTop: 2 }}>{sub.text}</div>}
                 {aboutEp === ep.episode_number && (
                   <div className="sd-ep-about" data-testid="episode-summary">
-                    <p>{(ep.overview || '').trim() || 'TMDB has no summary for this episode yet.'}</p>
+                    {hidden ? (
+                      <div className="sd-ep-shield" data-testid="spoiler-shield">
+                        <p>Title and summary hidden by Spoiler shield.</p>
+                        <button type="button" className="sd-ep-reveal" onClick={() => setRevealed((r) => new Set(r).add(ep.episode_number))}>Show anyway</button>
+                      </div>
+                    ) : (
+                      <p>{(ep.overview || '').trim() || 'TMDB has no summary for this episode yet.'}</p>
+                    )}
                     {(ep.air_date || ep.runtime) ? (
                       <span className="sd-mono">{[ep.air_date ? `Aired ${fmtDate(ep.air_date)}` : '', ep.runtime ? `${ep.runtime} min` : ''].filter(Boolean).join(' · ')}</span>
                     ) : null}
@@ -287,7 +299,7 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
                   style={{ width: 36 }}
                   title={note || epRating ? 'Your rating and note' : 'Rate it, react or add a note'}
                   aria-label={`${note || epRating ? 'Edit rating and note for' : 'Rate or add a note for'} ${code}`}
-                  onClick={() => setNoteEp({ n: ep.episode_number, name: ep.name || `Episode ${ep.episode_number}` })}
+                  onClick={() => setNoteEp({ n: ep.episode_number, name: title })}
                 >
                   {noteReaction ? (
                     <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}>{noteReaction.emoji}</span>
