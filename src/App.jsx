@@ -12,6 +12,7 @@ import Notes from './pages/Notes.jsx';
 import OfflineBanner from './components/OfflineBanner.jsx';
 import AccountSwitchSheet from './components/AccountSwitchSheet.jsx';
 import AccountChip from './components/AccountChip.jsx';
+import BadgeNote from './components/BadgeNote.jsx';
 import { newNotesMemo } from './components/notesSearchLogic.js';
 
 const TABS = [
@@ -82,6 +83,8 @@ export default function App() {
   // from it and pressing Back returns to the same search, filters and scroll.
   const [notesOpen, setNotesOpen] = useState(false);
   const notesMemo = useRef(newNotesMemo());
+  // Which Stats section to open with ("See badges" opens Badges); the key re-opens Stats there.
+  const [statsStart, setStatsStart] = useState({ tab: 'Overview', n: 0 });
 
   useEffect(() => {
     const unsub = initCloudSync();
@@ -133,12 +136,13 @@ export default function App() {
           {tab === 'shows' && <Shows openShow={openShow} />}
           {tab === 'movies' && <Movies />}
           {tab === 'watchlist' && <Watchlist openShow={openShow} />}
-          {tab === 'stats' && <Stats onOpenNotes={() => { notesMemo.current = newNotesMemo(); setNotesOpen(true); }} />}
+          {tab === 'stats' && <Stats key={statsStart.n} startTab={statsStart.tab} onOpenNotes={() => { notesMemo.current = newNotesMemo(); setNotesOpen(true); }} />}
           {tab === 'settings' && <Settings />}
         </>
       )}
 
       <AccountSwitchSheet />
+      <BadgeNote onOpen={() => { setStatsStart((s) => ({ tab: 'Badges', n: s.n + 1 })); setTab('stats'); closeShow(); setSearching(false); setNotesOpen(false); }} />
 
       <nav className="tabbar" aria-label="Main">
         {TABS.map((t) => (
@@ -147,6 +151,7 @@ export default function App() {
             className={tab === t.id && !showOpen && !searching ? 'active' : ''}
             onClick={() => {
               setTab(t.id);
+              if (t.id === 'stats' && statsStart.tab !== 'Overview') setStatsStart((s) => ({ tab: 'Overview', n: s.n + 1 }));
               closeShow();
               setSearching(false);
               setNotesOpen(false);

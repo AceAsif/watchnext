@@ -59,12 +59,12 @@ function HeroSpan({ span, size = 'hero' }) {
   );
 }
 
-export default function Stats({ onOpenNotes }) {
+export default function Stats({ onOpenNotes, startTab = 'Overview' }) {
   const state = useStore();
   const librarySyncing = useLibrarySyncing();
   const [year, setYear] = useState('all');       // Habits day-of-week scope
   const [reviewYear, setReviewYear] = useState(null); // Year in review scope
-  const [tab, setTab] = useState('Overview'); // Stats sub-tab
+  const [tab, setTab] = useState(startTab); // Stats sub-tab
   const noteCount = useMemo(() => collectNotes(state.shows, state.movies).length, [state.shows, state.movies]);
 
   const base = useMemo(() => {
