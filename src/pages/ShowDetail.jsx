@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import ScoresRow from '../components/ScoresRow.jsx';
 import { useServicesPrefs } from '../store/servicesPrefs.js';
 import { recordRegion, inRegion } from '../components/regionLogic.js';
 import { useStore } from '../store/useStore.js';
@@ -733,6 +734,8 @@ export default function ShowDetail({ id, onBack }) {
             <Stars value={rating} onChange={(v) => setShowRating(id, v)} size={24} half />
           </span>
         </div>
+
+        <ScoresRow kind="tv" tmdbId={show.tmdbId} name={show.name} label="Scores" className="sd-scores-row sd-sep" />
 
         <ListsRow item={itemFromShow(show)} />
 

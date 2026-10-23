@@ -18,10 +18,14 @@ import { ServicesToggle, ServicesStatus, ServicesSheet } from '../components/Ser
 import { PageHead, MediaRow, Empty, CheckIcon } from '../components/LibraryUI.jsx';
 import { localISODate } from '../components/showLogic.js';
 import { fmtDay } from '../components/statsLogic.js';
+import { useScoresMany, scoresOn } from '../components/useScores.js';
+import { scoreKey, sortScore } from '../components/scoresLogic.js';
 import { showTime, movieTime, watchlistTotal, yourPace, finishEstimate, headline, paceText, fmtLength, fmtShort, SORTS } from '../components/watchlistTimeLogic.js';
 
 const SORT_KEY = 'watchnext-wl-sort';
-const loadSort = () => { try { return localStorage.getItem(SORT_KEY) === 'short' ? 'short' : 'az'; } catch (e) { return 'az'; } };
+const loadSort = () => { try { const v = localStorage.getItem(SORT_KEY); return v === 'short' || (v === 'rated' && scoresOn()) ? v : 'az'; } catch (e) { return 'az'; } };
+// "IMDb 8.1" / "TMDB 7.4" for a row, from saved scores only.
+const scoreText = (e) => (e && e.imdb ? `IMDb ${e.imdb.toFixed(1)}` : e && e.tmdb ? `TMDB ${e.tmdb.toFixed(1)}` : '');
 
 // "≈ 23 days to finish everything" — the queue's total viewing time and when you'd be done.
 function TotalTime({ shows, movies, state, filtered, sort, onSort }) {
@@ -49,7 +53,7 @@ function TotalTime({ shows, movies, state, filtered, sort, onSort }) {
       {parts.length > 0 && <div className="sd-wltime-parts sd-mono">{parts.map((x) => <div key={x}>{x}</div>)}</div>}
       {notes.length > 0 && <div className="sd-wltime-note">{notes.join(' · ')}</div>}
       <div className="sd-wltime-sort" role="group" aria-label="Sort the watchlist">
-        {SORTS.map(([id, label]) => (
+        {SORTS.filter(([id]) => id !== 'rated' || scoresOn()).map(([id, label]) => (
           <button key={id} type="button" className="sd-wlsort" aria-pressed={sort === id} onClick={() => onSort(id)}>{label}</button>
         ))}
       </div>
@@ -64,6 +68,15 @@ export default function Watchlist({ openShow }) {
   const setSort = (v) => { setSortState(v); try { localStorage.setItem(SORT_KEY, v); } catch (e) { /* private mode: not remembered */ } };
   const today = localISODate();
 
+  // Critic/audience scores of everything queued: looked up only while sorting by "Highest rated".
+  const scoreItems = useMemo(() => [
+    ...Object.values(state.shows).filter((s) => s.watchlist && !s.followed && s.tmdbId).map((s) => ({ kind: 'tv', tmdbId: s.tmdbId })),
+    ...state.movies.filter((m) => movieStatus(m) === 'planned' && m.tmdbId).map((m) => ({ kind: 'movie', tmdbId: m.tmdbId })),
+  ], [state.shows, state.movies]);
+  const scores = useScoresMany(scoreItems, sort === 'rated' && scoresOn());
+  const scoreOf = (kind, tmdbId) => (tmdbId ? scores[scoreKey(kind, tmdbId)] || null : null);
+  const byScore = (x, y) => (sortScore(y) || -1) - (sortScore(x) || -1);
+
   // A show can only be a watchlist item while it isn't followed yet —
   // once "Start watching" clears watchlist and sets followed, it belongs
   // to the Shows/Up Next tabs instead. The !s.followed guard is a safety
@@ -72,16 +85,16 @@ export default function Watchlist({ openShow }) {
     const list = Object.entries(state.shows).filter(
       ([, s]) => s.watchlist && !s.followed
     );
-    list.sort((a, b) => (sort === 'short' ? showTime(a[1], today).minutes - showTime(b[1], today).minutes : 0) || a[1].name.localeCompare(b[1].name));
+    list.sort((a, b) => (sort === 'short' ? showTime(a[1], today).minutes - showTime(b[1], today).minutes : sort === 'rated' ? byScore(scoreOf('tv', a[1].tmdbId), scoreOf('tv', b[1].tmdbId)) : 0) || a[1].name.localeCompare(b[1].name));
     return list;
-  }, [state.shows, sort, today]);
+  }, [state.shows, sort, today, scores]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const movies = useMemo(() => {
     return state.movies
       .map((m, index) => ({ ...m, index }))
       .filter((m) => movieStatus(m) === 'planned')
-      .sort((a, b) => (sort === 'short' ? movieTime(a).minutes - movieTime(b).minutes : 0) || (a.name || '').localeCompare(b.name || ''));
-  }, [state.movies, sort]);
+      .sort((a, b) => (sort === 'short' ? movieTime(a).minutes - movieTime(b).minutes : sort === 'rated' ? byScore(scoreOf('movie', a.tmdbId), scoreOf('movie', b.tmdbId)) : 0) || (a.name || '').localeCompare(b.name || ''));
+  }, [state.movies, sort, scores]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const empty = shows.length === 0 && movies.length === 0;
 
@@ -183,7 +196,7 @@ export default function Watchlist({ openShow }) {
                       {show.genres && show.genres.length ? (
                         <span className="sd-mrow-meta">{show.genres.slice(0, 3).join(' · ')}</span>
                       ) : null}
-                      {(() => { const t = showTime(show, today); return t.eps ? <span className="sd-mrow-meta sd-wl-len">{t.eps} ep{t.eps === 1 ? '' : 's'} · {t.guessed ? '~' : ''}{fmtShort(t.minutes)}</span> : null; })()}
+                      {(() => { const t = showTime(show, today); const sc = scoreText(scoreOf('tv', show.tmdbId)); const parts = [t.eps ? `${t.eps} ep${t.eps === 1 ? '' : 's'} · ${t.guessed ? '~' : ''}${fmtShort(t.minutes)}` : '', sc].filter(Boolean); return parts.length ? <span className="sd-mrow-meta sd-wl-len">{parts.join(' · ')}</span> : null; })()}
                       {on && servicesLabel(show, mine, svc.region) ? <span className="sd-mrow-meta sd-svc-meta">{servicesLabel(show, mine, svc.region)}</span> : null}
                     </MediaRow>
                   ))}
@@ -225,7 +238,7 @@ export default function Watchlist({ openShow }) {
                       }
                     >
                       <span className="sd-mrow-name">{m.name}</span>
-                      <span className="sd-mrow-meta">{[m.year, (movieTime(m).guessed ? '~' : '') + fmtShort(movieTime(m).minutes)].filter(Boolean).join(' · ')}</span>
+                      <span className="sd-mrow-meta">{[m.year, (movieTime(m).guessed ? '~' : '') + fmtShort(movieTime(m).minutes), scoreText(scoreOf('movie', m.tmdbId))].filter(Boolean).join(' · ')}</span>
                       {on && servicesLabel(m, mine, svc.region) ? <span className="sd-mrow-meta sd-svc-meta">{servicesLabel(m, mine, svc.region)}</span> : null}
                     </MediaRow>
                   ))}

@@ -1,6 +1,6 @@
 // Builds the app for the browser suites into .harness-work/ (git-ignored). No .env file needed:
 // placeholder Firebase values are passed as environment variables, which Vite reads.
-//   node shot/build-test-dists.mjs          -> .harness-work/dist  and  .harness-work/dist-fake
+//   node shot/build-test-dists.mjs          -> .harness-work/dist, .harness-work/dist-fake and .harness-work/dist-scores
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 import { ROOT, APP_DIST, browserFile, workPath } from '../tests/paths.mjs';
@@ -22,4 +22,10 @@ await build({
   resolve: { alias: [{ find: /^.*\/store\/cloud\.js$/, replacement: browserFile('fakecloud.js').replace(/\\/g, '/') }] },
   build: { outDir: workPath('dist-fake'), emptyOutDir: true },
 });
+
+// Third build for scores.mjs: with an OMDb key, so the critic/audience scores row is switched on.
+console.log('Building scores build      ->', workPath('dist-scores'));
+process.env.VITE_OMDB_API_KEY = 'TESTOMDB';
+await build({ ...base, build: { outDir: workPath('dist-scores'), emptyOutDir: true } });
+delete process.env.VITE_OMDB_API_KEY;
 console.log('Done.');

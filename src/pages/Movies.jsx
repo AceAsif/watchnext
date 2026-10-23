@@ -1,4 +1,7 @@
 import React, { useMemo, useState } from 'react';
+import ScoresRow from '../components/ScoresRow.jsx';
+import { scoresOn } from '../components/useScores.js';
+import { fromTmdb } from '../components/scoresLogic.js';
 import { useStore } from '../store/useStore.js';
 import {
   addMovieWatched,
@@ -358,12 +361,16 @@ export default function Movies() {
                 {d && !d.error && (
                   <div className="sd-mdet-facts">
                     {d.runtime ? <span>{d.runtime} min</span> : null}
-                    {d.vote_average ? <span>★ {d.vote_average.toFixed(1)}</span> : null}
+                    {d.vote_average && !scoresOn() ? <span>★ {d.vote_average.toFixed(1)}</span> : null}
                     {(d.genres || []).length ? <span>{d.genres.map((g) => g.name).join(', ')}</span> : null}
                   </div>
                 )}
               </div>
             </div>
+
+            {sel.tmdbId && d && !d.error ? (
+              <ScoresRow kind="movie" tmdbId={sel.tmdbId} name={d.title || sel.name} known={fromTmdb(d)} label="Scores" className="sd-mdet-sec" />
+            ) : null}
 
             {selGroup ? (
               <div className="sd-mdet-sec" data-testid="viewings">

@@ -149,5 +149,6 @@ export function headline(est) {
 // "at your pace of 1 hr 50 min a day" / "at 2 hrs a day"
 export const paceText = (est) => (est.yours ? `at your pace of ${fmtShort(est.perDay)} a day` : `at ${fmtShort(est.perDay)} a day`);
 
-// Sorting the queue: 'az' (A–Z) or 'short' (quickest to finish first).
-export const SORTS = [['az', 'A–Z'], ['short', 'Quickest first']];
+// Sorting the queue: 'az' (A–Z), 'short' (quickest to finish first) or 'rated' (highest
+// IMDb score first, TMDB when IMDb has none; only offered when scores are switched on).
+export const SORTS = [['az', 'A–Z'], ['short', 'Quickest first'], ['rated', 'Highest rated']];

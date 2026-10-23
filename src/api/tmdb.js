@@ -45,6 +45,11 @@ export function searchMovieParams(params) {
   return get('/search/movie', params);
 }
 
+// What the scores row needs from TMDB: the IMDb id and TMDB's own user score.
+export function scoreDetails(kind, tmdbId) {
+  return kind === 'tv' ? get(`/tv/${tmdbId}`, { append_to_response: 'external_ids' }) : get(`/movie/${tmdbId}`);
+}
+
 export function movieDetails(tmdbId) {
   return get(`/movie/${tmdbId}`);
 }
