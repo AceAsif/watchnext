@@ -2047,3 +2047,14 @@ button.sd-coll-prow { cursor: pointer; }
   to { transform: none; opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .bn { animation: none; } }
+
+/* Up Next → "Add to your calendar" sheet. */
+.sd-cal-x { display: flex; flex-direction: column; gap: 12px; padding-bottom: 4px; }
+.sd-cal-x p { margin: 0; font-size: 14px; line-height: 1.5; }
+.sd-cal-x-p { color: var(--text); }
+.sd-cal-x-note { color: var(--text-dim); font-size: 13px !important; }
+.sd-cal-x-ok { color: var(--teal, #5ec8b8); font-weight: 600; }
+.sd-cal-x-pick { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.sd-cal-x-pick label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.sd-cal-x-pick input { accent-color: var(--amber); width: 16px; height: 16px; }
+.sd-cal-x-how { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; line-height: 1.5; color: var(--text); }

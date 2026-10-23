@@ -14,6 +14,7 @@ import {
 } from '../store/db.js';
 import { hasKey, fetchUpcomingEpisodes } from '../api/tmdb.js';
 import CalendarGrid from '../components/CalendarGrid.jsx';
+import CalendarExportSheet from '../components/CalendarExportSheet.jsx';
 import TonightSheet from '../components/TonightSheet.jsx';
 import PeopleNews from '../components/PeopleNews.jsx';
 import { Chevron } from '../components/ui.jsx';
@@ -146,6 +147,7 @@ export default function UpNext({ openShow }) {
   const [showAll, setShowAll] = useState(false);
   const [tonightOpen, setTonightOpen] = useState(false); // "What should I watch tonight?"
   const [toast, setToast] = useState(null); // last mark, for Undo
+  const [calOpen, setCalOpen] = useState(false); // "Add to calendar" sheet
 
   const today = localISODate();
   const alive = useRef(true);
@@ -315,9 +317,22 @@ export default function UpNext({ openShow }) {
               >
                 <RefreshIcon spinning={!!refresh} />
               </button>
+              <button
+                className="sd-ib"
+                aria-label="Add upcoming episodes to your calendar"
+                title="Add to your calendar (iPhone, Google, Outlook)"
+                onClick={() => setCalOpen(true)}
+                disabled={upcomingCount === 0}
+                data-testid="cal-export-open"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5" />
+                </svg>
+              </button>
             </div>
           </div>
 
+          <CalendarExportSheet open={calOpen} items={items} onClose={() => setCalOpen(false)} />
           {view === 'calendar' ? (
             <CalendarGrid items={items} onOpen={openShow} />
           ) : agenda.length === 0 ? (
