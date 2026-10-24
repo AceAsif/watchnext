@@ -286,11 +286,9 @@ await ok('scrolling to more cards (down the rows, and along a row) adds them; a 
   await wait(1800);
   assert.equal((await seenKeys()).length, before, 'cards flicked past in one go are not counted');
 });
-await ok('the footer line matches the synced log: suggested = titles seen, you added 1', async () => {
-  const st = await stored(p); const shown = Object.values(st.seenLog).filter((e) => !e.moved).length;
-  const t = await p.evaluate(() => document.querySelector('[data-testid=disc-hits]').textContent);
-  const pc = Math.round(100 / shown);
-  assert.equal(t, `Discover has suggested ${shown} titles: you added 1 (${pc < 1 ? '<1' : pc}%) and watched 0.`);
+await ok('Discover no longer shows the "Discover has suggested…" line (it lives in Stats → Your taste)', async () => {
+  assert.equal(await p.evaluate(() => document.querySelector('[data-testid=disc-hits]')), null);
+  assert.doesNotMatch(await p.evaluate(() => document.body.innerText), /Discover has suggested/);
 });
 await p.close();
 

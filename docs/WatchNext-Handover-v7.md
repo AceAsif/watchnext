@@ -159,7 +159,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 ## 11. To-do list (from the feature list doc)
 
 **Tidy-up from the code check (22–23 Oct):**
-- Remove the Discover hit-rate line ("Discover has suggested N titles…") from Watchlist → Discover; keep it in Stats → Your taste.
+- ~~Remove the Discover hit-rate line from Watchlist → Discover~~ (done 25 Oct; still in Stats → Your taste).
 - Quiet the 3 background `console.warn` calls (Shows ×2, Up Next ×1).
 - Fix the 12 failing browser suites (§9).
 - Later, as its own job: replace the 18 `alert()` and 6 `confirm()` pop-ups with in-app messages/dialogs.

@@ -9,7 +9,6 @@ import {
 } from '../api/tmdb.js';
 import { runDiscover, ownedKeys } from './discoverEngine.js';
 import { animeRecommendations } from '../api/anilist.js';
-import { hitStats, hitLine } from './hitLogic.js';
 import { createSeenTracker, SEEN_RATIO } from './seenTracker.js';
 import { loadCache, saveCache, progressText, genreLabel } from './tasteLogic.js';
 import { hiddenKeySet, hiddenList } from './hiddenLogic.js';
@@ -135,7 +134,6 @@ export default function Discover() {
     .map((r) => ({ ...r, items: r.items.filter((c) => !hiddenNow.has(c.key) && (!owned.has(c.key) || added[c.key])) }))
     .filter((r) => r.items.length > 0), [run, hiddenNow, owned, added]);
   const hiddenCount = useMemo(() => hiddenList(state.hidden).length, [state.hidden]);
-  const hits = useMemo(() => (run ? hitLine(hitStats(state.seenLog, state)) : ''), [run, state.seenLog, state.shows, state.movies]); // eslint-disable-line react-hooks/exhaustive-deps
   const rootRef = useRef(null);
   const seen = useSeenCards(rootRef, rows);
 
@@ -295,7 +293,6 @@ export default function Discover() {
         </section>
       ))}
 
-      {hits && run && !busy && <p className="sd-sub sd-disc-foot" data-testid="disc-hits">{hits}</p>}
       {hiddenCount > 0 && run && !busy && (
         <p className="sd-sub sd-disc-foot" data-testid="disc-hidden">
           {hiddenCount} {hiddenCount === 1 ? 'title' : 'titles'} hidden with “Not interested”. You can bring them back in Settings.
