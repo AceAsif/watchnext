@@ -54,7 +54,8 @@ import AnimeSheet from '../components/AnimeSheet.jsx';
 import FinishCardSheet from '../components/FinishCardSheet.jsx';
 import { WhenSheet, FixDatesSheet } from '../components/WatchDateSheets.jsx';
 import { stampForDay, fixedToast, watchedList } from '../components/watchDatesLogic.js';
-import { normalizeProviders } from '../components/servicesLogic.js';
+import { normalizeProviders, needsCheck } from '../components/servicesLogic.js';
+import WatchLinks from '../components/WatchLinks.jsx';
 import { isFinishedShow, becomesFinished } from '../components/finishCardLogic.js';
 import { looksLikeAnime, altTitles, summaryLine } from '../components/animeLogic.js';
 import { Bar, Chevron, Sheet } from '../components/ui.jsx';
@@ -359,7 +360,7 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
 // ---------------------------------------------------------------- page
 export default function ShowDetail({ id, onBack }) {
   const state = useStore();
-  const { region } = useServicesPrefs();
+  const { region, mine } = useServicesPrefs();
   const show = state.shows[id];
   const [syncing, setSyncing] = useState(false);
   const [sheet, setSheet] = useState(null); // 'platform' | 'streaming' | 'menu' | 'fix' | 'anime'
@@ -510,6 +511,24 @@ export default function ShowDetail({ id, onBack }) {
         .finally(() => setSyncing(false));
     }
   }, [id]);
+
+  // Watch links need to know where it streams: check quietly when opening a show that was never
+  // checked for this region (or not for 14 days). No pop-up on failure; "Streaming in …" can retry.
+  const [autoStream, setAutoStream] = useState(false);
+  useEffect(() => {
+    if (!show || !show.tmdbId || !hasKey() || !needsCheck(show, new Date(), region)) return undefined;
+    let alive = true;
+    setAutoStream(true);
+    watchProviders('tv', show.tmdbId, region)
+      .then((block) => {
+        if (!alive) return;
+        const { providers: subs, free, link } = normalizeProviders(block);
+        setShowProviders(id, subs, link, free, region);
+      })
+      .catch(() => {})
+      .finally(() => { if (alive) setAutoStream(false); });
+    return () => { alive = false; };
+  }, [id, region, show && show.tmdbId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!show) {
     return (
@@ -733,6 +752,9 @@ export default function ShowDetail({ id, onBack }) {
           <button type="button" className="sd-btn" data-testid="finish-card-btn" onClick={() => { setFinishToast(false); setFinishOpen(true); }}>
             Share your “You finished” card
           </button>
+        )}
+        {show.tmdbId && hasKey() && (
+          <WatchLinks rec={stream} title={show.name} mine={mine} checking={autoStream} />
         )}
         {syncing && <span className="sd-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>Syncing with TMDB…</span>}
       </div>

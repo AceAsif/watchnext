@@ -1,5 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import ScoresRow from '../components/ScoresRow.jsx';
+import WatchLinks from '../components/WatchLinks.jsx';
+import { regionBlock } from '../components/watchLinksLogic.js';
+import { normalizeProviders } from '../components/servicesLogic.js';
+import { useServicesPrefs } from '../store/servicesPrefs.js';
 import { scoresOn } from '../components/useScores.js';
 import { fromTmdb } from '../components/scoresLogic.js';
 import { useStore } from '../store/useStore.js';
@@ -63,6 +67,7 @@ const MOVIE_VIEWS = [
 export default function Movies() {
   const state = useStore();
   const librarySyncing = useLibrarySyncing();
+  const svc = useServicesPrefs(); // region + the services you pay for (Watch links)
   const [addOpen, setAddOpen] = useState(false); // the "Add a movie" dialog
   const [addQuery, setAddQuery] = useState('');
   const [fixIndex, setFixIndex] = useState(null); // movie index being fixed
@@ -251,6 +256,8 @@ export default function Movies() {
   const trackedMovie = useMemo(() => new Set((state.movies || []).map((m) => m.tmdbId).filter(Boolean)), [state.movies]);
   const selGroup = sel ? groupOfIndex(groups, sel.index) : null;
   const d = sel && sel.tmdbId ? details[sel.tmdbId] : null;
+  // Watch links: where it streams in your region, from the details the sheet already loaded.
+  const watchRec = d && !d.error ? (({ providers, free, link }) => ({ providers, providersFree: free, providersLink: link }))(normalizeProviders(regionBlock(d, svc.region))) : null;
   const fixing = sel && fixIndex === sel.index;
   const selCollId = useCollectionForDetails(d);
   const selColl = selCollId ? collInfo.collections.find((c) => c.id === selCollId) || null : null;
@@ -367,6 +374,10 @@ export default function Movies() {
                 )}
               </div>
             </div>
+
+            {watchRec && hasKey() && (
+              <WatchLinks rec={watchRec} title={d.title || sel.name} mine={svc.mine} className="sd-mdet-sec" />
+            )}
 
             {sel.tmdbId && d && !d.error ? (
               <ScoresRow kind="movie" tmdbId={sel.tmdbId} name={d.title || sel.name} known={fromTmdb(d)} label="Scores" className="sd-mdet-sec" />

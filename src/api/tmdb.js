@@ -165,7 +165,8 @@ export function tvDetailsWithCredits(tmdbId) {
 
 // A film's details + cast & crew in ONE request, for the movie sheet's Cast card.
 export function movieDetailsWithCredits(tmdbId) {
-  return get(`/movie/${tmdbId}`, { append_to_response: 'credits' });
+  // watch/providers too, for the movie sheet's Watch links (all regions; the sheet picks yours).
+  return get(`/movie/${tmdbId}`, { append_to_response: 'credits,watch/providers' });
 }
 
 // The streaming providers TMDB knows for TV in a region (ids mostly match the movie list's).

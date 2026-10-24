@@ -52,7 +52,7 @@ async function open({ w = 390, h = 844, svc = SVC } = {}) {
       const k = d[1] === 'tv' ? `tv|${q.get('with_watch_providers')}|${q.get('air_date.gte') ? 'air' : 'first'}` : `movie|${q.get('with_watch_providers')}|`;
       return j({ results: DISC[k] || [] });
     }
-    if (/\/movie\/949$/.test(url.pathname) && url.searchParams.get('append_to_response') === 'credits') return j({ id: 949, title: 'Heat', credits: { cast: [{ id: 1158, name: 'Al Pacino', character: 'Vincent Hanna', order: 0 }, { id: 380, name: 'Robert De Niro', character: 'Neil McCauley', order: 1 }], crew: [{ id: 2, name: 'Michael Mann', job: 'Director' }, { id: 2, name: 'Michael Mann', job: 'Screenplay' }] } });
+    if (/\/movie\/949$/.test(url.pathname) && (url.searchParams.get('append_to_response') || '').split(',').includes('credits')) return j({ id: 949, title: 'Heat', credits: { cast: [{ id: 1158, name: 'Al Pacino', character: 'Vincent Hanna', order: 0 }, { id: 380, name: 'Robert De Niro', character: 'Neil McCauley', order: 1 }], crew: [{ id: 2, name: 'Michael Mann', job: 'Director' }, { id: 2, name: 'Michael Mann', job: 'Screenplay' }] } });
     if (/\/movie\/41$/.test(url.pathname)) return j({ id: 41, title: 'New Netflix Film', release_date: '2026-09-30', runtime: 100, genres: [] });
     if (/\/movie\/949$/.test(url.pathname)) return j({ id: 949, title: 'Heat', runtime: 170, belongs_to_collection: null, genres: [] });
     if (/\/person\/1158\/combined_credits$/.test(url.pathname)) return j({ cast: [{ id: 949, media_type: 'movie', title: 'Heat', character: 'Vincent Hanna' }, { id: 10, media_type: 'tv', name: 'Slow Horses', character: 'Cameo', vote_count: 900 }, { id: 77, media_type: 'movie', title: 'The Irishman', character: 'Jimmy Hoffa', vote_count: 500 }], crew: [] });

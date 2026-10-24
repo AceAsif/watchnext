@@ -164,6 +164,14 @@ export const HELP_SECTIONS = [
     title: 'Finding what to watch',
     items: [
       {
+        id: 'watch-links',
+        q: 'How do I open a show or movie in Netflix, Stan or another app?',
+        a: [
+          'On a show page or a movie, tap a button like “▶ Netflix”. It opens that service’s search for the title. The services you ticked in Settings → My services come first.',
+          '“All options” opens a page listing every service that has it, with direct links (from TMDB and JustWatch).',
+        ],
+      },
+      {
         id: 'tonight',
         q: 'What should I watch tonight?',
         a: [

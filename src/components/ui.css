@@ -2089,3 +2089,13 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-help-a .sd-keys li { font-size: 14px; }
 .sd-keys-help { display: block; margin-top: 10px; height: 44px; padding: 0; font-size: 14px; }
 @media (min-width: 900px) { .sd-helppage { max-width: 760px; } }
+
+/* Watch links (WatchLinks.jsx): [▶ Netflix] [▶ Stan] [All options] */
+.sd-watch { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sd-watch .sd-btn.sm { height: 44px; padding: 0 14px; font-size: 14px; text-decoration: none; max-width: 100%; }
+.sd-watch-btn { color: var(--text); border-color: var(--line); }
+.sd-watch-btn svg { color: var(--amber); flex-shrink: 0; }
+.sd-watch-btn.mine { border-color: var(--amber); }
+.sd-watch-all { color: var(--text-dim); background: transparent; }
+.sd-watch-wait { font-size: 12px; color: var(--text-dim); }
+.sd-watch.sd-mdet-sec { flex-direction: row; flex-wrap: wrap; align-items: center; }

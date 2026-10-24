@@ -112,8 +112,8 @@ Firestore: `users/{uid}/shows/{id}` (one doc per show) and `users/{uid}/library/
 
 **Up Next:** Continue watching (one-tap mark, Undo, ≈ done-by date at your pace), On the way (list / calendar), **Add to calendar** (.ics export, below), What should I watch tonight?, new titles from people you follow.
 **Shows:** filter + Status menu, platforms, sort, On my services, favourites (♥) first.
-**Show page:** seasons/episodes, episode summaries (tap a title), episode ratings, +1 rewatch (keeps first date), Rewatch mode (⋯ → Start a rewatch), notes/reactions, Drop/Resume, Fix watch dates, "You finished" card, cast & crew (follow a person), AniList, streaming in your region, **Scores row**, Lists.
-**Movies:** one tile per film with viewings list, half-star ratings, change a viewing's date, Collections view, cast on the sheet, **Scores**, Fix match (year-aware search).
+**Show page:** seasons/episodes, episode summaries (tap a title), episode ratings, +1 rewatch (keeps first date), Rewatch mode (⋯ → Start a rewatch), notes/reactions, Drop/Resume, Fix watch dates, "You finished" card, cast & crew (follow a person), AniList, streaming in your region, **Watch links**, **Scores row**, Lists.
+**Movies:** one tile per film with viewings list, **Watch links** on the sheet, half-star ratings, change a viewing's date, Collections view, cast on the sheet, **Scores**, Fix match (year-aware search).
 **Watchlist:** Queue (total time to finish at your pace, Quickest first / A–Z / **Highest rated** sorts, scores on rows), Lists (custom lists), New (new on your services this week), Discover (taste-weighted rows incl. Hidden gems and an anime row; Movie night).
 **Stats:** Overview (Goals, Year in review, Month in review, **This month vs last year**), Habits, Rankings, Breakdown (Your taste), **Badges** (15 badges × 6 levels, Gem hex art), **World** (countries/languages map).
 **Settings:** **Help & FAQ** (own page: 8 sections, search, opens from the `?` keyboard list too), Sync, TMDB key, Region, My services, **Spoiler shield**, Import TV Time, Import from Letterboxd, Clean up shows, Duplicate movies, Hidden from Discover, **Your recent changes** (activity log with Undo), Backup (download, restore, **Bring back first watch dates**), Export for Power BI (CSV), Danger zone.
@@ -166,7 +166,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 - (Done by this file: update the handover. Delete `docs/WatchNext-Handover-v6.md` once v7 is in.)
 
 **Feature ideas left (5):**
-1. **Watch links** — buttons like [▶ Netflix] [▶ Stan] [All options] on the show page and movie sheet for the services a title is on in your region (yours first). Option 1+2 agreed as the plan: open the service's search for the title + "All options" = TMDB's JustWatch link (already stored as `providersLink`). Exact title links later via Watchmode if needed. Asked for by his friends; waiting for his go-ahead.
+1. ~~Watch links~~ — built 24 Oct (`watchLinksLogic.js`, `WatchLinks.jsx`). Service search URLs live in `WATCH_SERVICES`; rows with `sure: false` (Disney+, Stan, Binge, Paramount+, HBO Max, iview, SBS) could not be opened from the sandbox and need checking on a real device. Exact title links later via Watchmode if needed.
 2. **Home-screen shortcuts** — long-press the app icon → Up Next, Search, Tonight (manifest `shortcuts`).
 3. **Keyboard shortcuts** — on the computer: "/" search, 1–6 switch tabs.
 4. **Compare with a friend** — shows you've both watched, what they loved that you haven't.
