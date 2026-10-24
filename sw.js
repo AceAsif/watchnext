@@ -4,7 +4,7 @@
 // worker each release — which skips waiting, claims clients and purges the
 // old app cache. Result: new code loads on the next visit with no manual
 // cache clearing. Left as the literal placeholder for local `npm run deploy`.
-const BUILD = '15e7fe3cba8c67eb473bd1aa2df59eb8414e8333';
+const BUILD = 'be77138a29fb7eed70af4105c29e9760fa881988';
 const APP_CACHE = 'watchnext-app-' + BUILD;
 const IMG_CACHE = 'watchnext-img'; // stable across deploys — posters never change
 
@@ -61,6 +61,9 @@ self.addEventListener('fetch', (e) => {
         caches.open(APP_CACHE).then((c) => c.put(req, copy));
         return res;
       })
-      .catch(() => caches.match(req))
+      // Offline: a home-screen shortcut opens "./?go=search" etc., which isn't
+      // cached under that exact address, so fall back to the cached app page.
+      .catch(async () => (await caches.match(req)) ||
+        (req.mode === 'navigate' ? caches.match(req, { ignoreSearch: true }) : undefined))
   );
 });
