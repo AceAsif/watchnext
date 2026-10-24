@@ -27,7 +27,7 @@ export function useKeyboardShortcuts(actions, canGoBack) {
   }, []);
 }
 
-export function ShortcutsSheet({ open, onClose }) {
+export function ShortcutsSheet({ open, onClose, onOpenHelp }) {
   return (
     <Sheet open={open} title="Keyboard shortcuts" subtitle="On a computer keyboard" onClose={onClose}>
       <ul className="sd-keys">
@@ -41,6 +41,11 @@ export function ShortcutsSheet({ open, onClose }) {
         ))}
       </ul>
       <p className="sd-keys-note">Shortcuts don't work while you type in a box. Press Esc to close this.</p>
+      {onOpenHelp && (
+        <button type="button" className="sd-linkbtn sd-keys-help" onClick={onOpenHelp} data-testid="keys-help">
+          More help: Help &amp; FAQ ›
+        </button>
+      )}
     </Sheet>
   );
 }

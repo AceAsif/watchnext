@@ -116,7 +116,7 @@ Firestore: `users/{uid}/shows/{id}` (one doc per show) and `users/{uid}/library/
 **Movies:** one tile per film with viewings list, half-star ratings, change a viewing's date, Collections view, cast on the sheet, **Scores**, Fix match (year-aware search).
 **Watchlist:** Queue (total time to finish at your pace, Quickest first / A–Z / **Highest rated** sorts, scores on rows), Lists (custom lists), New (new on your services this week), Discover (taste-weighted rows incl. Hidden gems and an anime row; Movie night).
 **Stats:** Overview (Goals, Year in review, Month in review, **This month vs last year**), Habits, Rankings, Breakdown (Your taste), **Badges** (15 badges × 6 levels, Gem hex art), **World** (countries/languages map).
-**Settings:** Sync, TMDB key, Region, My services, **Spoiler shield**, Import TV Time, Import from Letterboxd, Clean up shows, Duplicate movies, Hidden from Discover, **Your recent changes** (activity log with Undo), Backup (download, restore, **Bring back first watch dates**), Export for Power BI (CSV), Danger zone.
+**Settings:** **Help & FAQ** (own page: 8 sections, search, opens from the `?` keyboard list too), Sync, TMDB key, Region, My services, **Spoiler shield**, Import TV Time, Import from Letterboxd, Clean up shows, Duplicate movies, Hidden from Discover, **Your recent changes** (activity log with Undo), Backup (download, restore, **Bring back first watch dates**), Export for Power BI (CSV), Danger zone.
 
 ### Built in the last sessions (Oct 22–24, 2026) — details
 - **Critic and audience scores** (`scoresLogic.js`, `useScores.js`, `ScoresRow.jsx`, `api/omdb.js`). OMDb by IMDb id (TMDB gives the id; `/tv/{id}?append_to_response=external_ids`). Chips: IMDb ★ + votes, Rotten Tomatoes critics %, Metacritic (green/yellow/red), TMDB; each links out. TV usually has only IMDb. Cached per device (new releases re-checked after 3 days, others 30, "not found" 7); queue of 2 lookups. Hidden entirely when there is no `VITE_OMDB_API_KEY`. Free OMDb = 1,000 lookups/day. Highest rated sort looks scores up only while that sort is chosen.
@@ -152,8 +152,9 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 1. `git fetch`, compare, reset to `origin/main` (§0).
 2. Put decisions in pure `*Logic.js` modules with unit tests; UI in `.jsx`; append CSS to `ui.css`.
 3. `npm run build` must pass. Run all unit suites + the related browser suites + a new browser suite for the feature. Look at phone screenshots.
-4. Zip only changed/new files with folders, SendUserFile, folder table, plain commit message.
-5. Update the "WatchNext feature list" doc.
+4. **Update Help & FAQ** (`src/components/helpContent.js`) when a feature adds or changes something people use: real button names, short plain answers. `tests/unit/help.test.mjs` checks the structure.
+5. Zip only changed/new files with folders, SendUserFile, folder table, plain commit message.
+6. Update the "WatchNext feature list" doc.
 
 ## 11. To-do list (from the feature list doc)
 

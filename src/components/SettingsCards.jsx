@@ -36,6 +36,7 @@ const I = {
   x: <Svg size={16}><path d="M6 6l12 12M18 6L6 18" /></Svg>,
   eye: <Svg><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><path d="M4 20L20 4" /></Svg>,
   warn: <Svg size={16}><path d="M12 3l10 18H2zM12 10v5M12 18h.01" /></Svg>,
+  help: <Svg><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01" /></Svg>,
 };
 
 export function Pill({ tone = 'teal', dot, children }) {
@@ -482,6 +483,20 @@ export function SpoilerCard({ on, onChange }) {
         <span>Hide episode titles and summaries until I’ve watched them</span>
       </label>
       <div className="sd-setnote">{I.lock}Kept on this device only. Turn it on on each phone or computer you use.</div>
+    </SetCard>
+  );
+}
+
+// Help & FAQ: opens its own page (pages/Help.jsx); the text is in helpContent.js.
+export function HelpCard({ onOpen }) {
+  return (
+    <SetCard icon={I.help} label="How to" title="Help & FAQ" id="help">
+      <p className="sd-setp">
+        How to use WatchNext: rewatches, lists, Discover, sync, backups, shortcuts and answers to common problems.
+      </p>
+      <div className="sd-setacts">
+        <button type="button" className="sd-setbtn" onClick={onOpen} data-testid="open-help">Open Help &amp; FAQ</button>
+      </div>
     </SetCard>
   );
 }

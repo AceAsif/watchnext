@@ -52,6 +52,7 @@ import {
   DangerCard,
   ConfirmDialog,
   ShowThumb,
+  HelpCard,
 } from '../components/SettingsCards.jsx';
 
 // Settings — Claude Design, Direction A: one column of cards (Sync, TMDB key,
@@ -62,7 +63,7 @@ import {
 
 const IMPORT_COMMAND = 'python tools/convert_tvtime.py gdpr-data.zip -o tvtime_import.json';
 
-export default function Settings() {
+export default function Settings({ onOpenHelp = () => {} }) {
   const state = useStore();
   const shield = useSpoilerShield();
   const savedKey = state.settings.tmdbKey || '';
@@ -304,6 +305,7 @@ export default function Settings() {
       {nudge.show && <BackupNudge copy={nudgeCopy(nudge)} onBackup={exportBackup} onLater={remindLater} />}
 
       <div className="sd-set">
+        <HelpCard onOpen={onOpenHelp} />
         <SyncCard available={cloudOn} user={cloudUser} busy={cloudBusy} onSignIn={handleSignIn} onSignOut={handleSignOut} backupOnSignOut={backupOnOut} onToggleBackup={toggleSignOutBackup} />
         <KeyCard status={keyStatus(savedKey, key)} value={key} onChange={setKey} onSave={saveKey} />
         <RegionCard region={svc.region} onChange={(r) => setServicesPrefs({ region: r })} />

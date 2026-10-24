@@ -9,6 +9,7 @@ import Stats from './pages/Stats.jsx';
 import Settings from './pages/Settings.jsx';
 import Search from './pages/Search.jsx';
 import Notes from './pages/Notes.jsx';
+import Help from './pages/Help.jsx';
 import OfflineBanner from './components/OfflineBanner.jsx';
 import AccountSwitchSheet from './components/AccountSwitchSheet.jsx';
 import AccountChip from './components/AccountChip.jsx';
@@ -107,6 +108,9 @@ export default function App() {
   const openShow = (id) => setShowOpen(id);
   const closeShow = () => setShowOpen(null);
   const [keysOpen, setKeysOpen] = useState(false);
+  // Help & FAQ (Settings → Help & FAQ, or the keyboard list's link). `at` = section to open at.
+  const [help, setHelp] = useState(null); // null | { at }
+  const openHelp = (at = null) => { setHelp({ at }); setTab('settings'); closeShow(); setSearching(false); setNotesOpen(false); setKeysOpen(false); };
 
   // Same as tapping a tab in the tab bar.
   const goTab = (id) => {
@@ -115,6 +119,7 @@ export default function App() {
     closeShow();
     setSearching(false);
     setNotesOpen(false);
+    setHelp(null);
   };
   const openSearch = () => {
     setSearching(true);
@@ -134,10 +139,11 @@ export default function App() {
         if (searching) setSearching(false);
         else if (showOpen) closeShow();
         else if (notesOpen) setNotesOpen(false);
+        else if (help) setHelp(null);
       },
       help: () => setKeysOpen(true),
     },
-    searching || !!showOpen || notesOpen,
+    searching || !!showOpen || notesOpen || !!help,
   );
 
   return (
@@ -148,7 +154,7 @@ export default function App() {
           Watch<span>Next</span>
         </h1>
         <span style={{ marginLeft: 'auto', minWidth: 0 }}>
-          <AccountChip onOpen={() => { setTab('settings'); closeShow(); setSearching(false); setNotesOpen(false); }} />
+          <AccountChip onOpen={() => { setTab('settings'); closeShow(); setSearching(false); setNotesOpen(false); setHelp(null); }} />
         </span>
         <button
           className="sd-ib masthead-search"
@@ -173,6 +179,8 @@ export default function App() {
         <ShowDetail id={showOpen} onBack={closeShow} />
       ) : notesOpen ? (
         <Notes memo={notesMemo.current} openShow={openShow} onBack={() => setNotesOpen(false)} />
+      ) : help ? (
+        <Help startAt={help.at} onBack={() => setHelp(null)} />
       ) : (
         <>
           {tab === 'next' && <UpNext openShow={openShow} startTonight={tonightOnStart} onStartedTonight={() => setTonightOnStart(false)} />}
@@ -180,13 +188,13 @@ export default function App() {
           {tab === 'movies' && <Movies />}
           {tab === 'watchlist' && <Watchlist openShow={openShow} />}
           {tab === 'stats' && <Stats key={statsStart.n} startTab={statsStart.tab} onOpenNotes={() => { notesMemo.current = newNotesMemo(); setNotesOpen(true); }} />}
-          {tab === 'settings' && <Settings />}
+          {tab === 'settings' && <Settings onOpenHelp={() => openHelp()} />}
         </>
       )}
 
       <AccountSwitchSheet />
-      <ShortcutsSheet open={keysOpen} onClose={() => setKeysOpen(false)} />
-      <BadgeNote onOpen={() => { setStatsStart((s) => ({ tab: 'Badges', n: s.n + 1 })); setTab('stats'); closeShow(); setSearching(false); setNotesOpen(false); }} />
+      <ShortcutsSheet open={keysOpen} onClose={() => setKeysOpen(false)} onOpenHelp={() => openHelp('shortcuts')} />
+      <BadgeNote onOpen={() => { setStatsStart((s) => ({ tab: 'Badges', n: s.n + 1 })); setTab('stats'); closeShow(); setSearching(false); setNotesOpen(false); setHelp(null); }} />
 
       <nav className="tabbar" aria-label="Main">
         {TABS.map((t, i) => (
