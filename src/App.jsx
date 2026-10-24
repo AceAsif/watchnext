@@ -15,6 +15,10 @@ import AccountChip from './components/AccountChip.jsx';
 import BadgeNote from './components/BadgeNote.jsx';
 import { useKeyboardShortcuts, ShortcutsSheet } from './components/KeyboardShortcuts.jsx';
 import { newNotesMemo } from './components/notesSearchLogic.js';
+import { launchTarget, cleanLaunchUrl } from './components/launchShortcutsLogic.js';
+
+// Home-screen / taskbar shortcut the app was opened from ("./?go=search" etc.), read once.
+const LAUNCH = typeof window !== 'undefined' ? launchTarget(window.location.search) : null;
 
 const TABS = [
   {
@@ -79,7 +83,9 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState('next');
   const [showOpen, setShowOpen] = useState(null); // show id or null
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] = useState(LAUNCH === 'search');
+  // "Tonight" shortcut: open Up Next with the "What should I watch tonight?" sheet, once.
+  const [tonightOnStart, setTonightOnStart] = useState(LAUNCH === 'tonight');
   // "Your notes" (opened from Stats) lives here, not inside Stats, so opening a show
   // from it and pressing Back returns to the same search, filters and scroll.
   const [notesOpen, setNotesOpen] = useState(false);
@@ -90,6 +96,12 @@ export default function App() {
   useEffect(() => {
     const unsub = initCloudSync();
     return unsub;
+  }, []);
+
+  // Take "?go=…" out of the address so a reload opens the app as normal.
+  useEffect(() => {
+    const clean = cleanLaunchUrl(window.location.href);
+    if (clean) try { window.history.replaceState(window.history.state, '', clean); } catch { /* ignore */ }
   }, []);
 
   const openShow = (id) => setShowOpen(id);
@@ -163,7 +175,7 @@ export default function App() {
         <Notes memo={notesMemo.current} openShow={openShow} onBack={() => setNotesOpen(false)} />
       ) : (
         <>
-          {tab === 'next' && <UpNext openShow={openShow} />}
+          {tab === 'next' && <UpNext openShow={openShow} startTonight={tonightOnStart} onStartedTonight={() => setTonightOnStart(false)} />}
           {tab === 'shows' && <Shows openShow={openShow} />}
           {tab === 'movies' && <Movies />}
           {tab === 'watchlist' && <Watchlist openShow={openShow} />}

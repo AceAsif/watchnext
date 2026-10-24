@@ -140,12 +140,13 @@ function ContinueRow({ id, show, next, today, first, onOpen, onMark, rewatch = f
 }
 
 // ---------------------------------------------------------------- page
-export default function UpNext({ openShow }) {
+export default function UpNext({ openShow, startTonight = false, onStartedTonight }) {
   const state = useStore();
   const [refresh, setRefresh] = useState(null); // {done, total} while refreshing
   const [view, setView] = useState('list'); // 'list' | 'calendar'
   const [showAll, setShowAll] = useState(false);
-  const [tonightOpen, setTonightOpen] = useState(false); // "What should I watch tonight?"
+  const [tonightOpen, setTonightOpen] = useState(!!startTonight); // "What should I watch tonight?" (also the "Tonight" home-screen shortcut)
+  useEffect(() => { if (startTonight && onStartedTonight) onStartedTonight(); }, []); // only on the first open
   const [toast, setToast] = useState(null); // last mark, for Undo
   const [calOpen, setCalOpen] = useState(false); // "Add to calendar" sheet
 

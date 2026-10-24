@@ -10,5 +10,13 @@
     { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "shortcuts": [
+    { "name": "Up Next", "short_name": "Up Next", "description": "What to watch next", "url": "./?go=next",
+      "icons": [{ "src": "./shortcut-upnext.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Search", "short_name": "Search", "description": "Search shows and movies", "url": "./?go=search",
+      "icons": [{ "src": "./shortcut-search.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "What should I watch tonight?", "short_name": "Tonight", "description": "Pick something for tonight", "url": "./?go=tonight",
+      "icons": [{ "src": "./shortcut-tonight.png", "sizes": "96x96", "type": "image/png" }] }
   ]
 }

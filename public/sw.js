@@ -61,6 +61,9 @@ self.addEventListener('fetch', (e) => {
         caches.open(APP_CACHE).then((c) => c.put(req, copy));
         return res;
       })
-      .catch(() => caches.match(req))
+      // Offline: a home-screen shortcut opens "./?go=search" etc., which isn't
+      // cached under that exact address, so fall back to the cached app page.
+      .catch(async () => (await caches.match(req)) ||
+        (req.mode === 'navigate' ? caches.match(req, { ignoreSearch: true }) : undefined))
   );
 });
