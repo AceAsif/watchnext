@@ -2099,3 +2099,44 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-watch-all { color: var(--text-dim); background: transparent; }
 .sd-watch-wait { font-size: 12px; color: var(--text-dim); }
 .sd-watch.sd-mdet-sec { flex-direction: row; flex-wrap: wrap; align-items: center; }
+
+/* Compare with a friend (pages/Compare.jsx) */
+.sd-stats-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.sd-cmppage { display: flex; flex-direction: column; gap: 12px; }
+.sd-cmppage .sd-title { margin: 0; }
+.sd-cmp-msg { margin: 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--teal); color: var(--text); font-size: 14px; line-height: 1.45; background: var(--bg-raise); }
+.sd-cmp-msg.err { border-color: var(--red, #e5484d); }
+.sd-cmp-p { margin: 6px 0 10px; font-size: 14px; line-height: 1.5; color: var(--text-dim); }
+.sd-cmp-shareRow { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.sd-cmp-name { display: flex; flex-direction: column; gap: 6px; flex: 1 1 180px; min-width: 0; }
+.sd-cmp-name input { height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 15px; width: 100%; }
+.sd-cmp-name input:focus { outline: 2px solid var(--amber); outline-offset: 0; }
+.sd-cmp-shareRow .sd-btn { height: 44px; }
+.sd-cmp-friends { display: flex; flex-wrap: wrap; gap: 8px; }
+.sd-cmp-friends .sd-nchip { min-height: 40px; }
+.sd-cmp-friends .sd-nchip.on { border-color: var(--amber); color: var(--amber); }
+.sd-cmp-head { display: flex; flex-direction: column; gap: 8px; }
+.sd-cmp-match { display: flex; align-items: baseline; gap: 10px; }
+.sd-cmp-match .big { font-family: var(--font-display); font-size: 44px; font-weight: 800; line-height: 1; color: var(--amber); }
+.sd-cmp-match .lab { font-size: 14px; color: var(--text); }
+.sd-cmp-remove { align-self: flex-start; height: 44px; padding: 0; font-size: 13px; color: var(--text-dim); }
+.sd-cmp-remove.danger { color: var(--red, #e5484d); }
+.sd-cmp-tabs button { flex: 1 1 auto; }
+.sd-cmp-list { list-style: none; margin: 0; padding: 0; overflow: hidden; }
+.sd-cmp-row { display: flex; align-items: center; gap: 10px; padding-right: 12px; }
+.sd-cmp-row + .sd-cmp-row { border-top: 1px solid var(--line); }
+.sd-cmp-main { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 10px 0 10px 12px; }
+button.sd-cmp-main { cursor: pointer; }
+button.sd-cmp-main:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; border-radius: 10px; }
+.sd-cmp-main .art { width: 40px; height: 60px; border-radius: 6px; object-fit: cover; flex: none; background: var(--line); }
+.sd-cmp-main .art.blank { display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-weight: 700; }
+.sd-cmp-main .body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sd-cmp-main .name { font-size: 15px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.sd-cmp-main .meta { font-size: 11px; color: var(--text-dim); }
+.sd-cmp-main .rates { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--text-dim); }
+.sd-cmp-main .rates .hot { color: var(--amber); }
+.sd-cmp-row .sd-btn.sm { height: 40px; flex: none; }
+.sd-cmp-tag { flex: none; font-size: 12px; color: var(--teal); }
+@media (min-width: 900px) { .sd-cmppage { max-width: 820px; } }
+.sd-cmp-share.compact .sd-cmp-shareRow .sd-btn { flex: 1 1 auto; }
+.sd-cmp-change { height: 44px; padding: 0; font-size: 14px; }

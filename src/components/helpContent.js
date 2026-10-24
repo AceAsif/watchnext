@@ -246,6 +246,14 @@ export const HELP_SECTIONS = [
         ],
       },
       {
+        id: 'compare',
+        q: 'How do I compare with a friend?',
+        a: [
+          'Open Stats → Friends. Tap “Share mine” and send the file to your friend; they open it in Stats → Friends → “Open a friend’s file”, and you do the same with theirs.',
+          'You see your taste match, what you have both watched, and what they loved (4★ or more, or ♥) that you haven’t seen. The file holds only titles, ratings, ♥ and what you finished.',
+        ],
+      },
+      {
         id: 'world',
         q: 'What is the World tab?',
         a: ['A map of the countries and languages of everything you have watched.'],

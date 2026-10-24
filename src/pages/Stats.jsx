@@ -59,7 +59,7 @@ function HeroSpan({ span, size = 'hero' }) {
   );
 }
 
-export default function Stats({ onOpenNotes, startTab = 'Overview' }) {
+export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview' }) {
   const state = useStore();
   const librarySyncing = useLibrarySyncing();
   const [year, setYear] = useState('all');       // Habits day-of-week scope
@@ -607,12 +607,20 @@ export default function Stats({ onOpenNotes, startTab = 'Overview' }) {
       <div className="sd-stats-head">
         <div className="sd-stats-titlerow">
           <h1 className="sd-title">Stats</h1>
-          {onOpenNotes ? (
-            <button type="button" className="sd-notesbtn" onClick={onOpenNotes} aria-label={`Your notes, ${noteCount} entries`}>
-              Notes{noteCount > 0 ? <span className="n">{noteCount.toLocaleString()}</span> : null}
-              <Chevron />
-            </button>
-          ) : null}
+          <span className="sd-stats-btns">
+            {onOpenCompare ? (
+              <button type="button" className="sd-notesbtn" onClick={onOpenCompare} aria-label="Compare with a friend" data-testid="open-compare">
+                Friends
+                <Chevron />
+              </button>
+            ) : null}
+            {onOpenNotes ? (
+              <button type="button" className="sd-notesbtn" onClick={onOpenNotes} aria-label={`Your notes, ${noteCount} entries`}>
+                Notes{noteCount > 0 ? <span className="n">{noteCount.toLocaleString()}</span> : null}
+                <Chevron />
+              </button>
+            ) : null}
+          </span>
         </div>
         <TabBar tabs={TABS} value={tab} onChange={setTab} label="Stats sections" />
         <SyncingNote />

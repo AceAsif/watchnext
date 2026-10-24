@@ -102,7 +102,7 @@ docs/                   this handover, screenshots, older .docx notes
 
 ### localStorage keys
 Library & sync: `watchnext-state-v1`, `watchnext-sync-v1`, `watchnext-tombstones-v1`, `watchnext-wipe-tombstones-v1`, `watchnext-movie-tombs-v1`, `watchnext-owner-v1`, `watchnext-signout-backup-v1`.
-**Device-only (not synced, not in backups):** `watchnext-activity-v1`, `watchnext-backup-v1`, `watchnext-services-v1` (region + my services), `watchnext-tonight-v1`, `watchnext-movienight-v1`, `watchnext-taste-v1`, `watchnext-discover-log-v1`, `watchnext-newon-v1`, `watchnext-origins-v1`, `watchnext-collections-v1`, `watchnext-people-credits-v1`, `watchnext-scores-v1` (OMDb cache), `watchnext-badges-seen-v1`, `watchnext-spoilers-v1`, `watchnext-cal-exported-v1`, `watchnext-wl-sort`.
+**Device-only (not synced, not in backups):** `watchnext-activity-v1`, `watchnext-backup-v1`, `watchnext-services-v1` (region + my services), `watchnext-tonight-v1`, `watchnext-movienight-v1`, `watchnext-taste-v1`, `watchnext-discover-log-v1`, `watchnext-newon-v1`, `watchnext-origins-v1`, `watchnext-collections-v1`, `watchnext-people-credits-v1`, `watchnext-scores-v1` (OMDb cache), `watchnext-badges-seen-v1`, `watchnext-spoilers-v1`, `watchnext-cal-exported-v1`, `watchnext-wl-sort`, `watchnext-friends-v1` (your share name + friends' compare files).
 
 ## 6. Cloud sync (short)
 
@@ -115,7 +115,7 @@ Firestore: `users/{uid}/shows/{id}` (one doc per show) and `users/{uid}/library/
 **Show page:** seasons/episodes, episode summaries (tap a title), episode ratings, +1 rewatch (keeps first date), Rewatch mode (⋯ → Start a rewatch), notes/reactions, Drop/Resume, Fix watch dates, "You finished" card, cast & crew (follow a person), AniList, streaming in your region, **Watch links**, **Scores row**, Lists.
 **Movies:** one tile per film with viewings list, **Watch links** on the sheet, half-star ratings, change a viewing's date, Collections view, cast on the sheet, **Scores**, Fix match (year-aware search).
 **Watchlist:** Queue (total time to finish at your pace, Quickest first / A–Z / **Highest rated** sorts, scores on rows), Lists (custom lists), New (new on your services this week), Discover (taste-weighted rows incl. Hidden gems and an anime row; Movie night).
-**Stats:** Overview (Goals, Year in review, Month in review, **This month vs last year**), Habits, Rankings, Breakdown (Your taste), **Badges** (15 badges × 6 levels, Gem hex art), **World** (countries/languages map).
+**Stats:** **Friends** (Compare with a friend, below), Overview (Goals, Year in review, Month in review, **This month vs last year**), Habits, Rankings, Breakdown (Your taste), **Badges** (15 badges × 6 levels, Gem hex art), **World** (countries/languages map).
 **Settings:** **Help & FAQ** (own page: 8 sections, search, opens from the `?` keyboard list too), Sync, TMDB key, Region, My services, **Spoiler shield**, Import TV Time, Import from Letterboxd, Clean up shows, Duplicate movies, Hidden from Discover, **Your recent changes** (activity log with Undo), Backup (download, restore, **Bring back first watch dates**), Export for Power BI (CSV), Danger zone.
 
 ### Built in the last sessions (Oct 22–24, 2026) — details
@@ -169,7 +169,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 1. ~~Watch links~~ — built 24 Oct (`watchLinksLogic.js`, `WatchLinks.jsx`). Service search URLs live in `WATCH_SERVICES`; rows with `sure: false` (Disney+, Stan, Binge, Paramount+, HBO Max, iview, SBS) could not be opened from the sandbox and need checking on a real device. Exact title links later via Watchmode if needed.
 2. **Home-screen shortcuts** — long-press the app icon → Up Next, Search, Tonight (manifest `shortcuts`).
 3. **Keyboard shortcuts** — on the computer: "/" search, 1–6 switch tabs.
-4. **Compare with a friend** — shows you've both watched, what they loved that you haven't.
+4. ~~Compare with a friend~~ — built 24 Oct (`compareLogic.js`, `pages/Compare.jsx`, Stats → Friends). Friends swap a small JSON file ("Share mine" → WhatsApp/email → "Open a friend's file"); only titles, ratings, ♥, finished/dropped. Loved = 4★+ or ♥. Friends' files stay on the device. A live share code would need new Firestore rules.
 5. **Episode IMDb scores** (later) — per-episode IMDb score on the show page (OMDb `?i=<show>&Season=N` returns a season's episodes in one call).
 
 **Other open items:**
