@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ScoresRow from '../components/ScoresRow.jsx';
+import useScores from '../components/useScores.js';
+import useEpisodeScores from '../components/useEpisodeScores.js';
+import { bestEpisode, scoreText } from '../components/epScoresLogic.js';
 import { useServicesPrefs } from '../store/servicesPrefs.js';
 import { recordRegion, inRegion } from '../components/regionLogic.js';
 import { useStore } from '../store/useStore.js';
@@ -95,7 +98,7 @@ const CheckIcon = ({ size = 16, w = 2.4 }) => (
 );
 
 // ---------------------------------------------------------------- seasons
-function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, onRewatched }) {
+function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, onRewatched, imdbId }) {
   // Watching anything resumes a dropped show (see db.js); tell the page so it can
   // offer Undo. `on` is whether the action marks something as watched.
   const resumes = (on) => { if (on && show.dropped === true && onResumed) onResumed(show.droppedAt || null); };
@@ -111,6 +114,9 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
   };
   const [eps, setEps] = useState(null);
   const [open, setOpen] = useState(isCurrent);
+  // IMDb score per episode (one OMDb lookup for the season, only once it is opened).
+  const epScores = useEpisodeScores(imdbId, season.n, open);
+  const bestEp = bestEpisode(epScores);
   const [err, setErr] = useState(null);
   const [expandDone, setExpandDone] = useState(false);
   const [noteEp, setNoteEp] = useState(null); // { n, name } of the episode whose note is open
@@ -262,6 +268,9 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
           const noteReaction = note && reactionById(note.react);
           const epRating = ratingOf(show, k);
           if (epRating) sub = sub ? { ...sub, text: `${sub.text} · ★ ${starLabel(epRating)}` } : { text: `★ ${starLabel(epRating)}`, color: 'var(--text-dim)' };
+          // IMDb score (not for episodes the Spoiler shield hides: a very high score can give a moment away).
+          const imdb = !hidden && typeof epScores[ep.episode_number] === 'number' ? epScores[ep.episode_number] : null;
+          const isBest = imdb != null && bestEp === ep.episode_number;
           return (
             <div className="sd-ep" key={ep.id}>
               <span className="sd-mono" style={{ width: 30, fontSize: 12, color: isNext ? 'var(--amber)' : 'var(--text-dim)' }}>
@@ -277,7 +286,20 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
                 >
                   {hidden ? <span className="sd-ep-shielded" data-testid="shielded-title">{title}</span> : title}
                 </button>
-                {sub && <div style={{ fontSize: 12, color: sub.color, marginTop: 2 }}>{sub.text}</div>}
+                {(sub || imdb != null) && (
+                  <div style={{ fontSize: 12, color: sub ? sub.color : 'var(--text-dim)', marginTop: 2 }}>
+                    {sub ? sub.text : null}
+                    {imdb != null && (
+                      <span
+                        className={'sd-ep-imdb' + (isBest ? ' best' : '')}
+                        data-testid="ep-imdb"
+                        title={isBest ? 'Highest IMDb score this season' : 'IMDb score'}
+                      >
+                        {sub ? ' · ' : ''}IMDb {scoreText(imdb)}{isBest ? ' · best' : ''}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {aboutEp === ep.episode_number && (
                   <div className="sd-ep-about" data-testid="episode-summary">
                     {hidden ? (
@@ -515,6 +537,8 @@ export default function ShowDetail({ id, onBack }) {
   // Watch links need to know where it streams: check quietly when opening a show that was never
   // checked for this region (or not for 14 days). No pop-up on failure; "Streaming in …" can retry.
   const [autoStream, setAutoStream] = useState(false);
+  // The show's IMDb id (from the Scores lookup) for the episode scores.
+  const showScores = useScores('tv', show && show.tmdbId);
   useEffect(() => {
     if (!show || !show.tmdbId || !hasKey() || !needsCheck(show, new Date(), region)) return undefined;
     let alive = true;
@@ -897,6 +921,7 @@ export default function ShowDetail({ id, onBack }) {
             onResumed={showResumed}
             onRewatched={showRewatched}
             onAdded={noteAdded}
+            imdbId={showScores && showScores.imdbId}
           />
         ))}
       </section>

@@ -103,7 +103,7 @@ docs/                   this handover, screenshots, older .docx notes
 
 ### localStorage keys
 Library & sync: `watchnext-state-v1`, `watchnext-sync-v1`, `watchnext-tombstones-v1`, `watchnext-wipe-tombstones-v1`, `watchnext-movie-tombs-v1`, `watchnext-owner-v1`, `watchnext-signout-backup-v1`.
-**Device-only (not synced, not in backups):** `watchnext-activity-v1`, `watchnext-backup-v1`, `watchnext-services-v1` (region + my services), `watchnext-tonight-v1`, `watchnext-movienight-v1`, `watchnext-taste-v1`, `watchnext-discover-log-v1`, `watchnext-newon-v1`, `watchnext-origins-v1`, `watchnext-collections-v1`, `watchnext-people-credits-v1`, `watchnext-scores-v1` (OMDb cache), `watchnext-badges-seen-v1`, `watchnext-spoilers-v1`, `watchnext-cal-exported-v1`, `watchnext-wl-sort`, `watchnext-friends-v1` (your share name + friends' compare files).
+**Device-only (not synced, not in backups):** `watchnext-activity-v1`, `watchnext-backup-v1`, `watchnext-services-v1` (region + my services), `watchnext-tonight-v1`, `watchnext-movienight-v1`, `watchnext-taste-v1`, `watchnext-discover-log-v1`, `watchnext-newon-v1`, `watchnext-origins-v1`, `watchnext-collections-v1`, `watchnext-people-credits-v1`, `watchnext-scores-v1` (OMDb cache), `watchnext-ep-scores-v1` (episode IMDb scores per season), `watchnext-badges-seen-v1`, `watchnext-spoilers-v1`, `watchnext-cal-exported-v1`, `watchnext-wl-sort`, `watchnext-friends-v1` (your share name + friends' compare files).
 
 ## 6. Cloud sync (short)
 
@@ -172,7 +172,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 2. **Home-screen shortcuts** — long-press the app icon → Up Next, Search, Tonight (manifest `shortcuts`).
 3. **Keyboard shortcuts** — on the computer: "/" search, 1–6 switch tabs.
 4. ~~Compare with a friend~~ — built 24 Oct (`compareLogic.js`, `pages/Compare.jsx`, Stats → Friends). Friends swap a small JSON file ("Share mine" → WhatsApp/email → "Open a friend's file"); only titles, ratings, ♥, finished/dropped. Loved = 4★+ or ♥. Friends' files stay on the device. A live share code would need new Firestore rules.
-5. **Episode IMDb scores** (later) — per-episode IMDb score on the show page (OMDb `?i=<show>&Season=N` returns a season's episodes in one call).
+5. ~~Episode IMDb scores~~ — built 25 Oct (`epScoresLogic.js`, `useEpisodeScores.js`, `omdbSeason` in `api/omdb.js`). One OMDb call per season, only when the season is opened; saved per device (30 days, 3 if airing, 7 if none). Best episode marked; hidden for shielded episodes. Needs the show's IMDb id from the title Scores lookup.
 
 **Other open items:**
 - Movie sheet: show the film's newest name and poster for every viewing, with a "Saved as … — use Fix match if this was a different film" line (the Amazing Spider-Man 2 issue).

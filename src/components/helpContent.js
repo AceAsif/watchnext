@@ -197,7 +197,7 @@ export const HELP_SECTIONS = [
         q: 'What are the IMDb, Rotten Tomatoes and Metacritic scores?',
         a: [
           'They appear on show pages, movies and the Watchlist. Tap a score to open that website. TV shows often only have an IMDb score.',
-          'In Watchlist → Queue, the “Highest rated” sort uses these scores.',
+          'In Watchlist → Queue, the “Highest rated” sort uses these scores. Open a season on a show page to see each episode’s IMDb score; the season’s best episode is marked “best”.',
         ],
       },
       {

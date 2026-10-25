@@ -67,6 +67,8 @@ async function open({ w = 390, h = 844, fresh = true } = {}) {
     const j = (b) => r.respond({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(b) });
     const url = new URL(u);
     if (url.hostname === 'www.omdbapi.com') {
+      // Season lookups (episode scores) are tested in ep_scores.mjs; this suite counts title lookups only.
+      if (url.searchParams.get('Season')) return j({ Response: 'False', Error: 'Series or season not found!' });
       const id = url.searchParams.get('i');
       omdbLog.push(id);
       assert.equal(url.searchParams.get('apikey'), 'TESTOMDB');
