@@ -175,8 +175,8 @@ export const HELP_SECTIONS = [
         id: 'watch-links',
         q: 'How do I open a show or movie in Netflix, Stan or another app?',
         a: [
-          'On a show page or a movie, tap a button like “▶ Netflix”. It opens that service’s search for the title. The services you ticked in Settings → My services come first.',
-          '“All options” opens a page listing every service that has it, with direct links (from TMDB and JustWatch).',
+          'On a show page, a movie, or a movie on your Watchlist, tap a button like “▶ Netflix”. It opens that service’s search for the title. The services you ticked in Settings → My services come first.',
+          '“All options” opens a page listing every service that has it, with direct links (from TMDB and JustWatch). When it isn’t streaming anywhere but you can buy or rent it, the button says “Buy or rent” instead.',
         ],
       },
       {

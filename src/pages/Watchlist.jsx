@@ -22,6 +22,9 @@ import { useScoresMany, scoresOn } from '../components/useScores.js';
 import { scoreKey, sortScore } from '../components/scoresLogic.js';
 import { showTime, movieTime, watchlistTotal, yourPace, finishEstimate, headline, paceText, fmtLength, fmtShort, SORTS } from '../components/watchlistTimeLogic.js';
 import { askConfirm } from '../components/appDialogs.js';
+import WatchLinks from '../components/WatchLinks.jsx';
+import { hasKey } from '../api/tmdb.js';
+import { recordRegion, cleanRegion } from '../components/regionLogic.js';
 
 const SORT_KEY = 'watchnext-wl-sort';
 const loadSort = () => { try { const v = localStorage.getItem(SORT_KEY); return v === 'short' || (v === 'rated' && scoresOn()) ? v : 'az'; } catch (e) { return 'az'; } };
@@ -114,7 +117,10 @@ export default function Watchlist({ openShow }) {
     }
     return out;
   }, [shows, movies]);
-  const av = useAvailability(checkItems, on, svc.region);
+  // Watch links on movie rows need to know where each movie streams, so planned movies are
+  // checked quietly on the Queue tab even with the filter off (remembered for two weeks).
+  const movieChecks = useMemo(() => checkItems.filter((i) => i.kind === 'movie'), [checkItems]);
+  const av = useAvailability(on ? checkItems : movieChecks, on || tab === 'queue', svc.region);
   const showsShown = on ? shows.filter(([, s]) => isOnMyServices(s, mine, svc.region)) : shows;
   const moviesShown = on ? movies.filter((m) => isOnMyServices(m, mine, svc.region)) : movies;
   const nothingOn = on && showsShown.length === 0 && moviesShown.length === 0;
@@ -210,9 +216,8 @@ export default function Watchlist({ openShow }) {
                 <div className="sd-sec2-head"><span className="sd-lbl">Movies to watch · {on ? `${moviesShown.length} of ${movies.length}` : movies.length}</span></div>
                 <div className="sd-card">
                   {moviesShown.map((m, i) => (
+                    <div key={`${m.tmdbId || m.name}|${m.index}`} className={'sd-wl-movie' + (i > 0 ? ' sd-sep' : '')} data-testid="wl-movie">
                     <MediaRow
-                      key={`${m.tmdbId || m.name}|${m.index}`}
-                      sep={i > 0}
                       path={m.poster}
                       name={m.name}
                       actions={
@@ -242,6 +247,8 @@ export default function Watchlist({ openShow }) {
                       <span className="sd-mrow-meta">{[m.year, (movieTime(m).guessed ? '~' : '') + fmtShort(movieTime(m).minutes), scoreText(scoreOf('movie', m.tmdbId))].filter(Boolean).join(' · ')}</span>
                       {on && servicesLabel(m, mine, svc.region) ? <span className="sd-mrow-meta sd-svc-meta">{servicesLabel(m, mine, svc.region)}</span> : null}
                     </MediaRow>
+                    {hasKey() && recordRegion(m) === cleanRegion(svc.region) && <WatchLinks rec={m} title={m.name} mine={svc.mine} className="sd-watch--row" />}
+                    </div>
                   ))}
                 </div>
               </section>

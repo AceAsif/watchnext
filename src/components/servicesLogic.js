@@ -40,7 +40,8 @@ const dedupe = (list) => { const seen = new Set(); return list.filter((p) => !se
 // `providers` stays the raw subscription list (the show page and "Detect platforms" use it).
 export function normalizeProviders(au) {
   const a = au && typeof au === 'object' ? au : {};
-  return { providers: dedupe(pick(a.flatrate)), free: dedupe([...pick(a.free), ...pick(a.ads)]), link: typeof a.link === 'string' ? a.link : '' };
+  // buyRent: it can be bought or rented here (TMDB's buy / rent lists), so "All options" can say "Buy or rent".
+  return { providers: dedupe(pick(a.flatrate)), free: dedupe([...pick(a.free), ...pick(a.ads)]), link: typeof a.link === 'string' ? a.link : '', buyRent: pick(a.buy).length + pick(a.rent).length > 0 };
 }
 
 // ------------------------------------------------------------------ freshness
@@ -48,6 +49,8 @@ export function needsCheck(rec, now = new Date(), region = DEFAULT_REGION) {
   if (!rec || typeof rec !== 'object') return false;
   if (rec.providersSynced && recordRegion(rec) !== cleanRegion(region)) return true; // checked for another country
   if (!rec.providersSynced || !Array.isArray(rec.providersFree)) return true; // never checked, or cached before free lists existed
+  // Cached before buy/rent was saved, with a TMDB page but nothing streaming: it's probably buy or rent only, so ask again.
+  if (typeof rec.providersBuyRent !== 'boolean' && rec.providersLink && !(Array.isArray(rec.providers) && rec.providers.length) && !rec.providersFree.length) return true;
   const t = Date.parse(rec.providersSynced);
   return !Number.isFinite(t) || (now.getTime() - t) / DAY >= FRESH_DAYS;
 }

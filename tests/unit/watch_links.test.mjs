@@ -75,4 +75,19 @@ t('movie sheet: reads the region from TMDB details (append watch/providers)', ()
   assert.deepEqual(r.buttons.map((b) => b.id), ['sbs', 'binge']);
   assert.equal(regionBlock(d, 'NZ'), null); assert.equal(regionBlock({}, 'AU'), null); assert.equal(regionBlock(null, 'AU'), null);
 });
+t('buy or rent only: the button says "Buy or rent"', () => {
+  const r = watchLinks({ providers: [], providersFree: [], providersLink: JW, providersBuyRent: true }, 'Batwoman');
+  assert.deepEqual(r.buttons, []); assert.equal(r.all, JW); assert.equal(r.allLabel, 'Buy or rent');
+  const { providers, free, link, buyRent } = normalizeProviders({ link: JW, rent: [{ provider_name: 'Apple TV' }], buy: [{ provider_name: 'Google Play Movies' }] });
+  assert.equal(buyRent, true);
+  assert.equal(watchLinks({ providers, providersFree: free, providersLink: link, providersBuyRent: buyRent }, 'X').allLabel, 'Buy or rent');
+  assert.equal(normalizeProviders({ link: JW, buy: [] }).buyRent, false);
+});
+t('streams somewhere (even a service we have no button for), or not saved yet: still "All options"', () => {
+  assert.equal(watchLinks({ providers: P('Netflix'), providersLink: JW, providersBuyRent: true }, 'X').allLabel, 'All options');
+  assert.equal(watchLinks({ providers: P('Foxtel Now'), providersLink: JW, providersBuyRent: true }, 'X').allLabel, 'All options');
+  assert.equal(watchLinks({ providersFree: P('SBS On Demand'), providersLink: JW, providersBuyRent: true }, 'X').allLabel, 'All options');
+  assert.equal(watchLinks({ providers: [], providersLink: JW }, 'X').allLabel, 'All options');
+  assert.equal(watchLinks({ providers: [], providersLink: JW, providersBuyRent: false }, 'X').allLabel, 'All options');
+});
 console.log(`\n${n} watch links tests passed`);

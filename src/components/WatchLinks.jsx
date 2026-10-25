@@ -1,11 +1,13 @@
 import React from 'react';
 import { watchLinks } from './watchLinksLogic.js';
 
-// [▶ Netflix] [▶ Stan] [All options] — on the show page and the movie sheet.
-// rec: { providers, providersFree, providersLink } for your region; mine: services you pay for.
+// [▶ Netflix] [▶ Stan] [All options] — on the show page, the movie sheet and Watchlist movie rows.
+// rec: { providers, providersFree, providersLink, providersBuyRent } for your region; mine: services you pay for.
+// "All options" says "Buy or rent" when that's the only way to watch it here.
 // Shows nothing when the title isn't streaming anywhere we know (or wasn't checked yet).
 export default function WatchLinks({ rec, title, mine, checking = false, className = '' }) {
-  const { buttons, more, all } = watchLinks(rec, title, mine);
+  const { buttons, more, all, allLabel } = watchLinks(rec, title, mine);
+  const buy = allLabel === 'Buy or rent';
   if (!buttons.length && !all) {
     return checking ? <div className={'sd-watch ' + className}><span className="sd-watch-wait sd-mono">Finding where to watch…</span></div> : null;
   }
@@ -31,10 +33,10 @@ export default function WatchLinks({ rec, title, mine, checking = false, classNa
           href={all}
           target="_blank"
           rel="noopener noreferrer"
-          title="Every service, with direct links (TMDB, by JustWatch)"
-          aria-label={`All options${more ? `, ${more} more service${more === 1 ? '' : 's'}` : ''} (opens TMDB)`}
+          title={buy ? 'Not streaming here: where to buy or rent it, with direct links (TMDB, by JustWatch)' : 'Every service, with direct links (TMDB, by JustWatch)'}
+          aria-label={`${allLabel}${more ? `, ${more} more service${more === 1 ? '' : 's'}` : ''} (opens TMDB)`}
         >
-          All options{more ? ` · +${more}` : ''}
+          {allLabel}{more ? ` · +${more}` : ''}
         </a>
       )}
     </div>

@@ -270,7 +270,7 @@ export default function Movies() {
     setTimeout(() => { const el = document.querySelector('[data-testid=fix-match]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 50);
   };
   // Watch links: where it streams in your region, from the details the sheet already loaded.
-  const watchRec = d && !d.error ? (({ providers, free, link }) => ({ providers, providersFree: free, providersLink: link }))(normalizeProviders(regionBlock(d, svc.region))) : null;
+  const watchRec = d && !d.error ? (({ providers, free, link, buyRent }) => ({ providers, providersFree: free, providersLink: link, providersBuyRent: buyRent }))(normalizeProviders(regionBlock(d, svc.region))) : null;
   const fixing = sel && fixIndex === sel.index;
   const selCollId = useCollectionForDetails(d);
   const selColl = selCollId ? collInfo.collections.find((c) => c.id === selCollId) || null : null;

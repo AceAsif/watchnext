@@ -2099,6 +2099,9 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-watch-all { color: var(--text-dim); background: transparent; }
 .sd-watch-wait { font-size: 12px; color: var(--text-dim); }
 .sd-watch.sd-mdet-sec { flex-direction: row; flex-wrap: wrap; align-items: center; }
+/* Watchlist movie rows: smaller buttons under the title, lined up with the text */
+.sd-watch--row { padding: 0 14px 12px 70px; margin-top: -4px; gap: 6px; }
+.sd-watch--row .sd-btn.sm { height: 36px; padding: 0 11px; font-size: 13px; }
 
 /* Compare with a friend (pages/Compare.jsx) */
 .sd-stats-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }

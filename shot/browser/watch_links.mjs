@@ -32,12 +32,24 @@ const STATE = () => ({ shows: {
   // checked, streams nowhere
   'tmdb:3': { tmdbId: 3, name: 'Nowhere Show', followed: true, runtimeMin: 30, totalEpisodes: 3, seasons: [{ n: 1, count: 3 }], watched: {}, lastSynced: '2026-10-21T00:00:00Z',
     providers: [], providersFree: [], providersLink: '', providersSynced: '2026-10-21T00:00:00.000Z', providersRegion: 'AU' },
+  // saved before buy/rent was stored: a TMDB page but nothing streaming -> asked again once
+  'tmdb:4': { tmdbId: 4, name: 'Batwoman', followed: true, runtimeMin: 42, totalEpisodes: 3, seasons: [{ n: 1, count: 3 }], watched: {}, lastSynced: '2026-10-21T00:00:00Z',
+    providers: [], providersFree: [], providersLink: JW('tv', 4), providersSynced: '2026-10-21T00:00:00.000Z', providersRegion: 'AU' },
+  // on the watchlist, never checked: the Watchlist only checks shows when "On my services" is on
+  'tmdb:5': { tmdbId: 5, name: 'Queued Show', watchlist: true, runtimeMin: 30, totalEpisodes: 3, seasons: [{ n: 1, count: 3 }], watched: {}, lastSynced: '2026-10-21T00:00:00Z' },
 }, movies: [
   { name: 'Heat', status: 'watched', watchedAt: '2026-09-01T10:00:00.000Z', runtimeMin: 170, tmdbId: 949, year: '1995' },
   { name: 'Lost Film', status: 'watched', watchedAt: '2026-08-01T10:00:00.000Z', runtimeMin: 90, tmdbId: 950, year: '2001' },
+  // Watchlist movies: never checked (streams), fresh buy/rent-only, never checked (nowhere)
+  { name: 'Dune: Part Two', status: 'planned', runtimeMin: 166, tmdbId: 951, year: '2024' },
+  { name: 'Rental Only', status: 'planned', runtimeMin: 100, tmdbId: 952, year: '2020',
+    providers: [], providersFree: [], providersLink: JW('movie', 952), providersBuyRent: true, providersSynced: '2026-10-21T00:00:00.000Z', providersRegion: 'AU' },
+  { name: 'Gone Film', status: 'planned', runtimeMin: 95, tmdbId: 953, year: '1999' },
 ], settings: { tmdbKey: 'TESTKEY' } });
 
 const PROVIDERS = {
+  'tv/4': { results: { AU: { link: JW('tv', 4), buy: [{ provider_name: 'Apple TV' }], rent: [{ provider_name: 'Google Play Movies' }] } } },
+  'movie/951': { results: { AU: { link: JW('movie', 951), flatrate: [{ provider_name: 'Netflix' }], rent: [{ provider_name: 'Apple TV' }] } } },
   'tv/2': { results: { AU: { link: JW('tv', 2), flatrate: [{ provider_name: 'Disney Plus' }, { provider_name: 'Netflix' }], free: [{ provider_name: 'ABC iview' }] } } },
 };
 const MOVIE = {
@@ -157,6 +169,53 @@ await ok('a show that streams nowhere has no Watch buttons', async () => {
   assert.ok(!(await p.evaluate(() => !!document.querySelector('[data-testid=watch-links]'))));
   assert.match(await p.evaluate(() => document.body.innerText), /Not streaming in Australia/i);
 });
+await p.close();
+
+console.log('D2. BUY OR RENT ONLY');
+p = await open();
+log = [];
+await openShow(p, 'Batwoman');
+await until(p, () => /Buy or rent/.test((document.querySelector('[data-testid=watch-links]') || {}).textContent || ''));
+await ok('saved before buy/rent was stored: checked again once, and the button says "Buy or rent"', async () => {
+  assert.equal(log.filter((x) => x === '/3/tv/4/watch/providers').length, 1, log.join(' '));
+  const l = await links(p);
+  assert.deepEqual(l.map((x) => x.text), ['Buy or rent']); assert.equal(l[0].href, JW('tv', 4));
+  assert.equal((await stored(p)).shows['tmdb:4'].providersBuyRent, true);
+});
+await p.evaluate(() => document.querySelector('.sd-back').click()); await wait(300);
+log = [];
+await openShow(p, 'Batwoman');
+await ok('opening it again does not look it up again', async () => { assert.ok(!log.some((x) => x.includes('/watch/providers')), log.join(' ')); });
+await p.close();
+
+console.log('D3. WATCHLIST MOVIE ROWS');
+p = await open({ mine: ['netflix'] });
+log = [];
+await tab(p, 'Watchlist');
+const rowLinks = (p) => p.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-testid=wl-movie]')].map((r) => [r.querySelector('.sd-mrow-name').textContent, [...r.querySelectorAll('[data-testid=watch-links] a')].map((a) => a.textContent.trim())])));
+await until(p, () => !!document.querySelector('[data-testid=wl-movie] [data-testid=watch-links] a.mine'));
+await wait(600);
+await ok('each movie row gets its own links: Dune ▶ Netflix (yours) + All options, Rental Only "Buy or rent", Gone Film nothing', async () => {
+  assert.deepEqual(await rowLinks(p), { 'Dune: Part Two': ['Netflix', 'All options'], 'Gone Film': [], 'Rental Only': ['Buy or rent'] });
+  assert.equal(await p.evaluate(() => document.querySelector('[data-testid=wl-movie] [data-testid=watch-links] a').href), 'https://www.netflix.com/search?q=Dune%3A%20Part%20Two');
+});
+await ok('movies are checked quietly with the filter off; fresh ones and shows are not', async () => {
+  assert.equal(log.filter((x) => x === '/3/movie/951/watch/providers').length, 1, log.join(' '));
+  assert.equal(log.filter((x) => x === '/3/movie/953/watch/providers').length, 1, log.join(' '));
+  assert.ok(!log.includes('/3/movie/952/watch/providers'), log.join(' '));
+  assert.ok(!log.includes('/3/tv/5/watch/providers'), log.join(' '));
+  const m = (await stored(p)).movies.find((x) => x.tmdbId === 951); assert.equal(m.providersBuyRent, true); assert.equal(m.providersRegion, 'AU');
+});
+await ok('row links: new tab, 36px tall, lined up with the title, no sideways scroll', async () => {
+  const r = await p.evaluate(() => { const row = document.querySelector('[data-testid=wl-movie]'); const a = row.querySelector('[data-testid=watch-links] a'); return { t: a.target, rel: a.rel, h: Math.round(a.getBoundingClientRect().height), dx: Math.round(a.getBoundingClientRect().left - row.querySelector('.sd-mrow-name').getBoundingClientRect().left) }; });
+  assert.equal(r.t, '_blank'); assert.match(r.rel, /noopener/); assert.equal(r.h, 36); assert.equal(r.dx, 0, JSON.stringify(r));
+  assert.ok(await noScroll(p));
+});
+await ok('the ✓ and ✕ buttons still work beside the links', async () => {
+  assert.equal(await p.evaluate(() => document.querySelectorAll('[data-testid=wl-movie] .sd-markbtn').length), 3);
+});
+await p.evaluate(() => document.querySelector('[data-testid=wl-movie]').scrollIntoView({ block: 'center' })); await wait(200);
+await p.screenshot({ path: path.join(OUT, 'watchlist_phone.png') });
 await p.close();
 
 console.log('E. MOVIE SHEET');

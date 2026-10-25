@@ -147,8 +147,8 @@ export default function Shows({ openShow }) {
       try {
         const au = await watchProviders('tv', show.tmdbId, svc.region);
         const flatrate = (au && au.flatrate) || [];
-        const { providers: subs, free, link } = normalizeProviders(au);
-        setShowProviders(id, subs, link, free, svc.region);
+        const { providers: subs, free, link, buyRent } = normalizeProviders(au);
+        setShowProviders(id, subs, link, free, svc.region, buyRent);
         const pid = platformFromProviders(flatrate);
         if (pid) setShowPlatform(id, pid);
       } catch (err) {

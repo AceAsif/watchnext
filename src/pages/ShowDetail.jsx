@@ -492,8 +492,8 @@ export default function ShowDetail({ id, onBack }) {
     setStreamLoading(true);
     try {
       const au = await watchProviders('tv', show.tmdbId, region);
-      const { providers: subs, free, link } = normalizeProviders(au);
-      setShowProviders(id, subs, link, free, region);
+      const { providers: subs, free, link, buyRent } = normalizeProviders(au);
+      setShowProviders(id, subs, link, free, region, buyRent);
     } catch (err) {
       notifyError(`Couldn’t check where it’s streaming: ${reason(err)}.`);
     } finally {
@@ -547,8 +547,8 @@ export default function ShowDetail({ id, onBack }) {
     watchProviders('tv', show.tmdbId, region)
       .then((block) => {
         if (!alive) return;
-        const { providers: subs, free, link } = normalizeProviders(block);
-        setShowProviders(id, subs, link, free, region);
+        const { providers: subs, free, link, buyRent } = normalizeProviders(block);
+        setShowProviders(id, subs, link, free, region, buyRent);
       })
       .catch(() => {})
       .finally(() => { if (alive) setAutoStream(false); });
@@ -590,7 +590,7 @@ export default function ShowDetail({ id, onBack }) {
   const pastRounds = rewatchLog(show);
   const platform = platformById(show.platform);
   // What was cached for a different region (the Region setting changed) is not shown as this region's answer.
-  const stream = recordRegion(show) === region ? show : { ...show, providers: [], providersFree: [], providersSynced: undefined, providersLink: '' };
+  const stream = recordRegion(show) === region ? show : { ...show, providers: [], providersFree: [], providersSynced: undefined, providersLink: '', providersBuyRent: false };
   const where = inRegion(region);
   const providers = stream.providers || [];
   const anime = show.anime || null;

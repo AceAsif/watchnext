@@ -31,9 +31,9 @@ export default function useAvailability(items, active, region = 'AU') {
         timers.current.delete(t);
         try {
           const au = await watchProviders(item.kind, item.tmdbId, region);
-          const { providers, free, link } = normalizeProviders(au); // no block for the region at all = "streams nowhere", still a valid answer
-          if (item.kind === 'movie') setMovieProviders(item.tmdbId, providers, link, free, region);
-          else setShowProviders(item.id, providers, link, free, region);
+          const { providers, free, link, buyRent } = normalizeProviders(au); // no block for the region at all = "streams nowhere", still a valid answer
+          if (item.kind === 'movie') setMovieProviders(item.tmdbId, providers, link, free, region, buyRent);
+          else setShowProviders(item.id, providers, link, free, region, buyRent);
         } catch (e) {
           failed.current.add(item.key); // offline / TMDB error: leave it unchecked, try again on Retry or next visit
           if (alive.current) setFailedCount(failed.current.size);

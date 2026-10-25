@@ -168,7 +168,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 - (Done by this file: update the handover. Delete `docs/WatchNext-Handover-v6.md` once v7 is in.)
 
 **Feature ideas left (5):**
-1. ~~Watch links~~ — built 24 Oct (`watchLinksLogic.js`, `WatchLinks.jsx`). Service search URLs live in `WATCH_SERVICES`; rows with `sure: false` (Disney+, Stan, Binge, Paramount+, HBO Max, iview, SBS) could not be opened from the sandbox and need checking on a real device. Exact title links later via Watchmode if needed.
+1. ~~Watch links~~ — built 24 Oct (`watchLinksLogic.js`, `WatchLinks.jsx`). Service search URLs live in `WATCH_SERVICES`; rows with `sure: false` (Disney+, Stan, Binge, Paramount+, HBO Max, iview, SBS) could not be opened from the sandbox and need checking on a real device. Exact title links later via Watchmode if needed. 26 Oct: the "All options" button says "Buy or rent" when TMDB lists only buy/rent here (`providersBuyRent` saved on shows and planned movies; older saves with a TMDB link but no streaming are checked again once), and Watchlist movie rows have Watch links (planned movies are checked quietly on the Queue tab, even with "On my services" off).
 2. **Home-screen shortcuts** — long-press the app icon → Up Next, Search, Tonight (manifest `shortcuts`).
 3. **Keyboard shortcuts** — on the computer: "/" search, 1–6 switch tabs.
 4. ~~Compare with a friend~~ — built 24 Oct (`compareLogic.js`, `pages/Compare.jsx`, Stats → Friends). Friends swap a small JSON file ("Share mine" → WhatsApp/email → "Open a friend's file"); only titles, ratings, ♥, finished/dropped. Loved = 4★+ or ♥. Friends' files stay on the device. A live share code would need new Firestore rules.

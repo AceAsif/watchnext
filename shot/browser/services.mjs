@@ -116,12 +116,13 @@ await p.reload({ waitUntil: 'networkidle0' }); await wait(400); await tab(p, 'Se
 await ok('after a reload the ticks are still there', async () => assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('.chip.on')].map((c) => c.textContent.trim()).sort()), ['Netflix', 'Stan']));
 await p.close();
 
-// ============================================================ B. filter OFF = no lookups at all
+// ============================================================ B. filter OFF = only movies are looked up (for their Watch links)
 console.log('B. filter off');
 ({ page: p, log } = await open(stateFresh(), null, { tab: 'Watchlist' }));
-await wait(1500);
-await ok('with the filter off nothing changes: every title is listed and TMDB is never asked about availability', async () => {
-  assert.equal((await rows(p)).length, 8 + 4); assert.equal(log.length, 0); assert.equal(await status(p), null); assert.equal(await toggleOn(p), false);
+await wait(2500);
+await ok('with the filter off every title is listed; only the movies are looked up quietly (for Watch links), never the shows', async () => {
+  assert.equal((await rows(p)).length, 8 + 4); assert.equal(await status(p), null); assert.equal(await toggleOn(p), false);
+  assert.ok(log.length > 0 && log.every((k) => k.startsWith('movie/')), log.join(' '));
 });
 await p.close();
 

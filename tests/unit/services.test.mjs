@@ -18,7 +18,7 @@ t('service choices = subscription chips only (no cinema / other / YouTube / ivie
 t('normalizeProviders: subscription list, free + ad-supported merged and de-duplicated, rent/buy ignored, link kept; null/junk -> empty', () => {
   const au = { flatrate: [{ provider_name: 'Netflix', logo_path: '/n.png' }, { provider_name: 'Netflix', logo_path: '/n2.png' }], free: [{ provider_name: 'ABC iview' }], ads: [{ provider_name: 'Tubi' }, { provider_name: 'ABC iview' }], rent: [{ provider_name: 'Apple TV' }], buy: [{ provider_name: 'Google Play' }], link: 'https://tmdb/x' };
   const r = S.normalizeProviders(au); assert.deepEqual(r.providers, [{ name: 'Netflix', logo: '/n.png' }]); assert.deepEqual(r.free.map((p) => p.name), ['ABC iview', 'Tubi']); assert.equal(r.link, 'https://tmdb/x');
-  for (const bad of [null, undefined, 5, 'x', [], { flatrate: 'no', free: [null, 3, {}] }]) assert.deepEqual(S.normalizeProviders(bad), { providers: [], free: [], link: '' });
+  for (const bad of [null, undefined, 5, 'x', [], { flatrate: 'no', free: [null, 3, {}] }]) assert.deepEqual(S.normalizeProviders(bad), { providers: [], free: [], link: '', buyRent: false });
 });
 t('freshness: never checked, cached before free lists existed, 13.9 days = fresh, 14 days = stale, bad date = stale', () => {
   assert.equal(S.needsCheck({}, NOW), true); assert.equal(S.needsCheck({ providersSynced: ago(1) }, NOW), true, 'old format: no providersFree');
@@ -78,5 +78,14 @@ t('toggleService adds / removes without mutating', () => { const a = ['netflix']
 t('scale: 5,000 titles classified in well under a second', () => {
   const rows = Array.from({ length: 5000 }, (_, i) => rec({ providers: prov(['Netflix', 'Stan', 'Binge', 'Max'][i % 4]), providersFree: i % 7 ? [] : prov('ABC iview') }));
   const t0 = Date.now(); const on = rows.filter((r) => S.isOnMyServices(r, mine('netflix', 'stan'))); assert.ok(Date.now() - t0 < 800); assert.ok(on.length > 2000);
+});
+t('needsCheck: saved before buy/rent was stored, with a TMDB page but nothing streaming -> ask again once', () => {
+  const now = new Date('2026-10-26T00:00:00Z'); const at = '2026-10-25T00:00:00.000Z';
+  const base = { providersSynced: at, providersRegion: 'AU', providers: [], providersFree: [], providersLink: 'https://tmdb/x' };
+  assert.equal(S.needsCheck(base, now, 'AU'), true);
+  assert.equal(S.needsCheck({ ...base, providersBuyRent: true }, now, 'AU'), false);
+  assert.equal(S.needsCheck({ ...base, providersBuyRent: false }, now, 'AU'), false);
+  assert.equal(S.needsCheck({ ...base, providersLink: '' }, now, 'AU'), false); // streams nowhere at all: nothing to fix
+  assert.equal(S.needsCheck({ ...base, providers: [{ name: 'Netflix' }] }, now, 'AU'), false); // streams: the label is right anyway
 });
 console.log(`\n${n} tests passed`);

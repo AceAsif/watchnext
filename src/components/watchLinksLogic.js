@@ -45,7 +45,8 @@ const names = (list) => (Array.isArray(list) ? list : []).map((p) => (p && (p.na
  * title: the name to search for
  * mine:  ids of the services you pay for (Settings → My services) — these come first
  * Returns { buttons: [{ id, label, url }], more: N other services not shown as buttons,
- *           all: the "All options" url or '' }
+ *           all: the "All options" url or '', allLabel: 'All options' or 'Buy or rent' }
+ * "Buy or rent" when nothing streams it here but it can be bought or rented (rec.providersBuyRent).
  */
 export function watchLinks(rec, title, mine = []) {
   const r = rec && typeof rec === 'object' ? rec : {};
@@ -66,7 +67,8 @@ export function watchLinks(rec, title, mine = []) {
   const buttons = t ? sorted.slice(0, MAX_BUTTONS).map(({ s }) => ({ id: s.id, label: s.label, url: searchUrl(s, t), mine: own.has(s.id) })) : [];
   const more = Math.max(0, sorted.length - buttons.length) + other.size;
   const all = typeof r.providersLink === 'string' && /^https:\/\//.test(r.providersLink) ? r.providersLink : '';
-  return { buttons, more, all };
+  const buyOnly = !found.length && !other.size && r.providersBuyRent === true;
+  return { buttons, more, all, allLabel: buyOnly ? 'Buy or rent' : 'All options' };
 }
 
 // Movie sheet: TMDB's details response with append_to_response=watch/providers has
