@@ -140,10 +140,11 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 
 **Sandbox setup:** clone or fetch the repo, `npm install`, `cd shot && npm install` (+ `npm i --no-save @sparticuz/chromium` if no Chrome), then `node shot/build-test-dists.mjs` — it builds `.harness-work/dist`, `dist-fake` (fake cloud) and `dist-scores` (OMDb test key `TESTOMDB`). **Rebuild the test dists after every source change** before running browser suites.
 
-- `npm run test:unit` → **65 suites, 943 tests, all passing** (24 Oct 2026). The runner needs each suite to end with `console.log("N <words> tests passed")` (no hyphens in the words).
+- `npm run test:unit` → **70 suites, 1004 tests, all passing** (25 Oct 2026). The runner needs each suite to end with `console.log("N <words> tests passed")` (no hyphens in the words).
 - Browser suites: `node shot/browser/<name>.mjs`. Conventions: date pinned with a FakeDate (usually 2026-10-21T22:00Z = 22 Oct 09:00 Hobart), `emulateTimezone('Australia/Hobart')`, bypass the service worker, mock TMDB/OMDb with `access-control-allow-origin: *`, check no sideways scroll at 390px, take a screenshot and LOOK at it.
-- **Passing:** settings, scores, badge_note, spoilers, calendar_export, activity, rewatch, rewatch_mode, ep_ratings, world_badges, goals, yearimage, month_vs_year, watchlist_time, first_dates, restore, lists, new_on, movie_groups, discover and others.
-- **Known failing (old, not caused by recent work; on the tidy-up list):** anime, desktop, dropped_csv, movie_night, notes, notes_search, recaps, region, services, tonight, watchdates, wipe_resume. **Cannot run** (need old baseline/design files): library, upnext (stops at "Caught Up Airing"), showpage (stops at "Cast").
+- **All browser suites pass (25 Oct 2026)** except the 3 that **cannot run** (need old baseline/design files): library, upnext (stops at "Caught Up Airing"), showpage (stops at "Cast"). The 12 old failures were fixed on 25 Oct: 8 already passed after recent work; anime, notes, notes_search and region had stale checks, and anime also caught a real bug (Esc in a sheet also closed the page — sheets now `preventDefault` Esc).
+- A full run of every suite takes over 10 minutes: run it in two halves.
+- Sheets mark Esc as used (`e.preventDefault()` in `Sheet`); page-wide keys skip `defaultPrevented` events. Keep that if you add another Esc handler.
 - When a suite fails, check it also fails on `origin/main` (git stash, rebuild dists, run) before blaming your change.
 - Gotchas: `innerText` applies `text-transform` (use case-insensitive regex); elements behind the fixed tab bar need `el.click()` in `evaluate`; screenshots during sheet/note animations catch half-drawn UI (wait ~500 ms); new Settings cards must be added to the order list in `settings.mjs`; episode rows need a mocked `/tv/{id}/season/{n}` response.
 
@@ -160,8 +161,8 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 
 **Tidy-up from the code check (22–23 Oct):**
 - ~~Remove the Discover hit-rate line from Watchlist → Discover~~ (done 25 Oct; still in Stats → Your taste).
-- Quiet the 3 background `console.warn` calls (Shows ×2, Up Next ×1).
-- Fix the 12 failing browser suites (§9).
+- ~~Quiet the 3 background `console.warn` calls~~ (done 25 Oct: `devWarn` in `components/devLog.js`, logs only in `npm run dev`).
+- ~~Fix the 12 failing browser suites~~ (done 25 Oct, §9). Still open: the 3 suites that cannot run (library, upnext, showpage).
 - Later, as its own job: replace the 18 `alert()` and 6 `confirm()` pop-ups with in-app messages/dialogs.
 - (Done by this file: update the handover. Delete `docs/WatchNext-Handover-v6.md` once v7 is in.)
 

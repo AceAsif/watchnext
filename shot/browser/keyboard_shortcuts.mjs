@@ -122,8 +122,21 @@ await ok('Esc on a show page goes back to Shows', async () => {
   assert.equal(await active(p), 'Shows');
   assert.ok(await p.evaluate(() => !!document.querySelector('button.sd-ltile')));
 });
+await ok('Esc on a main tab does nothing', async () => { await press(p, 'Escape'); assert.equal(await active(p), 'Shows'); });
+await p.evaluate(() => [...document.querySelectorAll('button.sd-ltile')].find((b) => b.textContent.includes('Dark')).click()); await wait(600);
+await p.evaluate(() => document.querySelector('button[aria-label="More actions"]').click()); await wait(500);
+await ok('a sheet on the show page is open', async () => { assert.ok(await p.evaluate(() => !!document.querySelector('[aria-modal="true"]'))); });
+await press(p, 'Escape'); await wait(200);
+await ok('Esc closes ONLY the sheet: you stay on the show page', async () => {
+  assert.ok(!(await p.evaluate(() => !!document.querySelector('[aria-modal="true"]'))));
+  assert.ok(await p.evaluate(() => !!document.querySelector('button.sd-back')), 'still on the show page');
+});
+await p.evaluate(() => document.activeElement && document.activeElement.blur());
 await press(p, 'Escape');
-await ok('Esc on a main tab does nothing', async () => { assert.equal(await active(p), 'Shows'); });
+await ok('a second Esc then goes back to Shows', async () => {
+  assert.ok(!(await p.evaluate(() => !!document.querySelector('button.sd-back'))));
+  assert.equal(await active(p), 'Shows');
+});
 
 console.log('E. SHORTCUT LIST AND SHEETS');
 await press(p, '?');

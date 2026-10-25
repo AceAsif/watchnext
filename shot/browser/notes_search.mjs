@@ -54,11 +54,11 @@ let p = await open(MAIN);
 await tab(p, 'Stats');
 await ok('Stats shows a "Notes" button with the number of entries (derived from the data)', async () => {
   const total = Object.values(MAIN.shows).reduce((a, s) => a + Object.keys(s.notes || {}).length, 0) + 1; // + Dune (the planned film doesn't count)
-  const b = await p.evaluate(() => { const x = document.querySelector('.sd-notesbtn'); return x ? x.innerText.replace(/\s+/g, ' ').trim() : null; });
+  const b = await p.evaluate(() => { const x = document.querySelector('.sd-notesbtn[aria-label^="Your notes"]'); return x ? x.innerText.replace(/\s+/g, ' ').trim() : null; });
   assert.equal(b, `Notes ${total.toLocaleString()}`); assert.equal(total, 3 + 3 + 3 + 70 + 1);
 });
 await p.screenshot({ path: `${OUT}/stats_button_phone.png` });
-await p.evaluate(() => document.querySelector('.sd-notesbtn').click()); await wait(500);
+await p.evaluate(() => document.querySelector('.sd-notesbtn[aria-label^="Your notes"]').click()); await wait(500);
 await ok('Notes page opens: title, summary line, search box, tabs, six reaction chips + Words only, newest first', async () => {
   const t = await text(p); assert.match(t, /Your notes/); assert.match(t, /80 entries · \d+ with a written note/);
   assert.equal((await p.evaluate(() => document.querySelectorAll('.sd-nchip').length)), 7);
@@ -111,8 +111,8 @@ await ok('Back returns to Notes with the SAME search, chip, list and scroll posi
   assert.ok((await items(p)).length > 12); const y1 = await p.evaluate(() => window.scrollY); assert.ok(Math.abs(y1 - y0) < 4, `scroll ${y0} -> ${y1}`);
 });
 await p.evaluate(() => [...document.querySelectorAll('.sd-back')][0].click()); await wait(450);
-await ok('Back button on Notes returns to Stats', async () => { assert.ok(await p.evaluate(() => !!document.querySelector('.sd-notesbtn'))); assert.equal(await p.evaluate(() => !!document.querySelector('.sd-nitem')), false); });
-await p.evaluate(() => document.querySelector('.sd-notesbtn').click()); await wait(400);
+await ok('Back button on Notes returns to Stats', async () => { assert.ok(await p.evaluate(() => !!document.querySelector('.sd-notesbtn[aria-label^="Your notes"]'))); assert.equal(await p.evaluate(() => !!document.querySelector('.sd-nitem')), false); });
+await p.evaluate(() => document.querySelector('.sd-notesbtn[aria-label^="Your notes"]').click()); await wait(400);
 await ok('opening Notes again from Stats starts fresh (no old search)', async () => { assert.equal(await p.evaluate(() => document.querySelector('input[aria-label="Search your notes"]').value), ''); assert.equal(await count(p), '80 of 80'); });
 await tab(p, 'Shows'); await tab(p, 'Stats');
 await ok('bottom tabs leave Notes; coming back to Stats shows Stats, not Notes', async () => assert.equal(await p.evaluate(() => !!document.querySelector('.sd-nitem')), false));
@@ -136,16 +136,16 @@ await p.close();
 // ============================================================ empty + layouts
 p = await open(EMPTY); await tab(p, 'Stats');
 await ok('no notes at all: the Stats button has no number, and the page explains how to add some', async () => {
-  assert.equal(await p.evaluate(() => document.querySelector('.sd-notesbtn').innerText.replace(/\s+/g, ' ').trim()), 'Notes');
-  await p.evaluate(() => document.querySelector('.sd-notesbtn').click()); await wait(400); const t = await text(p); assert.match(t, /Nothing here yet/); assert.match(t, /0 entries/); assert.equal(await p.evaluate(() => !!document.querySelector('input[aria-label="Search your notes"]')), false);
+  assert.equal(await p.evaluate(() => document.querySelector('.sd-notesbtn[aria-label^="Your notes"]').innerText.replace(/\s+/g, ' ').trim()), 'Notes');
+  await p.evaluate(() => document.querySelector('.sd-notesbtn[aria-label^="Your notes"]').click()); await wait(400); const t = await text(p); assert.match(t, /Nothing here yet/); assert.match(t, /0 entries/); assert.equal(await p.evaluate(() => !!document.querySelector('input[aria-label="Search your notes"]')), false);
 });
 await p.close();
-p = await open(MAIN, 320, 700); await tab(p, 'Stats'); await p.evaluate(() => document.querySelector('.sd-notesbtn').click()); await wait(400);
+p = await open(MAIN, 320, 700); await tab(p, 'Stats'); await p.evaluate(() => document.querySelector('.sd-notesbtn[aria-label^="Your notes"]').click()); await wait(400);
 await ok('320px wide: no sideways scroll on Notes or on the chip row', async () => assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false));
 await p.close();
 p = await open(MAIN, 1280, 900); await tab(p, 'Stats');
 await p.screenshot({ path: `${OUT}/stats_button_desktop.png` });
-await p.evaluate(() => document.querySelector('.sd-notesbtn').click()); await wait(500);
+await p.evaluate(() => document.querySelector('.sd-notesbtn[aria-label^="Your notes"]').click()); await wait(500);
 await ok('desktop: two-column list, no sideways scroll', async () => {
   assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
   const cols = await p.evaluate(() => new Set([...document.querySelectorAll('.sd-nlist > li')].slice(0, 6).map((l) => Math.round(l.getBoundingClientRect().left))).size); assert.equal(cols, 2);

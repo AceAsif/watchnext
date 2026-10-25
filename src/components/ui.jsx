@@ -103,7 +103,12 @@ export function Sheet({ open, title, subtitle, action, onClose, children, varian
     const me = token.current;
     openSheets.push(me);
     const onKey = (e) => {
-      if (e.key === 'Escape' && openSheets[openSheets.length - 1] === me) onClose();
+      if (e.key === 'Escape' && openSheets[openSheets.length - 1] === me) {
+        // Mark Esc as used: the sheet is gone before the page-wide keyboard shortcuts see the key,
+        // and they must not treat it as "go back" too (that would also close the show page).
+        e.preventDefault();
+        onClose();
+      }
     };
     document.addEventListener('keydown', onKey);
 

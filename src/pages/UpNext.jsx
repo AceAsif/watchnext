@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { devWarn } from '../components/devLog.js';
 import { useStore } from '../store/useStore.js';
 import {
   watchedCount,
@@ -210,7 +211,7 @@ export default function UpNext({ openShow, startTonight = false, onStartedTonigh
         const eps = await fetchUpcomingEpisodes(show);
         setShowUpcoming(id, eps);
       } catch (err) {
-        console.warn('upcoming fetch failed for', show.name, err);
+        devWarn('upcoming fetch failed for', show.name, err);
       }
       done++;
       if (alive.current) setRefresh({ done, total: syncTargets.length });

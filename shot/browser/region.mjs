@@ -116,12 +116,15 @@ await p.close();
 console.log('C. SHOW PAGE');
 const STATE_C = STATE(); STATE_C.shows['tmdb:101'] = { ...STATE_C.shows['tmdb:101'], followed: true, watchlist: false };
 ({ page: p, log } = await open(STATE_C, { mine: ['netflix'], showsOnly: false, watchlistOnly: false, region: 'NZ' }, { tab: 'Shows' }));
-await ok('the show page says where it is streaming in the chosen country and ignores an answer cached for another one', async () => {
-  await p.evaluate(() => [...document.querySelectorAll('.sd-ltile')].find((r) => /Netflix Show/.test(r.textContent)).click()); await wait(800);
+await ok('the show page says where it is streaming in the chosen country: it ignores the Australian answer and checks New Zealand by itself', async () => {
+  log.length = 0;
+  await p.evaluate(() => [...document.querySelectorAll('.sd-ltile')].find((r) => /Netflix Show/.test(r.textContent)).click()); await wait(1200);
   const t = await p.evaluate(() => document.body.innerText);
   assert.match(t, /Streaming in New Zealand/); assert.doesNotMatch(t, /Australia/);
-  assert.match(t, /Tap to check availability/); // the cached Australian Netflix answer is not shown as New Zealand's
+  assert.ok(log.includes('tv/101'), 'it asked TMDB again for New Zealand');
+  assert.match(t, /Streaming in New Zealand\s*Disney Plus/); // New Zealand's answer, not the cached Australian Netflix
   assert.doesNotMatch(t, /Netflix\s*$/m);
+  const st = await stateOf(p); assert.equal(st.shows['tmdb:101'].providersRegion, 'NZ');
 });
 await p.close();
 

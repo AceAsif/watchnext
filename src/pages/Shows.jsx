@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { devWarn } from '../components/devLog.js';
 import { showWatchTimes } from '../components/rewatchLogic.js';
 import { useStore } from '../store/useStore.js';
 import {
@@ -127,7 +128,7 @@ export default function Shows({ openShow }) {
         const details = await resolveShow(show);
         if (details) applyTmdbDetails(id, details);
       } catch (err) {
-        console.warn('sync failed for', show.name, err);
+        devWarn('sync failed for', show.name, err);
       }
       done++;
       setSync({ done, total: targets.length });
@@ -151,7 +152,7 @@ export default function Shows({ openShow }) {
         const pid = platformFromProviders(flatrate);
         if (pid) setShowPlatform(id, pid);
       } catch (err) {
-        console.warn('provider lookup failed for', show.name, err);
+        devWarn('provider lookup failed for', show.name, err);
       }
       done++;
       setDetect({ done, total: targets.length });
