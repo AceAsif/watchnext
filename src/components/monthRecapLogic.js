@@ -6,11 +6,12 @@
 // early-morning watch on the 1st into the previous month. (This is the same local
 // date the CSV export gives.)
 //
-// Counting follows the Year card: an episode record counts every viewing (`n`) on
-// the date of its latest watch; hours = TV minutes + movie minutes; Days = distinct
-// days with any watch.
+// Counting follows the Year card: each viewing counts on its own date (first watch,
+// rewatch-mode date, "+1" date — see viewingDates.js); hours = TV minutes + movie minutes;
+// Days = distinct days with any watch.
 
 import { localDate } from './csvExport.js';
+import { viewingDates, doneDates } from './viewingDates.js';
 
 export const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -33,7 +34,6 @@ export function prevMonth(ym) {
 export const currentMonthKey = (now = new Date()) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
 const num = (v, dflt) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : dflt);
-const count = (n) => { const v = Math.floor(Number(n)); return Number.isFinite(v) && v >= 1 ? v : 1; };
 
 // One pass over everything -> { 'YYYY-MM': { episodes, minutes, movies, days:Set, perDay, perShow, genre } }
 export function collectMonths(shows, movies) {
@@ -41,20 +41,22 @@ export function collectMonths(shows, movies) {
   const get = (ym) => out[ym] || (out[ym] = { episodes: 0, minutes: 0, movies: 0, days: new Set(), perDay: {}, perShow: {}, genre: {} });
   for (const [id, s] of Object.entries(shows || {})) {
     if (BAD_KEYS.has(id) || !s || typeof s !== 'object') continue;
-    for (const w of Object.values(s.watched || {})) {
+    const done = doneDates(s);
+    for (const [k, w] of Object.entries(s.watched || {})) {
       if (!w || typeof w !== 'object' || !w.at) continue;
-      const day = localDate(w.at);
-      const ym = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day.slice(0, 7) : '';
-      if (!ym) continue;
-      const n = count(w.n);
-      const m = get(ym);
-      m.episodes += n;
-      m.minutes += num(w.min, 40) * n;
-      m.days.add(day);
-      m.perDay[day] = (m.perDay[day] || 0) + n;
-      const ps = m.perShow[id] || (m.perShow[id] = { name: String(s.name || 'Untitled'), poster: s.poster || null, count: 0 });
-      ps.count += n;
-      for (const g of Array.isArray(s.genres) ? s.genres : []) if (typeof g === 'string' && g) m.genre[g] = (m.genre[g] || 0) + n;
+      for (const v of viewingDates(w, done[k])) {
+        const day = localDate(v.at);
+        const ym = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day.slice(0, 7) : '';
+        if (!ym) continue;
+        const m = get(ym);
+        m.episodes += 1;
+        m.minutes += num(w.min, 40);
+        m.days.add(day);
+        m.perDay[day] = (m.perDay[day] || 0) + 1;
+        const ps = m.perShow[id] || (m.perShow[id] = { name: String(s.name || 'Untitled'), poster: s.poster || null, count: 0 });
+        ps.count += 1;
+        for (const g of Array.isArray(s.genres) ? s.genres : []) if (typeof g === 'string' && g) m.genre[g] = (m.genre[g] || 0) + 1;
+      }
     }
   }
   for (const mv of Array.isArray(movies) ? movies : []) {

@@ -236,6 +236,7 @@ export const HELP_SECTIONS = [
         q: 'What are Year in review and Month in review?',
         a: [
           'Summaries of what you watched, in Stats → Overview. “Save image” makes a picture you can share. “This month vs last year” compares this month with the same month last year.',
+          'A rewatch counts in the month you rewatched (with “+1” or Rewatch mode); the first watch stays in its own month.',
         ],
       },
       {

@@ -10,27 +10,22 @@
 
 import { localDate } from './csvExport.js';
 import { MONTH_NAMES, currentMonthKey } from './monthRecapLogic.js';
+import { viewingDates, doneDates } from './viewingDates.js';
 
 const BAD = new Set(['__proto__', 'constructor', 'prototype']);
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const mins = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
-const cnt = (n) => { const v = Math.floor(Number(n)); return Number.isFinite(v) && v >= 1 ? v : 1; };
 
 // Every viewing as [localDay, kind, minutes, showId|null, showName|null].
 export function viewings(shows, movies) {
   const out = [];
   for (const [id, s] of Object.entries(shows || {})) {
     if (BAD.has(id) || !s || typeof s !== 'object') continue;
-    const done = s.rewatch && s.rewatch.done && typeof s.rewatch.done === 'object' ? s.rewatch.done : {};
+    const done = doneDates(s);
     for (const [k, w] of Object.entries(s.watched || {})) {
       if (!w || typeof w !== 'object' || !w.at) continue;
       const m = mins(w.min, mins(s.runtimeMin, 40));
-      const dates = [w.at];
-      let extra = cnt(w.n) - 1;
-      if (extra > 0 && typeof done[k] === 'string') { dates.push(done[k]); extra--; }
-      if (extra > 0 && typeof w.last === 'string') { dates.push(w.last); extra--; }
-      for (; extra > 0; extra--) dates.push(w.at);
-      for (const at of dates) {
+      for (const { at } of viewingDates(w, done[k])) {
         const day = localDate(at);
         if (DAY_RE.test(day)) out.push([day, 'ep', m, id, String(s.name || 'Untitled')]);
       }

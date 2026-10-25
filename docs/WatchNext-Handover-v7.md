@@ -96,6 +96,7 @@ docs/                   this handover, screenshots, older .docx notes
 - **Never write `undefined`** (Firestore rejects it): delete the key or use `null`/`''`.
 - `update()` returns fresh `shows`/`movies` references (memoised views rely on it).
 - **+1 watch keeps `at`** (the first date) and sets `last`. Hand-set dates get `fixedAt` and win in sync.
+- **Counting viewings in Stats:** `components/viewingDates.js` is the ONE rule — each viewing on its own date (first `at`, Rewatch mode `rewatch.done[key]`, `+1` `last`; extra viewings with no date go on `at`). Year in review, Goals, Month in review and This month vs last year all use it, so a rewatch counts when you rewatched (fixed 25 Oct: after "Bring back first watch dates" rewatches had moved to the old month).
 - **Activity log:** each user mutation is wrapped `logged(fn, label)` in db.js (originals renamed `X__raw`); 50 entries, device-only, Undo per entry (`activityLogic.js`).
 - Dates: "today" = local (`localISODate()` in showLogic.js). Some Stats use UTC dates, Month in review / CSV / month compare use local (known open decision).
 - Bulk imports: ≥15 watches in one minute = an import, left out of pace and habits.

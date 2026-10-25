@@ -28,6 +28,7 @@ import {
   timeTotals,
 } from '../components/statsLogic.js';
 import { localISODate } from '../components/showLogic.js';
+import { viewingDates, doneDates } from '../components/viewingDates.js';
 import { rewatchedShows, rewatchedMovies, rewatchSummary } from '../components/rewatchLogic.js';
 import { lovedShows, collectNotes, LOVE_WEIGHT, FUNNY_WEIGHT } from '../components/notesSearchLogic.js';
 
@@ -94,19 +95,24 @@ export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview
       let count = 0;
       let showMin = 0;
       const showYear = {}; // this show's episodes per year
-      for (const w of entries) {
+      const done = doneDates(show);
+      for (const [k, w] of Object.entries(show.watched || {})) {
         const n = w.n || 1;
         count += n;
         episodes += n;
         showMin += (w.min || 40) * n;
         minutes += (w.min || 40) * n;
-        if (w.at) {
-          const y = w.at.slice(0, 4);
-          perYear[y] = (perYear[y] || 0) + n;
-          perYearMin[y] = (perYearMin[y] || 0) + (w.min || 40) * n;
-          const day = w.at.slice(0, 10);
-          events.push({ year: y, day, wd: weekdayOf(day), minute: w.at.slice(0, 16), ts: w.at });
-          showYear[y] = (showYear[y] || 0) + n;
+        // Each viewing on its own date (first watch, rewatch, "+1"), so a rewatch this year counts
+        // this year even when the first watch was long ago. Same rule as Month in review.
+        for (const v of viewingDates(w, done[k])) {
+          const y = v.at.slice(0, 4);
+          perYear[y] = (perYear[y] || 0) + 1;
+          perYearMin[y] = (perYearMin[y] || 0) + (w.min || 40);
+          showYear[y] = (showYear[y] || 0) + 1;
+          if (v.own) {
+            const day = v.at.slice(0, 10);
+            events.push({ year: y, day, wd: weekdayOf(day), minute: v.at.slice(0, 16), ts: v.at });
+          }
         }
       }
       if (entries.length) perShow.push({ label: show.name, value: count });
