@@ -2155,3 +2155,9 @@ button.sd-cmp-main:focus-visible { outline: 2px solid var(--amber); outline-offs
 @keyframes sd-notice-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .sd-notice { animation: none; } }
 .sd-ask-body { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text); }
+
+/* Movie sheet: a viewing saved under an older/different name (Movies.jsx) */
+.sd-savedas { padding: 12px 14px; border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: 12px; background: var(--bg-raise); }
+.sd-savedas p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.sd-savedas-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.sd-savedas-acts .sd-btn.sm { height: 44px; }

@@ -1227,6 +1227,17 @@ function updateMovie__raw(index, patch) {
   markMoviesDirty();
 }
 
+// Several movie entries at once: patches = [{ index, patch }] (Settings → Old movie names).
+function updateMovies__raw(patches) {
+  const byIndex = new Map((Array.isArray(patches) ? patches : []).filter((p) => p && Number.isInteger(p.index) && p.patch).map((p) => [p.index, p.patch]));
+  if (!byIndex.size) return 0;
+  update((s) => {
+    s.movies = s.movies.map((m, i) => (byIndex.has(i) ? { ...m, ...byIndex.get(i) } : m));
+  });
+  markMoviesDirty();
+  return byIndex.size;
+}
+
 // ---------------------------------------------------------------------------
 // Activity log with Undo (Settings → Activity). Rules in components/activityLogic.js.
 // Every change you make through the functions wrapped below is recorded (only what
@@ -1354,3 +1365,5 @@ export const setMovieRating = logged(setMovieRating__raw, ([, r]) => (r ? `Rated
 export const setMoviePlatform = logged(setMoviePlatform__raw, 'Changed where you watched');
 export const removeMovie = logged(removeMovie__raw, 'Deleted');
 export const updateMovie = logged(updateMovie__raw, 'Edited (date or details)');
+export const updateMovies = logged(updateMovies__raw, ([p]) => `Used the newest film names (${(p || []).length})`);
+export const applyCurrentMovieName = logged(updateMovie__raw, 'Used the current film name');

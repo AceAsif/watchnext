@@ -175,7 +175,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 5. ~~Episode IMDb scores~~ — built 25 Oct (`epScoresLogic.js`, `useEpisodeScores.js`, `omdbSeason` in `api/omdb.js`). One OMDb call per season, only when the season is opened; saved per device (30 days, 3 if airing, 7 if none). Best episode marked; hidden for shielded episodes. Needs the show's IMDb id from the title Scores lookup.
 
 **Other open items:**
-- Movie sheet: show the film's newest name and poster for every viewing, with a "Saved as … — use Fix match if this was a different film" line (the Amazing Spider-Man 2 issue).
+- ~~Movie sheet newest name/poster for every viewing~~ (done 25 Oct, `movieNamesLogic.js`): the sheet shows TMDB's current title/poster (else the newest viewing's); a viewing saved under a really different name shows "Saved as …" with Fix match / Use the new name; Settings → **Old movie names** updates all viewings to their film's newest viewing name (one undoable change, `updateMovies`).
 - Waiting on his friend's Letterboxd import screenshots.
 - Someday: make Habits stats more realistic (bulk-imported history shares one date).
 - Older ideas (v6): Power BI starter guide, more stats (genre trends, longest binge), UTC vs local for all Stats (ask first), new-episode push notifications (needs a backend), friendly message when the Google popup is cancelled.

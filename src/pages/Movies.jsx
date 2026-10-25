@@ -12,6 +12,7 @@ import {
   addMovieToWatchlist,
   removeMovie,
   updateMovie,
+  applyCurrentMovieName,
   setMovieRating,
   setMoviePlatform,
   setMovieNote,
@@ -28,6 +29,7 @@ import { ListsRow } from '../components/ListPicker.jsx';
 import CastCrew from '../components/CastCrew.jsx';
 import { itemFromMovie } from '../components/listsLogic.js';
 import { groupMovies, groupOfIndex, viewingsLabel, viewingDay, watchedAtFor } from '../components/movieGroupsLogic.js';
+import { currentFilm, savedAs, newNamePatch } from '../components/movieNamesLogic.js';
 import ViewingDateEditor from '../components/ViewingDateEditor.jsx';
 import { NoteEditor } from '../components/NoteEditor.jsx';
 import { movieNoteOf } from '../store/notes.js';
@@ -257,6 +259,16 @@ export default function Movies() {
   const trackedMovie = useMemo(() => new Set((state.movies || []).map((m) => m.tmdbId).filter(Boolean)), [state.movies]);
   const selGroup = sel ? groupOfIndex(groups, sel.index) : null;
   const d = sel && sel.tmdbId ? details[sel.tmdbId] : null;
+  // The film as it is now (TMDB's current title/poster, else the newest viewing's), the same for
+  // every viewing; and the picked viewing's own old name when it really differs.
+  const film = sel ? currentFilm(selGroup || sel, d) : null;
+  const oldName = sel && film ? savedAs(sel, film) : null;
+  const startFix = () => {
+    setFixIndex(sel.index);
+    setFixQuery(sel.name);
+    setFixResults(null);
+    setTimeout(() => { const el = document.querySelector('[data-testid=fix-match]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 50);
+  };
   // Watch links: where it streams in your region, from the details the sheet already loaded.
   const watchRec = d && !d.error ? (({ providers, free, link }) => ({ providers, providersFree: free, providersLink: link }))(normalizeProviders(regionBlock(d, svc.region))) : null;
   const fixing = sel && fixIndex === sel.index;
@@ -355,14 +367,14 @@ export default function Movies() {
 
       <Sheet
         open={!!sel}
-        title={sel ? sel.name : ''}
-        subtitle={sel ? [sel.year, `watched ${(sel.watchedAt || '').slice(0, 10) || 'sometime'}`].filter(Boolean).join(' · ') : ''}
+        title={film ? film.name : ''}
+        subtitle={sel ? [film.year || sel.year, `watched ${(sel.watchedAt || '').slice(0, 10) || 'sometime'}`].filter(Boolean).join(' · ') : ''}
         onClose={closeSheet}
       >
         {sel && (
           <>
             <div className="sd-mdet-head">
-              <Poster path={sel.poster} name={sel.name} width={84} height={126} radius={10} />
+              <Poster path={film.poster} name={film.name} width={84} height={126} radius={10} />
               <div className="sd-gap10" style={{ minWidth: 0, flex: 1 }}>
                 <Stars value={sel.rating || 0} size={24} half onChange={(n) => setMovieRating(sel.index, n)} />
                 {sel.platform ? <div><PlatformChip id={sel.platform} /></div> : null}
@@ -376,12 +388,33 @@ export default function Movies() {
               </div>
             </div>
 
+            {oldName && (
+              <div className="sd-mdet-sec sd-savedas" data-testid="saved-as">
+                <p>
+                  This viewing was saved as <b>“{oldName}”</b>. If it was a different film, use Fix match.
+                </p>
+                <div className="sd-savedas-acts">
+                  <button type="button" className="sd-btn sm" onClick={startFix}>Fix match</button>
+                  <button
+                    type="button"
+                    className="sd-btn sm"
+                    onClick={() => {
+                      applyCurrentMovieName(sel.index, newNamePatch(sel, film));
+                      notify(`This viewing now uses “${film.name}”. You can undo it in Settings → Your recent changes.`);
+                    }}
+                  >
+                    Use the new name
+                  </button>
+                </div>
+              </div>
+            )}
+
             {watchRec && hasKey() && (
-              <WatchLinks rec={watchRec} title={d.title || sel.name} mine={svc.mine} className="sd-mdet-sec" />
+              <WatchLinks rec={watchRec} title={film.name} mine={svc.mine} className="sd-mdet-sec" />
             )}
 
             {sel.tmdbId && d && !d.error ? (
-              <ScoresRow kind="movie" tmdbId={sel.tmdbId} name={d.title || sel.name} known={fromTmdb(d)} label="Scores" className="sd-mdet-sec" />
+              <ScoresRow kind="movie" tmdbId={sel.tmdbId} name={film.name} known={fromTmdb(d)} label="Scores" className="sd-mdet-sec" />
             ) : null}
 
             {selGroup ? (
@@ -483,7 +516,7 @@ export default function Movies() {
             </div>
 
             {fixing && (
-              <div className="sd-mdet-sec">
+              <div className="sd-mdet-sec" data-testid="fix-match">
                 <span className="sd-lbl">Fix match</span>
                 <p className="sd-sub">Search TMDB and pick the correct movie — try the English title, and add the year if it is a common name (e.g. Ready 2011). Your watch date stays.</p>
                 <SearchField value={fixQuery} onChange={setFixQuery} placeholder="Movie title" onSubmit={runFixSearch} />

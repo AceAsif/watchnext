@@ -146,6 +146,14 @@ export const HELP_SECTIONS = [
         a: ['Open the movie and use “Fix match”. The search uses the year too, so you can pick the right film.'],
       },
       {
+        id: 'saved-as',
+        q: 'A viewing says “Saved as …” with a different name.',
+        a: [
+          'That viewing was saved under another name (an import or an old title). The sheet always shows the film’s current name and poster.',
+          'If it really was a different film, tap “Fix match”. If it’s the same film, tap “Use the new name”. Settings → Old movie names can update them all at once.',
+        ],
+      },
+      {
         id: 'collections',
         q: 'What are Collections?',
         a: [

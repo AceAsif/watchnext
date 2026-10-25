@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { findDuplicateMovies } from '../components/duplicateMoviesLogic.js';
+import { groupMovies } from '../components/movieGroupsLogic.js';
+import { oldNames, allPatches, oldNamesIntro } from '../components/movieNamesLogic.js';
 import { useStore } from '../store/useStore.js';
-import { setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount, setDiscoverHidden, getActivity, subscribeActivity, undoActivity, restoreFirstDates } from '../store/db.js';
+import { updateMovies, setTmdbKey, importTvTime, restoreBackup, getState, resetAll, deleteShow, watchedCount, setDiscoverHidden, getActivity, subscribeActivity, undoActivity, restoreFirstDates } from '../store/db.js';
 import { planFirstDates, epCode as fdCode } from '../components/firstDatesLogic.js';
 import { fmtDay } from '../components/statsLogic.js';
 import { hiddenList } from '../components/hiddenLogic.js';
@@ -38,6 +40,7 @@ import {
   LetterboxdCard,
   CleanupCard,
   DuplicatesCard,
+  OldNamesCard,
   HiddenCard,
   ActivityCard,
   UndoAnywayDialog,
@@ -141,6 +144,14 @@ export default function Settings({ onOpenHelp = () => {} }) {
   useEffect(() => () => clearTimeout(copyTimer.current), []);
 
   const dups = useMemo(() => findDuplicateMovies(state.movies), [state.movies]);
+  const oldRows = useMemo(
+    () => oldNames(groupMovies((state.movies || []).map((m, index) => ({ ...m, index })).filter((m) => (m.status || 'watched') === 'watched'))),
+    [state.movies]
+  );
+  function useNewestNames() {
+    const n = updateMovies(allPatches(oldRows));
+    say(`Updated ${n} ${n === 1 ? 'viewing' : 'viewings'} to the film's newest name. You can undo it in Your recent changes.`);
+  }
   const orphans = useMemo(
     () => orphanShows(state.shows).map(([id, sh]) => [id, sh, watchedCount(sh)]),
     [state.shows]
@@ -322,6 +333,7 @@ export default function Settings({ onOpenHelp = () => {} }) {
         <LetterboxdCard st={lb.st} fileRef={lbRef} onChoose={() => lbRef.current.click()} onFiles={lb.onFiles} onStart={lb.start} onStop={lb.stop} onReset={lb.reset} />
         <CleanupCard rows={orphans} onAskDelete={(id) => setConfirm({ type: 'show', id })} />
         <DuplicatesCard groups={dups.groups} titles={dups.titles} extra={dups.extra} />
+        <OldNamesCard rows={oldRows} intro={oldNamesIntro(oldRows)} onUpdate={useNewestNames} />
         <HiddenCard rows={hiddenList(state.hidden)} onShowAgain={(e) => setDiscoverHidden(e, false)} />
         <ActivityCard log={activity} state={state} onUndo={undoEntry} />
         <BackupCard lastLine={lastBackupLine(bk, new Date())} onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} datesRef={datesRef} onDatesFile={onDatesFile} />

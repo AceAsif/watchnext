@@ -334,6 +334,42 @@ export function DuplicatesCard({ groups, titles, extra }) {
   );
 }
 
+// Films watched more than once whose older viewings were saved under a different name
+// (movieNamesLogic.oldNames). One button gives them all the film's newest name. Hidden when none.
+export function OldNamesCard({ rows, intro, onUpdate }) {
+  const [all, setAll] = useState(false);
+  if (!rows.length) return null;
+  const n = rows.reduce((s, r) => s + r.old.length, 0);
+  const shown = all ? rows : rows.slice(0, DUP_FIRST);
+  return (
+    <SetCard icon={I.broom} label="Cleanup" title="Old movie names" pill={<Pill tone="amber">{n}</Pill>} id="old-names">
+      <p className="sd-setp">{intro}</p>
+      <ul className="sd-orphs sd-dups" data-testid="old-names">
+        {shown.map((r) => (
+          <li key={r.key} data-testid="old-name-row">
+            <ShowThumb show={{ name: r.name, poster: r.poster }} />
+            <div className="who">
+              <div className="nm" title={r.name}>{r.name}{r.year ? <span className="yr"> ({r.year})</span> : null}</div>
+              <div className="mt">Saved as: {[...new Set(r.old.map((o) => `“${o.name}”`))].join(', ')}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="sd-setacts">
+        <button type="button" className="sd-setbtn primary" onClick={onUpdate} data-testid="use-newest-names">
+          Use the newest names ({n})
+        </button>
+        {rows.length > DUP_FIRST ? (
+          <button type="button" className="sd-setbtn" onClick={() => setAll(!all)} aria-expanded={all}>
+            {all ? 'Show fewer' : `Show all ${rows.length}`}
+          </button>
+        ) : null}
+      </div>
+      <div className="sd-setinfo">{I.info}<span>You can undo this in Your recent changes.</span></div>
+    </SetCard>
+  );
+}
+
 // Discover's "Not interested" titles, with a way to bring each back. Hidden when the list is empty.
 export function HiddenCard({ rows, onShowAgain }) {
   if (!rows.length) return null;
