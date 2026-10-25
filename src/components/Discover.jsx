@@ -16,6 +16,7 @@ import { trailerUrl } from './movieNightLogic.js';
 import { Empty } from './LibraryUI.jsx';
 import MovieNightSheet from './MovieNightSheet.jsx';
 import { Chevron, Sheet } from './ui.jsx';
+import { notifyError, reason } from './appDialogs.js';
 
 // Discover: Netflix-style rows built from your taste (see tasteLogic.js for how it works).
 // The first visit looks up keywords and people for your library once ("Learning your taste…");
@@ -151,7 +152,7 @@ export default function Discover() {
       setAdded((a) => ({ ...a, [c.key]: true }));
     } catch (e) {
       console.error('Add to watchlist failed', e);
-      alert(`Could not add "${c.name}" — try again.`);
+      notifyError(`Couldn’t add “${c.name}” to your watchlist: ${reason(e)}. Try again.`);
     } finally {
       setAdding(null);
     }

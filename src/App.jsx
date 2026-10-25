@@ -11,6 +11,7 @@ import Search from './pages/Search.jsx';
 import Notes from './pages/Notes.jsx';
 import Help from './pages/Help.jsx';
 import Compare from './pages/Compare.jsx';
+import DialogHost from './components/DialogHost.jsx';
 import OfflineBanner from './components/OfflineBanner.jsx';
 import AccountSwitchSheet from './components/AccountSwitchSheet.jsx';
 import AccountChip from './components/AccountChip.jsx';
@@ -199,6 +200,7 @@ export default function App() {
       )}
 
       <AccountSwitchSheet />
+      <DialogHost />
       <ShortcutsSheet open={keysOpen} onClose={() => setKeysOpen(false)} onOpenHelp={() => openHelp('shortcuts')} />
       <BadgeNote onOpen={() => { setStatsStart((s) => ({ tab: 'Badges', n: s.n + 1 })); setTab('stats'); closeShow(); setSearching(false); setNotesOpen(false); setCompareOpen(false); setHelp(null); }} />
 

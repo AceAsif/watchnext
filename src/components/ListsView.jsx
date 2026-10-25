@@ -5,6 +5,7 @@ import { searchShows, searchMovies, showDetails, movieDetails, hasKey, img } fro
 import { visibleLists, itemStatus, listProgress, itemFromResult, cleanName, SUGGESTED_NAMES, LIST_MAX } from './listsLogic.js';
 import { MediaRow, SearchField, Empty } from './LibraryUI.jsx';
 import { Chevron } from './ui.jsx';
+import { notifyError, reason, askConfirm } from './appDialogs.js';
 
 const RESULTS_EACH = 5;
 const plural = (n, one, many) => `${n.toLocaleString('en-AU')} ${n === 1 ? one : many || one + 's'}`;
@@ -141,7 +142,7 @@ function ListDetail({ list, state, openShow, onBack }) {
     try {
       if (it.kind === 'tv') addShowToWatchlist(await showDetails(it.tmdbId));
       else addMovieToWatchlist(await movieDetails(it.tmdbId));
-    } catch (e) { alert(e.message); }
+    } catch (e) { notifyError(`Couldn’t add it to your watchlist: ${reason(e)}.`); }
     setAdding(null);
   };
   return (
@@ -202,7 +203,7 @@ function ListDetail({ list, state, openShow, onBack }) {
       <button
         type="button"
         className="sd-btn sd-ldelete"
-        onClick={() => { if (confirm(`Delete the list “${list.name}”? The shows and movies in it stay in your library.`)) { deleteList(list.id); onBack(); } }}
+        onClick={async () => { if (await askConfirm({ title: 'Delete this list?', body: `“${list.name}” will be deleted. The shows and movies in it stay in your library.`, confirmLabel: 'Delete list' })) { deleteList(list.id); onBack(); } }}
       >
         Delete this list
       </button>

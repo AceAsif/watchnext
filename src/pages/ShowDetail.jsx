@@ -72,6 +72,7 @@ import {
   leadingWatchedFold,
   localISODate,
 } from '../components/showLogic.js';
+import { notify, notifyError, reason, askConfirm } from '../components/appDialogs.js';
 
 // Show page — "v2 C" from the Claude Design round: a compact hero with the
 // one primary action, then grouped list-row cards (rating / where you watch /
@@ -465,7 +466,7 @@ export default function ShowDetail({ id, onBack }) {
     // reverse-tabnabbing reason to use noopener doesn't apply.
     const win = window.open('', '_blank');
     if (!win) {
-      alert('Your browser blocked the new tab — please allow pop-ups for this site.');
+      notifyError('Your browser blocked the new tab. Allow pop-ups for this site, then try again.');
       return;
     }
     setTrailerLoading(true);
@@ -476,11 +477,11 @@ export default function ShowDetail({ id, onBack }) {
         win.location = `https://www.youtube.com/watch?v=${v.key}`;
       } else {
         win.close();
-        alert(`No trailer found on TMDB for "${show.name}".`);
+        notify(`No trailer found on TMDB for “${show.name}”.`);
       }
     } catch (err) {
       win.close();
-      alert('Could not load trailer: ' + err.message);
+      notifyError(`Couldn’t load the trailer: ${reason(err)}.`);
     } finally {
       setTrailerLoading(false);
     }
@@ -494,7 +495,7 @@ export default function ShowDetail({ id, onBack }) {
       const { providers: subs, free, link } = normalizeProviders(au);
       setShowProviders(id, subs, link, free, region);
     } catch (err) {
-      alert('Could not load streaming info: ' + err.message);
+      notifyError(`Couldn’t check where it’s streaming: ${reason(err)}.`);
     } finally {
       setStreamLoading(false);
     }
@@ -507,7 +508,7 @@ export default function ShowDetail({ id, onBack }) {
       const data = await searchShows(fixQuery.trim());
       setFixResults(data.results || []);
     } catch (err) {
-      alert(err.message);
+      notifyError(`Search didn’t work: ${reason(err)}.`);
     }
   }
 
@@ -519,7 +520,7 @@ export default function ShowDetail({ id, onBack }) {
       setFixResults(null);
       setFixQuery('');
     } catch (err) {
-      alert(err.message);
+      notifyError(`Couldn’t link that show: ${reason(err)}.`);
     }
   }
 
@@ -701,7 +702,7 @@ export default function ShowDetail({ id, onBack }) {
         {rewatching && (
           <div className="sd-rwbar" data-testid="rewatch-bar">
             <span className="sd-rwbar-txt"><b>↻ {roundLabel(show, today)}</b><span>Your first watch dates are kept.</span></span>
-            <button type="button" className="sd-btn sm" onClick={() => { if (confirm('End this rewatch? What you have rewatched so far is kept.')) endRewatch(id); }}>End rewatch</button>
+            <button type="button" className="sd-btn sm" onClick={async () => { if (await askConfirm({ title: 'End this rewatch?', body: 'What you have rewatched so far is kept, and your first watch dates stay.', confirmLabel: 'End rewatch', danger: false })) endRewatch(id); }}>End rewatch</button>
           </div>
         )}
         {!rewatching && pastRounds.length > 0 && (
@@ -1047,9 +1048,9 @@ export default function ShowDetail({ id, onBack }) {
             <button
               className="sd-row sd-sep"
               data-testid="rewatch-row"
-              onClick={() => {
+              onClick={async () => {
                 setSheet(null);
-                if (rewatching) { if (confirm('End this rewatch? What you have rewatched so far is kept.')) endRewatch(id); }
+                if (rewatching) { if (await askConfirm({ title: 'End this rewatch?', body: 'What you have rewatched so far is kept, and your first watch dates stay.', confirmLabel: 'End rewatch', danger: false })) endRewatch(id); }
                 else startRewatch(id);
               }}
             >
@@ -1083,12 +1084,13 @@ export default function ShowDetail({ id, onBack }) {
           <button
             className="sd-row sd-sep"
             style={{ color: 'var(--red)' }}
-            onClick={() => {
+            onClick={async () => {
               if (
-                confirm(
-                  `Delete "${show.name}" and its watch history? This removes it ` +
-                    `from your library and every signed-in device, and can't be undone.`
-                )
+                await askConfirm({
+                  title: 'Delete this show?',
+                  body: `“${show.name}” and its watch history will be removed from your library on every signed-in device. This can’t be undone.`,
+                  confirmLabel: 'Delete show',
+                })
               ) {
                 setSheet(null);
                 deleteShow(id);

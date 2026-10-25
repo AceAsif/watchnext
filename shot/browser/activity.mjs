@@ -6,6 +6,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
 import { launchBrowser } from './launch.mjs';
+import { AUTO_YES } from './autoYes.js';
 
 // Activity log with Undo: changes made on the show page appear in Settings → Activity, each
 // with its own Undo that puts the exact old values back. TMDB mocked.
@@ -28,7 +29,7 @@ const until = async (page, fn, arg, ms = 6000) => { const t0 = Date.now(); while
 async function open({ w = 390, h = 844 } = {}) {
   const page = await browser.newPage(); await page.emulateTimezone('Australia/Hobart'); await page.setViewport({ width: w, height: h, deviceScaleFactor: 2 });
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message)); page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) problems.push('console.error: ' + m.text()); });
-  page.on('dialog', (d) => d.accept());
+  await page.evaluateOnNewDocument(AUTO_YES); // answer the app's own questions with yes
   await page.setBypassServiceWorker(true); await page.setRequestInterception(true);
   page.on('request', (r) => {
     const u = r.url();

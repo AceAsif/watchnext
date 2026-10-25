@@ -5,6 +5,7 @@ import { renderPeriodImage } from './yearImageRender.js';
 import { initialOf, deltaLine, factCells, GOAL_FOR_STAT } from './yearImageLogic.js';
 import { Bar } from './ui.jsx';
 import { loadImg, canvasToBlob, downloadBlob, shareText } from './shareImage.js';
+import { notifyError, reason } from './appDialogs.js';
 
 // One shareable "period" card: the on-screen card, a period picker, and the Share /
 // Save image buttons. Year in review and Month in review are both just this with
@@ -33,7 +34,7 @@ export default function RecapSection({ title, className, select, data, big, sub,
       downloadBlob(await canvasToBlob(canvas), fileName);
     } catch (e) {
       console.error(`${errorLabel} export failed`, e);
-      alert('Sorry — could not generate the image.' + (e && e.message ? ` (${e.message})` : ''));
+      notifyError(`Sorry, couldn’t make the image: ${reason(e)}.`);
     } finally {
       setSaving(false);
     }

@@ -5,6 +5,7 @@ import { followed, newTitles, peopleToCheck, slimCredits, loadCredits, saveCredi
 import { localISODate } from './showLogic.js';
 import { fmtDay } from './statsLogic.js';
 import { Avatar, Sheet } from './ui.jsx';
+import { notifyError, reason } from './appDialogs.js';
 
 const PREVIEW = 3;
 const POOL = 3;
@@ -85,7 +86,7 @@ export default function PeopleNews({ state, openShow }) {
     try {
       if (n.title.kind === 'tv') addShowToWatchlist(await showDetails(n.title.id));
       else addMovieToWatchlist(await movieDetails(n.title.id));
-    } catch (e) { alert(e.message); }
+    } catch (e) { notifyError(`Couldn’t add it to your watchlist: ${reason(e)}.`); }
     setAdding(null);
   };
   const shown = all ? news : news.slice(0, PREVIEW);

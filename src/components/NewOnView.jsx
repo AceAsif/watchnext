@@ -9,6 +9,7 @@ import { fmtDay } from './statsLogic.js';
 import { ServicesSheet } from './ServicesUI.jsx';
 import { Empty } from './LibraryUI.jsx';
 import { SECTIONS, myServices, buildQueries, collect, servicesText, cacheId, loadCache, saveCache } from './newOnLogic.js';
+import { notifyError, reason } from './appDialogs.js';
 
 const PREVIEW = 12;
 const storage = () => { try { return window.localStorage; } catch (e) { return null; } };
@@ -67,7 +68,7 @@ export default function NewOnView({ openShow }) {
     try {
       if (it.kind === 'tv') addShowToWatchlist(await showDetails(it.tmdbId));
       else addMovieToWatchlist(await movieDetails(it.tmdbId));
-    } catch (e) { alert(e.message); }
+    } catch (e) { notifyError(`Couldn’t add it to your watchlist: ${reason(e)}.`); }
     if (alive.current) setAdding(null);
   };
 

@@ -21,6 +21,7 @@ import { fmtDay } from '../components/statsLogic.js';
 import { useScoresMany, scoresOn } from '../components/useScores.js';
 import { scoreKey, sortScore } from '../components/scoresLogic.js';
 import { showTime, movieTime, watchlistTotal, yourPace, finishEstimate, headline, paceText, fmtLength, fmtShort, SORTS } from '../components/watchlistTimeLogic.js';
+import { askConfirm } from '../components/appDialogs.js';
 
 const SORT_KEY = 'watchnext-wl-sort';
 const loadSort = () => { try { const v = localStorage.getItem(SORT_KEY); return v === 'short' || (v === 'rated' && scoresOn()) ? v : 'az'; } catch (e) { return 'az'; } };
@@ -226,8 +227,8 @@ export default function Watchlist({ openShow }) {
                           </button>
                           <button
                             className="sd-ib sd-ib--sm"
-                            onClick={() => {
-                              if (confirm(`Remove "${m.name}" from your watchlist?`)) removeMovie(m.index);
+                            onClick={async () => {
+                              if (await askConfirm({ title: 'Remove from your watchlist?', body: `“${m.name}” will be taken off your watchlist.`, confirmLabel: 'Remove' })) removeMovie(m.index);
                             }}
                             aria-label={`Remove ${m.name} from watchlist`}
                             title="Remove"

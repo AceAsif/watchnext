@@ -46,7 +46,7 @@ export function parseSeason(j) {
 export function isFresh(e, now = Date.now()) {
   if (!isObj(e) || !e.at) return false;
   const age = now - Date.parse(e.at);
-  if (!Number.isFinite(age) || age < 0) return false;
+  if (!Number.isFinite(age)) return false; // (a date a little ahead — the clock moved back — still counts as fresh)
   if (e.none) return age < NONE_DAYS * DAY;
   const rel = Date.parse(e.latest || '');
   const airing = e.pending || (Number.isFinite(rel) && now - rel < RECENT_DAYS * DAY);

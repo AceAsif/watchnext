@@ -56,7 +56,7 @@ VITE_OMDB_API_KEY=
 
 Dark theme; amber accent (`--amber`), teal (`--teal`) for done/ok, red for destructive. Fonts: Bricolage Grotesque (display), Inter (body), IBM Plex Mono (labels/codes). 44px touch targets. Tokens in `src/styles.css`; **all redesigned UI is in `src/components/ui.css`** (large shared file, `sd-*` classes; only ever append/edit it, never replace it from an old copy).
 - Phone: one column (≤560px). Desktop ≥900px: two-column Up Next / Show page / Stats, grid libraries.
-- `Sheet` (`ui.jsx`) = bottom sheet on phone, dialog on desktop. `.sd-btn` (+ `primary`, `sm`), `.sd-ib` icon button, `.sd-lbl` mono labels, `.sd-card`, `.sd-toast` (above the tab bar).
+- `Sheet` (`ui.jsx`) = bottom sheet on phone, dialog on desktop. `.sd-btn` (+ `primary`, `sm`), `.sd-ib` icon button, `.sd-lbl` mono labels, `.sd-card`, `.sd-toast` (above the tab bar), `.sd-notice` (in-app messages, top of screen).
 - Badge level colours: `.ach-l1`…`.ach-l6` set `--lv` (Bronze, Silver, Gold, Platinum, Diamond, Legend).
 
 ## 4. Project structure
@@ -164,7 +164,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 - ~~Remove the Discover hit-rate line from Watchlist → Discover~~ (done 25 Oct; still in Stats → Your taste).
 - ~~Quiet the 3 background `console.warn` calls~~ (done 25 Oct: `devWarn` in `components/devLog.js`, logs only in `npm run dev`).
 - ~~Fix the 12 failing browser suites~~ (done 25 Oct, §9). Still open: the 3 suites that cannot run (library, upnext, showpage).
-- Later, as its own job: replace the 18 `alert()` and 6 `confirm()` pop-ups with in-app messages/dialogs.
+- ~~Replace the 18 `alert()` and 6 `confirm()` pop-ups~~ (done 25 Oct). **Never use alert()/confirm() again**: `notify()` / `notifyError(…: ${reason(e)}.)` for messages and `await askConfirm({ title, body, confirmLabel, danger })` for questions (`components/appDialogs.js`, drawn by `DialogHost.jsx` in App). A unit test fails if alert( or confirm( comes back. Browser tests answer questions with `shot/browser/autoYes.js`.
 - (Done by this file: update the handover. Delete `docs/WatchNext-Handover-v6.md` once v7 is in.)
 
 **Feature ideas left (5):**

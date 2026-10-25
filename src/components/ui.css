@@ -2144,3 +2144,14 @@ button.sd-cmp-main:focus-visible { outline: 2px solid var(--amber); outline-offs
 /* Episode IMDb scores (ShowDetail episode rows) */
 .sd-ep-imdb { white-space: nowrap; }
 .sd-ep-imdb.best { color: var(--amber); font-weight: 600; }
+
+/* In-app messages and questions (DialogHost.jsx) — instead of alert()/confirm() */
+.sd-notices { position: fixed; top: max(12px, env(safe-area-inset-top)); left: 16px; right: 16px; z-index: 80; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.sd-notice { pointer-events: auto; width: 100%; max-width: 520px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 8px 6px 8px 16px; border-radius: 14px; border: 1px solid var(--teal); background: var(--bg-raise); color: var(--text); font-size: 14px; line-height: 1.45; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); animation: sd-notice-in 180ms ease-out; }
+.sd-notice.err { border-color: var(--red); }
+.sd-notice .txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.sd-notice .x { flex: none; width: 44px; height: 44px; border: 0; background: transparent; color: var(--text-dim); font-size: 22px; line-height: 1; cursor: pointer; border-radius: 10px; }
+.sd-notice .x:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+@keyframes sd-notice-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sd-notice { animation: none; } }
+.sd-ask-body { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text); }

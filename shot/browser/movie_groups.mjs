@@ -6,6 +6,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
 import { launchBrowser } from './launch.mjs';
+import { AUTO_YES } from './autoYes.js';
 
 // Movies grid: ONE tile per film (rewatches grouped, "4×"), the movie sheet's Viewings list,
 // and half-star movie ratings (tap the left half of a star). TMDB is mocked.
@@ -35,7 +36,7 @@ const problems = []; let checks = 0; const ok = async (n, f) => { await f(); che
 async function open({ w = 390, h = 844 } = {}) {
   const page = await browser.newPage(); await page.emulateTimezone('Australia/Hobart'); await page.setViewport({ width: w, height: h, deviceScaleFactor: 2 });
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message)); page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) problems.push('console.error: ' + m.text()); });
-  page.on('dialog', (d) => { page.__lastDialog = d.message(); d.accept(); });
+  await page.evaluateOnNewDocument(AUTO_YES); // answer the app's own questions with yes
   await page.setBypassServiceWorker(true); await page.setRequestInterception(true);
   page.on('request', (r) => { const u = r.url(); if (u.startsWith('http://localhost:')) return r.continue(); if (u.includes('fonts.googleapis.com')) return r.respond({ status: 200, contentType: 'text/css', body: fontsCss }); if (u.includes('image.tmdb.org')) return r.respond({ status: 200, contentType: 'image/png', body: PNG });
     const m = /api\.themoviedb\.org\/3\/movie\/(\d+)\?/.exec(u); if (m) return r.respond({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ id: +m[1], title: 'X', runtime: 90, genres: [], overview: 'A film.', belongs_to_collection: null }) });
@@ -89,7 +90,8 @@ await p.screenshot({ path: `${OUT}/viewings_phone.png` });
 await ok('"Remove this one" removes only that viewing; the tile then shows 3×', async () => {
   const label = await p.evaluate(() => [...document.querySelectorAll('.sd-mdet-actions button')].map((b) => b.textContent).join('|')); assert.match(label, /Remove this one/);
   await p.evaluate(() => [...document.querySelectorAll('.sd-mdet-actions button')].find((b) => b.textContent === 'Remove this one').click()); await wait(400);
-  assert.match(p.__lastDialog, /^Remove the 1 Jan 2020 viewing of "Alvin and the Chipmunks"\? Your other 3 viewings stay\.$/);
+  const ask = await p.evaluate(() => window.__lastAsk || '');
+  assert.match(ask, /Remove this viewing\?/); assert.match(ask, /Remove the 1 Jan 2020 viewing of "Alvin and the Chipmunks"\? Your other 3 viewings stay\./);
   const m = await lib(p); assert.equal(m.filter((x) => x.tmdbId === 6477).length, 3); assert.ok(!m.some((x) => (x.watchedAt || '').startsWith('2020-01-01')));
   assert.equal((await tiles(p)).find((x) => /Alvin/.test(x.name)).chip, '3×');
 });

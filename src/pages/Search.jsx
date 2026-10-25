@@ -15,6 +15,7 @@ import {
   hasKey,
   img,
 } from '../api/tmdb.js';
+import { notifyError, reason } from '../components/appDialogs.js';
 
 // One search box across both TMDB shows AND movies, flagging what's already in
 // your library / watchlist so you don't re-add something. Results are merged
@@ -72,7 +73,7 @@ export default function Search({ openShow, onClose }) {
       }));
       setResults([...shows, ...movies].sort((a, b) => b.popularity - a.popularity));
     } catch (err) {
-      alert(err.message);
+      notifyError(`Search didn’t work: ${reason(err)}.`);
     } finally {
       setBusy(false);
     }
@@ -83,7 +84,7 @@ export default function Search({ openShow, onClose }) {
     try {
       await fn();
     } catch (err) {
-      alert(err.message);
+      notifyError(`That didn’t work: ${reason(err)}.`);
     } finally {
       setActing(null);
     }

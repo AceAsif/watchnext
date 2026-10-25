@@ -55,6 +55,7 @@ import {
   PlusIcon,
   FilmIcon,
 } from '../components/LibraryBar.jsx';
+import { notify, notifyError, reason, askConfirm } from '../components/appDialogs.js';
 
 const searchMoviesList = (q) => searchMovies(q).then((d) => d.results || []);
 
@@ -104,7 +105,7 @@ export default function Movies() {
     // used here — it makes window.open() return null.
     const win = window.open('', '_blank');
     if (!win) {
-      alert('Your browser blocked the new tab — please allow pop-ups for this site.');
+      notifyError('Your browser blocked the new tab. Allow pop-ups for this site, then try again.');
       return;
     }
     setTrailerBusy(m.index);
@@ -115,11 +116,11 @@ export default function Movies() {
         win.location = `https://www.youtube.com/watch?v=${v.key}`;
       } else {
         win.close();
-        alert(`No trailer found on TMDB for "${m.name}".`);
+        notify(`No trailer found on TMDB for “${m.name}”.`);
       }
     } catch (err) {
       win.close();
-      alert('Could not load trailer: ' + err.message);
+      notifyError(`Couldn’t load the trailer: ${reason(err)}.`);
     } finally {
       setTrailerBusy(null);
     }
@@ -132,7 +133,7 @@ export default function Movies() {
       const data = await searchMovies(fixQuery.trim());
       setFixResults(data.results || []);
     } catch (err) {
-      alert(err.message);
+      notifyError(`Search didn’t work: ${reason(err)}.`);
     }
   }
 
@@ -150,7 +151,7 @@ export default function Movies() {
       setFixResults(null);
       setFixQuery('');
     } catch (err) {
-      alert(err.message);
+      notifyError(`Couldn’t link that film: ${reason(err)}.`);
     }
   }
 
@@ -526,11 +527,12 @@ export default function Movies() {
               </button>
               <button
                 className="sd-btn danger"
-                onClick={() => {
+                onClick={async () => {
+                  const many = selGroup && selGroup.times > 1;
                   const msg = selGroup && selGroup.times > 1
                     ? `Remove the ${fmtDay(viewingDay(sel)) || 'undated'} viewing of "${sel.name}"? Your other ${selGroup.times - 1 === 1 ? 'viewing stays' : `${selGroup.times - 1} viewings stay`}.`
                     : `Remove "${sel.name}" from your watched movies?`;
-                  if (confirm(msg)) {
+                  if (await askConfirm({ title: many ? 'Remove this viewing?' : 'Remove this movie?', body: msg, confirmLabel: 'Remove' })) {
                     removeMovie(sel.index);
                     closeSheet();
                   }

@@ -35,7 +35,7 @@ t('fresh: a season still airing (recent or unrated episode) only for 3 days', ()
 });
 t('fresh: "nothing found" is asked again after 7 days; bad entries are never fresh', () => {
   assert.equal(isFresh({ at: ago(6), none: true }, NOW), true); assert.equal(isFresh({ at: ago(8), none: true }, NOW), false);
-  assert.equal(isFresh(null, NOW), false); assert.equal(isFresh({ at: 'x' }, NOW), false); assert.equal(isFresh({ at: ago(-1), eps: {} }, NOW), false);
+  assert.equal(isFresh(null, NOW), false); assert.equal(isFresh({ at: 'x' }, NOW), false); assert.equal(isFresh({ at: ago(-1), eps: {} }, NOW), true); // clock moved back a little: still fresh
 });
 t('best episode: the highest score (earlier one on a tie), only with 3+ scores', () => {
   assert.equal(bestEpisode({ 1: 8.5, 2: 8.1, 4: 9.6, 9: 9.3 }), 4);
