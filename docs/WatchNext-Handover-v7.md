@@ -178,7 +178,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 - ~~Movie sheet newest name/poster for every viewing~~ (done 25 Oct, `movieNamesLogic.js`): the sheet shows TMDB's current title/poster (else the newest viewing's); a viewing saved under a really different name shows "Saved as …" with Fix match / Use the new name; Settings → **Old movie names** updates all viewings to their film's newest viewing name (one undoable change, `updateMovies`).
 - Waiting on his friend's Letterboxd import screenshots.
 - Someday: make Habits stats more realistic (bulk-imported history shares one date).
-- Older ideas (v6): Power BI starter guide, more stats (genre trends, longest binge), UTC vs local for all Stats (ask first), new-episode push notifications (needs a backend), friendly message when the Google popup is cancelled.
+- Older ideas (v6): Power BI starter guide, more stats (genre trends, longest binge), UTC vs local for all Stats (ask first), new-episode push notifications (needs a backend), ~~friendly message when the Google popup is cancelled~~ (done 25 Oct: `store/signInLogic.js`; closing the window = calm note, no red; fake cloud can start signed out with `window.__fakeSignedOut` / fail with `window.__signInError`).
 
 ## 12. First message to paste into the new chat
 

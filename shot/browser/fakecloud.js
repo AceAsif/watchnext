@@ -3,15 +3,25 @@
 import { resetAll, takeDirty, addWipeTombstones, getState } from '../../src/store/db.js';
 export const isCloudAvailable = () => true;
 const user = { email: 'asif@example.com', uid: 'u1' };
-export const getCloudUser = () => user;
-export const subscribeCloudUser = () => () => {};
+// Signed in by default. A test can start signed out (window.__fakeSignedOut = true before load) and make
+// "Sign in with Google" fail like Firebase does (window.__signInError = 'auth/popup-closed-by-user').
+let current = typeof window !== 'undefined' && window.__fakeSignedOut ? null : user;
+const userSubs = new Set();
+export const getCloudUser = () => current;
+export const subscribeCloudUser = (fn) => { userSubs.add(fn); return () => userSubs.delete(fn); };
 export const initCloudSync = () => () => {};
 // "Still downloading the library" flag; a test flips it with window.__setSyncing(true/false).
 let syncing = false; const syncSubs = new Set();
 export const getCloudSyncing = () => syncing;
 export const subscribeCloudSyncing = (fn) => { syncSubs.add(fn); return () => syncSubs.delete(fn); };
 if (typeof window !== 'undefined') window.__setSyncing = (v) => { syncing = !!v; syncSubs.forEach((f) => f()); };
-export const signIn = async () => {};
+export const signIn = async () => {
+  (window.__events = window.__events || []).push('signin');
+  await new Promise((r) => setTimeout(r, 50));
+  const code = window.__signInError;
+  if (code) throw Object.assign(new Error(`Firebase: Error (${code}).`), { code });
+  current = user; userSubs.forEach((f) => f());
+};
 export const signOutCloud = async () => { (window.__events = window.__events || []).push('signout'); };
 export async function wipeEverywhere() {
   (window.__events = window.__events || []).push('wipe-start');

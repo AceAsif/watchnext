@@ -10,6 +10,7 @@ import { hiddenList } from '../components/hiddenLogic.js';
 import { isBackupFile, isTvTimeFile } from '../store/backupMerge.js';
 import { isCloudAvailable, getCloudUser, subscribeCloudUser, signIn, signOutCloud, wipeEverywhere } from '../store/cloud.js';
 import { wipeDoneText, wipeFailText } from '../store/wipeLogic.js';
+import { signInProblem } from '../store/signInLogic.js';
 import { useServicesPrefs, toggleMyService, setServicesPrefs } from '../store/servicesPrefs.js';
 import { useSpoilerShield, setSpoilerShield } from '../components/spoilerShield.js';
 import {
@@ -162,7 +163,9 @@ export default function Settings({ onOpenHelp = () => {} }) {
     try {
       await signIn();
     } catch (err) {
-      say('Sign-in failed: ' + err.message, 'err');
+      // Closing the Google window is not an error: signInProblem gives a calm note (or nothing).
+      const p = signInProblem(err);
+      if (p) say(p.text, p.kind);
     } finally {
       setCloudBusy(false);
     }

@@ -404,6 +404,14 @@ export const HELP_SECTIONS = [
         ],
       },
       {
+        id: 'sign-in-cancelled',
+        q: 'Google sign-in says “cancelled” or “blocked”.',
+        a: [
+          '“Cancelled” means the Google window was closed before you finished. Nothing changed: tap “Sign in with Google” again in Settings → Sync across devices.',
+          '“Blocked” means the browser stopped the Google window. Allow pop-ups for this site, then try again.',
+        ],
+      },
+      {
         id: 'other-account',
         q: 'It asks about a different Google account.',
         a: [
