@@ -6,7 +6,7 @@ import { FilterField, StatusTabs } from '../components/LibraryBar.jsx';
 import { REACTIONS, reactionById } from '../store/notes.js';
 import {
   KINDS,
-  NO_REACTION,
+  writtenCount,
   PAGE_SIZE,
   collectNotes,
   filterNotes,
@@ -62,21 +62,23 @@ export default function Notes({ onBack, openShow, memo }) {
   const all = useMemo(() => collectNotes(state.shows, state.movies), [state.shows, state.movies]);
   const [q, setQ] = useState(memo.q);
   const [reacts, setReacts] = useState(memo.reacts);
+  const [written, setWritten] = useState(!!memo.written);
   const [kind, setKind] = useState(memo.kind);
   const [shown, setShown] = useState(memo.shown);
 
   // Remember everything so Back from a show restores it.
-  useEffect(() => { Object.assign(memo, { q, reacts, kind, shown }); }, [memo, q, reacts, kind, shown]);
+  useEffect(() => { Object.assign(memo, { q, reacts, written, kind, shown }); }, [memo, q, reacts, written, kind, shown]);
   useLayoutEffect(() => { if (memo.scroll) window.scrollTo(0, memo.scroll); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const f = { q, reacts, kind };
-  const rows = useMemo(() => filterNotes(all, f), [all, q, reacts, kind]); // eslint-disable-line react-hooks/exhaustive-deps
-  const kinds = useMemo(() => kindCounts(all, f), [all, q, reacts]); // eslint-disable-line react-hooks/exhaustive-deps
-  const rc = useMemo(() => reactionCounts(all, f), [all, q, kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  const f = { q, reacts, written, kind };
+  const rows = useMemo(() => filterNotes(all, f), [all, q, reacts, written, kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  const kinds = useMemo(() => kindCounts(all, f), [all, q, reacts, written]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rc = useMemo(() => reactionCounts(all, f), [all, q, written, kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  const wc = useMemo(() => writtenCount(all, f), [all, q, reacts, kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const change = (fn) => (v) => { fn(v); setShown(PAGE_SIZE); };
   const open = (id) => { memo.scroll = window.scrollY; openShow(id); };
-  const clear = () => { setQ(''); setReacts([]); setKind('All'); setShown(PAGE_SIZE); };
+  const clear = () => { setQ(''); setReacts([]); setWritten(false); setKind('All'); setShown(PAGE_SIZE); };
   const visible = rows.slice(0, shown);
 
   return (
@@ -111,12 +113,13 @@ export default function Notes({ onBack, openShow, memo }) {
             })}
             <button
               type="button"
-              className={'sd-nchip words' + (reacts.includes(NO_REACTION) ? ' on' : '') + (rc[NO_REACTION] === 0 && !reacts.includes(NO_REACTION) ? ' z' : '')}
-              aria-pressed={reacts.includes(NO_REACTION)}
-              aria-label={`Words only, no reaction, ${rc[NO_REACTION]}`}
-              onClick={() => change(setReacts)(toggleReaction(reacts, NO_REACTION))}
+              className={'sd-nchip words' + (written ? ' on' : '') + (wc === 0 && !written ? ' z' : '')}
+              aria-pressed={written}
+              aria-label={`Written, notes with words (with or without a reaction), ${wc}`}
+              title="Only notes you wrote something in (with or without a reaction)"
+              onClick={() => change(setWritten)(!written)}
             >
-              <span>Words only</span><span className="n">{rc[NO_REACTION]}</span>
+              <span aria-hidden="true">✎</span><span>Written</span><span className="n">{wc}</span>
             </button>
           </div>
 

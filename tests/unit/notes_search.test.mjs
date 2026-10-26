@@ -46,9 +46,29 @@ t('an episode code is an EXACT match: s1e5 must not find S1E50-S1E59, and s1 / e
   assert.equal(N.filterNotes(all, { q: 's1e1' }).every((e) => e.kind === 'episode'), true, 'a code never matches a movie');
 });
 t('search by reaction word or emoji', () => { assert.equal(names({ q: 'loved' }).length, 3); assert.equal(names({ q: '😂' }).length, 2); assert.equal(names({ q: 'funny office' }).length, 1); });
-t('reaction filter: OR across chips; empty = all; "Words only" = a note with no emoji', () => {
+t('reaction filter: OR across chips; empty = all', () => {
   assert.equal(N.filterNotes(all, { reacts: ['love'] }).length, 3); assert.equal(N.filterNotes(all, { reacts: ['love', 'funny'] }).length, 5);
-  assert.equal(N.filterNotes(all, { reacts: [] }).length, 8); assert.deepEqual(names({ reacts: [N.NO_REACTION] }), ['Suits S2E10']);
+  assert.equal(N.filterNotes(all, { reacts: [] }).length, 8);
+});
+t('"Written": every note with words, WITH or without a reaction (a reaction + words is not hidden)', () => {
+  const w = N.filterNotes(all, { written: true });
+  assert.equal(w.length, 5); assert.ok(w.every((e) => e.text));
+  assert.ok(w.some((e) => e.react === 'love' && e.text === 'Harvey’s best speech'), 'reaction + words is included');
+  assert.ok(w.some((e) => !e.react && e.text === 'Mike sold out?!'), 'words with no reaction is included');
+  assert.equal(N.filterNotes(all, { written: false }).length, 8);
+});
+t('"Written" combines with emoji chips (AND), the kind tabs and search', () => {
+  assert.deepEqual(names({ written: true, reacts: ['love'] }), ['Suits S1E5']);
+  assert.deepEqual(names({ written: true, reacts: ['love', 'funny'] }).sort(), ['Suits S1E5', 'The Office S3E4']);
+  assert.deepEqual(names({ written: true, kind: 'Movies' }), ['Dune']);
+  assert.deepEqual(names({ written: true, q: 'office' }).sort(), ['The Office S3E4', 'The Office S4E4']);
+});
+t('"Written" count respects the other filters; the other counts respect "Written"', () => {
+  assert.equal(N.writtenCount(all, {}), 5); assert.equal(N.writtenCount(all, { written: true }), 5);
+  assert.equal(N.writtenCount(all, { reacts: ['love'] }), 1); assert.equal(N.writtenCount(all, { kind: 'Movies' }), 1); assert.equal(N.writtenCount(all, { q: 'suits' }), 2);
+  assert.equal(N.reactionCounts(all, { written: true }).love, 1); assert.equal(N.reactionCounts(all, { written: true }).funny, 1);
+  assert.deepEqual(N.kindCounts(all, { written: true }), { All: 5, Episodes: 4, Movies: 1 });
+  assert.equal(N.hasFilters({ written: true }), true); assert.equal(N.newNotesMemo().written, false);
 });
 t('kind filter: Episodes / Movies / All; combined with a query and a reaction', () => {
   assert.equal(N.filterNotes(all, { kind: 'Episodes' }).length, 6); assert.equal(N.filterNotes(all, { kind: 'Movies' }).length, 2); assert.equal(N.filterNotes(all, { kind: 'All' }).length, 8);

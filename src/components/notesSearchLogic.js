@@ -9,13 +9,13 @@ import { REACTIONS, reactionById, isEpKey, cleanNote, movieNoteOf } from '../sto
 
 export const PAGE_SIZE = 50;
 export const KINDS = ['All', 'Episodes', 'Movies'];
-export const NO_REACTION = 'none'; // pseudo-reaction: a written note with no emoji ("Words only")
+export const NO_REACTION = 'none'; // count key for notes with words but no emoji (no chip of its own any more)
 
 // "Most loved shows": a 😍 on an episode counts double, a 😂 once.
 export const LOVE_WEIGHT = 2;
 export const FUNNY_WEIGHT = 1;
 
-export const newNotesMemo = () => ({ q: '', reacts: [], kind: 'All', shown: PAGE_SIZE, scroll: 0 });
+export const newNotesMemo = () => ({ q: '', reacts: [], written: false, kind: 'All', shown: PAGE_SIZE, scroll: 0 });
 
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -76,11 +76,13 @@ const tokens = (q) => String(q == null ? '' : q).toLowerCase().split(/\s+/).filt
 const kindOk = (e, kind) => kind === 'All' || !kind || (kind === 'Episodes' ? e.kind === 'episode' : e.kind === 'movie');
 const reactOk = (e, reacts) => !reacts || reacts.length === 0 || reacts.includes(e.react || NO_REACTION);
 
-// f = { q, reacts: ['love', …, 'none'], kind: 'All' | 'Episodes' | 'Movies' }
+// f = { q, reacts: ['love', …], written: true = only notes with words (any reaction or none),
+//       kind: 'All' | 'Episodes' | 'Movies' }. Emoji chips are OR'd together; "Written" is AND'd on top.
 export function filterNotes(entries, f = {}) {
   const t = tokens(f.q);
   return entries.filter((e) => {
     if (!kindOk(e, f.kind) || !reactOk(e, f.reacts)) return false;
+    if (f.written && !e.text) return false;
     if (!t.length) return true;
     const h = haystack(e);
     return t.every((w) => {
@@ -105,13 +107,16 @@ export function reactionCounts(entries, f = {}) {
   return c;
 }
 
+// The "✎ Written" chip's number: notes with words, respecting the other filters.
+export const writtenCount = (entries, f = {}) => filterNotes(entries, { ...f, written: false }).filter((e) => e.text).length;
+
 export const summaryLine = (entries) => {
   const n = entries.length;
   const written = entries.filter((e) => e.text).length;
   return `${n.toLocaleString()} ${n === 1 ? 'entry' : 'entries'} · ${written.toLocaleString()} with a written note`;
 };
 
-export const hasFilters = (f) => !!(f && (tokens(f.q).length || (f.reacts && f.reacts.length) || (f.kind && f.kind !== 'All')));
+export const hasFilters = (f) => !!(f && (tokens(f.q).length || (f.reacts && f.reacts.length) || f.written || (f.kind && f.kind !== 'All')));
 
 export function toggleReaction(reacts, id) {
   return reacts.includes(id) ? reacts.filter((r) => r !== id) : [...reacts, id];

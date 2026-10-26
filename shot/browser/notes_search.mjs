@@ -59,7 +59,7 @@ await ok('Stats shows a "Notes" button with the number of entries (derived from 
 });
 await p.screenshot({ path: `${OUT}/stats_button_phone.png` });
 await p.evaluate(() => document.querySelector('.sd-notesbtn[aria-label^="Your notes"]').click()); await wait(500);
-await ok('Notes page opens: title, summary line, search box, tabs, six reaction chips + Words only, newest first', async () => {
+await ok('Notes page opens: title, summary line, search box, tabs, six reaction chips + Written, newest first', async () => {
   const t = await text(p); assert.match(t, /Your notes/); assert.match(t, /80 entries · \d+ with a written note/);
   assert.equal((await p.evaluate(() => document.querySelectorAll('.sd-nchip').length)), 7);
   const first = (await items(p))[0]; assert.equal(first.name, 'Dune'); // 10 Sep is the newest dated entry
@@ -80,7 +80,7 @@ await ok('search by note text finds the one episode, with its code, date and rea
   assert.match(await text(p), /Clear filters/i);
 });
 await typeQ(p, 's1e5'); await ok('search by episode code is exact: both S1E5 notes, and none of S1E50-S1E59', async () => { const r = await items(p); assert.deepEqual(r.map((i) => i.name), ['Suits', 'Binge Show']); assert.ok(r.every((i) => /^S1E5 ·/.test(i.meta))); });
-await typeQ(p, 'suits'); await ok('search by show name; Words-only chip count reflects the query', async () => { assert.equal((await items(p)).length, 3); assert.equal((await chipInfo(p))['Words only'].n, 1); });
+await typeQ(p, 'suits'); await ok('search by show name; the Written chip count reflects the query', async () => { assert.equal((await items(p)).length, 3); assert.equal((await chipInfo(p))['Written'].n, 2); });
 await typeQ(p, 'zzzz nothing'); await ok('no match: friendly message and Clear filters', async () => { assert.match(await text(p), /No notes match/); assert.equal((await items(p)).length, 0); });
 await p.evaluate(() => [...document.querySelectorAll('.sd-ncount button')].find((b) => /Clear filters/i.test(b.textContent)).click()); await wait(300);
 await ok('Clear filters resets search, chips and tab', async () => { assert.equal(await count(p), '80 of 80'); assert.equal(await p.evaluate(() => document.querySelector('input[aria-label="Search your notes"]').value), ''); });
@@ -91,9 +91,25 @@ await ok('😍 chip: pressed, shows only 😍 entries, other chips keep sensible
 });
 await chip(p, 'Funny'); await wait(250);
 await ok('two chips = OR (😍 or 😂)', async () => { const r = await items(p); assert.equal(r.length, 5 + 3); assert.ok(r.every((i) => ['😍', '😂'].includes(i.emo))); });
-await chip(p, 'Loved it'); await chip(p, 'Funny'); await chip(p, 'Words only'); await wait(250);
-await ok('"Words only" = a written note with no emoji', async () => { const r = await items(p); assert.ok(r.length > 0 && r.every((i) => i.emo === '' && i.txt)); assert.ok(r.some((i) => i.txt === 'Mike sold out?!')); });
-await chip(p, 'Words only'); await wait(200);
+await chip(p, 'Loved it'); await chip(p, 'Funny'); await chip(p, 'Written'); await wait(250);
+await ok('"✎ Written" = every note with words, with OR without a reaction (the bug: reaction + words used to be hidden)', async () => {
+  const r = await items(p); const exp = Object.values(MAIN.shows).flatMap((s) => Object.values(s.notes || {})).filter((n) => n.text).length + 1; // + Dune
+  assert.equal(await count(p), `${exp} of 80`); assert.equal(r.length, Math.min(exp, 50)); assert.ok(r.every((i) => i.txt));
+  assert.ok(r.some((i) => i.txt === 'Mike sold out?!' && i.emo === ''), 'words only');
+  assert.ok(r.some((i) => i.txt === 'That ending' && i.emo === '😍'), 'reaction + words');
+  assert.ok(r.some((i) => i.txt === 'Harvey’s best speech' && i.emo === '😍'), 'reaction + words');
+  const c = await chipInfo(p); assert.equal(c['Written'].on, true); assert.equal(c['Written'].n, exp);
+  assert.equal(await p.evaluate(() => document.querySelector('.sd-nchip.words').textContent.replace(/\d+$/, '')), '✎Written');
+});
+await chip(p, 'Loved it'); await wait(250);
+await ok('Written + 😍 = loved AND has words; 😍 count now counts only written ones', async () => {
+  const r = await items(p); assert.ok(r.length > 0 && r.every((i) => i.emo === '😍' && i.txt)); assert.ok(r.some((i) => i.name === 'Dune'));
+  assert.equal((await chipInfo(p))['Loved it'].n, r.length);
+});
+await p.evaluate(() => document.querySelector('.sd-nchip.words').scrollIntoView({ block: 'center' })); await wait(150);
+await p.screenshot({ path: `${OUT}/written_chip_phone.png` });
+await ok('the chip row has no sideways scroll on a phone', async () => { assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)); });
+await chip(p, 'Loved it'); await chip(p, 'Written'); await wait(200);
 await p.evaluate(() => [...document.querySelectorAll('.sd-lstatus [role=tab]')].find((t) => t.textContent.startsWith('Movies')).click()); await wait(250);
 await ok('Movies tab: only the film; tab counts add up (All = Episodes + Movies)', async () => { const r = await items(p); assert.deepEqual(r.map((i) => i.name), ['Dune']); const t = await tabInfo(p); assert.equal(t.All.n, t.Episodes.n + t.Movies.n); assert.equal(t.Movies.sel, true); });
 await p.evaluate(() => [...document.querySelectorAll('.sd-lstatus [role=tab]')].find((t) => t.textContent.startsWith('All')).click()); await wait(250);
