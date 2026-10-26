@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { APP_DIST, workPath } from '../tests/paths.mjs';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'browser');
-const CANNOT_RUN = ['library.mjs', 'upnext.mjs', 'showpage.mjs', 'launch.mjs']; // need old baselines / design mock-ups
+const CANNOT_RUN = ['launch.mjs']; // a helper, not a suite
 if (!fs.existsSync(path.join(APP_DIST, 'index.html'))) { console.error('No test build yet. Run: node shot/build-test-dists.mjs'); process.exit(2); }
 workPath('tmp');
 const words = process.argv.slice(2);

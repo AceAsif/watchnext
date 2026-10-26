@@ -5,7 +5,6 @@ import http from 'node:http';
 import path from 'node:path';
 import { workPath, browserFile, APP_DIST } from '../../tests/paths.mjs';
 import { launchBrowser } from './launch.mjs';
-import { pathToFileURL } from 'node:url';
 
 const DIST = APP_DIST;
 const OUT = workPath('out3');
@@ -248,11 +247,7 @@ await p.close();
 // ============================================================ 5. desktop
 p = await open({ w: 1280, h: 900 }); await OUTSHOT(p, '07_desktop'); await p.close();
 
-// ============================================================ design reference
-p = await browser.newPage(); await p.setViewport({ width: 390, height: 1420, deviceScaleFactor: 2 });
-await p.goto(pathToFileURL(workPath('design', 'upnext.html')).href, { waitUntil: 'networkidle0' }); await wait(1500);
-await p.screenshot({ path: `${OUT}/00_DESIGN_upnext.png` }); await p.close();
-
 await browser.close(); server.close();
 console.log(`\n${checks} checks passed`);
 console.log('PROBLEMS:', problems.length ? '\n' + problems.join('\n') : 'none');
+if (problems.length) process.exit(1);

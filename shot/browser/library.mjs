@@ -1,3 +1,7 @@
+process.env.TZ = 'Australia/Hobart';
+// The Library (Shows and Movies tabs): filters, sorts and status tabs give the order worked out
+// from the seeded data; then phone layout, tiles, Tools, the Add dialog, empty states, Movies and
+// desktop. (It used to compare against an old build of the app, which no longer exists.)
 import puppeteer from 'puppeteer-core';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,8 +22,8 @@ const serve = (dir, port) => new Promise((res) => {
     r.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(r);
   }); s.listen(port, () => res(s));
 });
-const NEW = 'http://localhost:4181', OLD = 'http://localhost:4182';
-const servers = [await serve(APP_DIST, 4181), await serve(workPath('wl-base-dist'), 4182)];
+const NEW = 'http://localhost:4181';
+const servers = [await serve(APP_DIST, 4181)];
 const FIXED_ISO = '2026-10-01T22:00:00.000Z'; // Fri 2 Oct 2026, 09:00 in Hobart
 
 // ------------------------------------------------------------------ seed
@@ -116,82 +120,84 @@ const clickText = (p, sel, label, { exact = false } = {}) => p.evaluate((s, l, e
 const setNative = (p, sel, v) => p.evaluate((s, val) => { const el = document.querySelector(s); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, val); el.dispatchEvent(new Event('input', { bubbles: true })); }, sel, v);
 let checks = 0; const ok = (name, fn) => { fn(); checks++; console.log('  PASS', name); };
 const newNames = (p) => p.evaluate(() => [...document.querySelectorAll('.sd-ltile-name')].map((e) => e.textContent));
+// Status is a button (the first toolbar button) that opens a sheet (phone) or a list (desktop) of options with counts.
+const STATUS_OPTS = '.sd-sheet .sd-sheetopt, .sd-sheet .sd-sheetrow, .sd-popopt';
+const statusCounts = async (p) => { await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[0].click()); await wait(300); const c = await p.evaluate((sel) => Object.fromEntries([...document.querySelectorAll(sel)].map((x) => { const t = x.textContent.trim(); return [t.replace(/\d+$/, ''), Number((t.match(/(\d+)$/) || [0, 0])[1])]; })), STATUS_OPTS); await p.keyboard.press('Escape'); await wait(250); return c; };
+const pickStatus = async (p, label) => { await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[0].click()); await wait(300); await clickText(p, STATUS_OPTS, label); await wait(200); if (await p.evaluate(() => !!document.querySelector('.sd-sheet'))) { await clickText(p, '.sd-sheet button', 'Done'); await wait(250); } };
 
-// ============================================================ driver: new vs old, same operations
+// ============================================================ 1. ORDER: filters and sorts give the expected titles
 const DRV = {
-  new: {
-    names: newNames,
-    async status(p, s) { await clickText(p, '[role=tab]', s); await wait(150); },
-    async platform(p, label) { await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[0].click()); await wait(200); await clickText(p, '.sd-popopt', label); await wait(150); },
-    async sort(p, label) { await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[1].click()); await wait(200); await clickText(p, '.sd-popopt', label); await wait(150); },
-    async dir(p) { await p.evaluate(() => document.querySelector('button[aria-label$="tap to reverse"]').click()); await wait(150); },
-    async query(p, q) { await setNative(p, '.sd-lfilter input', q); await wait(150); },
-  },
-  old: {
-    names: (p) => p.evaluate(() => [...document.querySelectorAll('.poster-card .title')].map((e) => e.textContent)),
-    async status(p, s) { await clickText(p, '.lib-controls .btn', s, { exact: true }); await wait(150); },
-    async platform(p, label) { await clickText(p, '.chips .chip', label, { exact: true }); await wait(150); },
-    async sort(p, label) { await p.select('select[aria-label="Sort library"]', label); await wait(150); },
-    async dir(p) { await p.evaluate(() => document.querySelector('button[aria-label="Reverse sort order"]').click()); await wait(150); },
-    async query(p, q) { await setNative(p, 'input.lib-filter', q); await wait(150); },
-  },
+  names: newNames,
+  // Desktop toolbar, in order: Status · Platform · Sort · On my services. A button shows the
+  // current choice ("Watching", "Netflix"), so they are found by position.
+  async chip(p, name) { const i = { Status: 0, Platform: 1, Sort: 2 }[name]; await p.evaluate((x) => document.querySelectorAll('.sd-lbar .sd-chipbtn, .sd-chipbtn')[x].click(), i); await wait(200); },
+  async status(p, s) { if (await p.evaluate(() => !!document.querySelector('.sd-lstatus [role=tab]'))) { await clickText(p, '.sd-lstatus [role=tab]', s); } else { await DRV.chip(p, 'Status'); await clickText(p, '.sd-popopt', s); } await wait(150); },
+  async platform(p, label) { await DRV.chip(p, 'Platform'); await clickText(p, '.sd-popopt', label); await wait(150); },
+  async sort(p, label) { await DRV.chip(p, 'Sort'); await clickText(p, '.sd-popopt', label); await wait(150); },
+  async dir(p) { await p.evaluate(() => document.querySelector('button[aria-label$="tap to reverse"]').click()); await wait(150); },
+  async query(p, q) { await setNative(p, '.sd-lfilter input', q); await wait(150); },
 };
-// label mapping new-UI sort label -> old select value
-const SORT_NEW = { Alphabetical: 'Title', 'Recently watched': 'Recently watched', 'Recently added': 'Recently added', Progress: 'Progress', Rating: 'Rating' };
-
-// ============================================================ 1. PARITY: same operations through both UIs
-console.log('1. PARITY with your current Shows page — identical ordered titles for the same filters and sorts (desktop)');
-const COMBOS = [
-  { name: 'default' },
-  { name: 'status Watching', status: 'Watching' },
-  { name: 'status Finished + sort Rating', status: 'Finished', sort: 'Rating' },
-  { name: 'status Not started + sort Progress, reversed', status: 'Not started', sort: 'Progress', dir: true },
-  { name: 'platform Netflix', platform: 'Netflix' },
-  { name: 'platform Stan + sort Recently watched', platform: 'Stan', sort: 'Recently watched' },
-  { name: 'name "a"', query: 'a' },
-  { name: 'name "the" + status Finished', query: 'the', status: 'Finished' },
-  { name: 'sort Recently added', sort: 'Recently added' },
-  { name: 'sort Recently added, reversed', sort: 'Recently added', dir: true },
-  { name: 'sort Title, reversed (Z→A)', dir: true },
-  { name: 'platform Max + Watching + name "o" + Rating reversed', platform: 'Max', status: 'Watching', query: 'o', sort: 'Rating', dir: true },
-  { name: 'name matching nothing', query: 'zzzz' },
-  { name: 'platform Disney+ + sort Progress', platform: 'Disney+', sort: 'Progress' },
+console.log('1. SHOWS ORDER (desktop) — worked out from the seeded data');
+const lib = Object.values(shows).filter((s) => s.followed);
+const az = (list) => list.map((s) => s.name).sort((a, b) => a.localeCompare(b));
+const PLAT_LABEL = { netflix: 'Netflix', stan: 'Stan', disney: 'Disney+', max: 'Max' };
+const CASES = [
+  { name: 'default: A–Z', want: az(lib) },
+  { name: 'A–Z reversed (Z→A)', dir: true, want: az(lib).reverse() },
+  { name: 'platform Netflix', platform: 'Netflix', want: az(lib.filter((s) => s.platform === 'netflix')) },
+  { name: 'platform Stan', platform: 'Stan', want: az(lib.filter((s) => s.platform === 'stan')) },
+  { name: 'name "a"', query: 'a', want: az(lib.filter((s) => /a/i.test(s.name))) },
+  { name: 'name "the" + platform Disney+', query: 'the', platform: 'Disney+', want: az(lib.filter((s) => /the/i.test(s.name) && s.platform === 'disney')) },
+  { name: 'name matching nothing', query: 'zzzz', want: [] },
 ];
-for (const c of COMBOS) {
-  const o = await open(OLD, { w: 1280, h: 800 }), n = await open(NEW, { w: 1280, h: 800 });
-  for (const [side, p] of [['old', o], ['new', n]]) {
-    const d = DRV[side];
-    if (c.status) await d.status(p, c.status);
-    if (c.platform) await d.platform(p, c.platform);
-    if (c.query != null) await d.query(p, c.query);
-    if (c.sort) await d.sort(p, side === 'new' ? SORT_NEW[c.sort] || c.sort : c.sort === 'Title' ? 'Alphabetical' : c.sort);
-    if (c.dir) await d.dir(p);
-  }
-  const a = await DRV.old.names(o), b = await DRV.new.names(n);
-  ok(`${c.name}: ${b.length} shows, same order`, () => assert.deepEqual(b, a));
-  await o.close(); await n.close();
+for (const c of CASES) {
+  const n = await open(NEW, { w: 1280, h: 800 });
+  if (c.platform) await DRV.platform(n, c.platform);
+  if (c.query != null) await DRV.query(n, c.query);
+  if (c.dir) await DRV.dir(n);
+  const b = await DRV.names(n);
+  ok(`${c.name}: ${b.length} shows in the expected order`, () => assert.deepEqual(b, c.want));
+  await n.close();
+}
+{
+  const n = await open(NEW, { w: 1280, h: 800 });
+  await DRV.sort(n, 'Rating');
+  const b = await DRV.names(n);
+  const rating = (name) => Number(lib.find((s) => s.name === name).rating) || 0;
+  ok('sort Rating: every show, highest rated first', () => { assert.equal(b.length, lib.length); assert.ok(b.every((x, i) => i === 0 || rating(b[i - 1]) >= rating(x)), b.map((x) => rating(x)).join(',')); });
+  await DRV.dir(n);
+  const r = await DRV.names(n);
+  ok('Rating reversed: lowest first', () => assert.ok(r.every((x, i) => i === 0 || rating(r[i - 1]) <= rating(x))));
+  await n.close();
 }
 // the status counts on the tabs equal what each tab actually shows
 {
   const n = await open(NEW, { w: 1280, h: 800 });
-  const tabs = await n.evaluate(() => [...document.querySelectorAll('[role=tab]')].map((t) => [t.textContent.replace(/\d+$/, ''), Number(t.querySelector('.n').textContent)]));
-  for (const [label, count] of tabs) { await DRV.new.status(n, label); const got = (await newNames(n)).length; ok(`tab "${label}" says ${count} and shows ${got}`, () => assert.equal(got, count)); }
+  // Desktop: Status is a dropdown; each option shows its count.
+  await DRV.chip(n, 'Status');
+  const tabs = await n.evaluate(() => [...document.querySelectorAll('.sd-popopt')].map((t) => [t.textContent.trim().replace(/\d+$/, ''), Number(t.textContent.trim().match(/(\d+)$/)[1])]));
+  await n.keyboard.press('Escape'); await wait(200);
+  ok('Status offers All, Watching, Finished and Not started', () => assert.deepEqual(tabs.map((t) => t[0]).filter((x) => ['All', 'Watching', 'Finished', 'Not started'].includes(x)), ['All', 'Watching', 'Finished', 'Not started']));
+  for (const [label, count] of tabs) { await DRV.status(n, label); const got = (await newNames(n)).length; ok(`status "${label}" says ${count} and shows ${got}`, () => assert.equal(got, count)); }
   ok(`All = ${FOLLOWED} followed shows (unfollowed and watchlist-only are not in the library)`, () => assert.equal(tabs.find((t) => t[0] === 'All')[1], FOLLOWED));
+  ok('Not started = followed shows with nothing watched', () => assert.equal(tabs.find((t) => /Not started/.test(t[0]))[1], lib.filter((s) => !Object.keys(s.watched).length).length));
   await n.close();
 }
 
-// ---- Movies parity
-console.log('1b. PARITY with your current Movies page');
-const MDRV = {
-  new: { names: newNames, async sort(p, l) { await clickText(p, '[role=radio]', l, { exact: true }); await wait(150); }, async query(p, q) { await setNative(p, '.sd-lfilter input', q); await wait(150); } },
-  old: { names: (p) => p.evaluate(() => [...document.querySelectorAll('.sd-tilebtn-name')].map((e) => e.textContent)), async sort(p, l) { await clickText(p, '.sd-seg button', l, { exact: true }); await wait(150); }, async query(p, q) { await setNative(p, 'input[placeholder="Filter your movies"]', q); await wait(150); } },
-};
-for (const c of [{ n: 'default' }, { n: 'sort A–Z', sort: 'A–Z' }, { n: 'sort Rating', sort: 'Rating' }, { n: 'filter "s"', query: 's' }, { n: 'filter "an" + Rating', query: 'an', sort: 'Rating' }, { n: 'filter nothing', query: 'qqq' }]) {
-  const o = await open(OLD, { w: 1280, h: 800, tab: 'Movies' }), n = await open(NEW, { w: 1280, h: 800, tab: 'Movies' });
-  for (const [side, p] of [['old', o], ['new', n]]) { if (c.sort) await MDRV[side].sort(p, c.sort); if (c.query) await MDRV[side].query(p, c.query); }
-  const a = await MDRV.old.names(o), b = await MDRV.new.names(n);
-  ok(`movies ${c.n}: ${b.length} movies, same order`, () => assert.deepEqual(b, a));
-  await o.close(); await n.close();
+console.log('1b. MOVIES ORDER');
+const watchedMovies = movies.filter((m) => !m.status);
+const MCASES = [
+  { n: 'sort A–Z (one tile per film: two different films can share a name)', sort: 'A–Z', want: [...new Map(watchedMovies.map((m) => [m.tmdbId, m.name])).values()].sort((a, b) => a.localeCompare(b)) },
+  { n: 'filter "castle"', sort: 'A–Z', query: 'castle', want: watchedMovies.filter((m) => /castle/i.test(m.name)).map((m) => m.name).sort((a, b) => a.localeCompare(b)) },
+  { n: 'filter "zzz" finds nothing', query: 'qqq', want: [] },
+];
+for (const c of MCASES) {
+  const n = await open(NEW, { w: 1280, h: 800, tab: 'Movies' });
+  if (c.sort) { await clickText(n, '[role=radio]', c.sort, { exact: true }); await wait(150); }
+  if (c.query) { await setNative(n, '.sd-lfilter input', c.query); await wait(150); }
+  const b = await newNames(n);
+  ok(`movies ${c.n}: ${b.length} in the expected order`, () => assert.deepEqual(b, c.want));
+  await n.close();
 }
 
 // ============================================================ 2. SHOWS on a phone
@@ -206,26 +212,35 @@ const head = await p.evaluate(() => ({ count: document.querySelector('.sd-libhea
 assert.deepEqual(head, { count: String(FOLLOWED), add: true, tools: true }); checks++; console.log('  PASS title count, Add and Tools present');
 const ibSize = await p.evaluate(() => { const b = document.querySelector('.masthead-search').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; });
 ok('header search button is a 44x44 touch target', () => assert.deepEqual(ibSize, [44, 44]));
-const rows = await p.evaluate(() => { const tops = ['.sd-lfilter', '.sd-lstatus', '.sd-lbar-chips'].map((s) => Math.round(document.querySelector(s).getBoundingClientRect().top)); return { tops, firstTile: Math.round(document.querySelector('.sd-ltile').getBoundingClientRect().top) }; });
-ok(`filter bar is 3 rows (filter / status / chips) and posters start at y=${rows.firstTile} (was far lower with 5 control rows)`, () => { assert.ok(rows.tops[0] < rows.tops[1] && rows.tops[1] < rows.tops[2]); assert.ok(rows.firstTile < 400, String(rows.firstTile)); });
+const rows = await p.evaluate(() => { const c = document.querySelectorAll('.sd-chipbtn'); const top = (e) => Math.round(e.getBoundingClientRect().top); return { filter: top(document.querySelector('.sd-lfilter')), status: top(c[0]), platform: top(c[1]), sort: top(c[2]), firstTile: top(document.querySelector('.sd-ltile')) }; });
+ok(`phone: Filter + Status on the first row, Platform + Sort on the next, posters start at y=${rows.firstTile}`, () => { assert.equal(rows.filter, rows.status); assert.equal(rows.platform, rows.sort); assert.ok(rows.platform > rows.filter); assert.ok(rows.firstTile < 400, String(rows.firstTile)); });
+const chipNames = await p.evaluate(() => [...document.querySelectorAll('.sd-chipbtn')].map((c) => c.textContent.trim()));
+ok('toolbar buttons: Status, Platform, Sort, On my services', () => { assert.equal(chipNames[0], 'Status'); assert.equal(chipNames[1], 'Platform'); assert.match(chipNames[2], /^Sort/); assert.match(chipNames[3], /On my services/); });
 const flat = await p.evaluate(() => { const i = document.querySelector('.sd-lfilter input'); const c = getComputedStyle(i); return [c.borderTopWidth, c.paddingLeft, c.backgroundColor]; });
 ok('the filter field is ONE box: its inner <input> has no border, no padding and no background of its own (no double border)', () => assert.deepEqual(flat, ['0px', '0px', 'rgba(0, 0, 0, 0)']));
+let nn;
 const cols = await p.evaluate(() => new Set([...document.querySelectorAll('.sd-ltile')].map((e) => Math.round(e.getBoundingClientRect().left))).size);
 ok('poster grid is 3 columns', () => assert.equal(cols, 3));
 assert.ok(await noOverflow(p)); checks++; console.log('  PASS no horizontal overflow');
 await shot(p, '01_shows_phone');
 
-// tabs: counts, keyboard
-const tabInfo = await p.evaluate(() => ({ roles: [...document.querySelectorAll('[role=tab]')].map((x) => x.getAttribute('aria-selected')), tabindex: [...document.querySelectorAll('[role=tab]')].map((x) => x.tabIndex) }));
-ok('status tabs are an ARIA tablist with the first selected and one tab stop', () => { assert.deepEqual(tabInfo.roles, ['true', 'false', 'false', 'false']); assert.equal(tabInfo.tabindex.filter((x) => x === 0).length, 1); });
-await p.focus('[role=tab][aria-selected=true]'); await p.keyboard.press('ArrowRight'); await wait(200);
-const kb = await p.evaluate(() => ({ sel: document.querySelector('[role=tab][aria-selected=true]').textContent.replace(/\d+$/, ''), focus: document.activeElement.textContent.replace(/\d+$/, '') }));
-ok('ArrowRight moves the status tab AND the focus together', () => assert.deepEqual(kb, { sel: 'Watching', focus: 'Watching' }));
-await clickText(p, '[role=tab]', 'All'); await wait(150);
+// status: a bottom sheet of options with counts
+await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[0].click()); await wait(300);
+const stOpts = await p.evaluate(() => [...document.querySelectorAll('.sd-sheet .sd-sheetopt, .sd-sheet .sd-sheetrow')].map((o) => o.textContent.trim()));
+ok('Status opens a sheet: All, Watching, Finished, Not started (with counts)', () => { assert.deepEqual(stOpts.map((x) => x.replace(/\d+$/, '')), ['All', 'Watching', 'Finished', 'Not started']); assert.equal(Number(stOpts[0].match(/\d+$/)[0]), FOLLOWED); });
+await clickText(p, '.sd-sheet .sd-sheetopt, .sd-sheet .sd-sheetrow', 'Watching'); await wait(200);
+if (await p.evaluate(() => !!document.querySelector('.sd-sheet'))) { await clickText(p, '.sd-sheet button', 'Done'); await wait(250); }
+nn = await newNames(p);
+const stChip = await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[0].textContent.replace(/\s+/g, ' ').trim());
+const nWatching = Number(stOpts[1].match(/\d+$/)[0]);
+ok(`choosing Watching shows ${nWatching} shows and the button says "Watching ${nWatching}"`, () => { assert.equal(nn.length, nWatching); assert.equal(stChip, `Watching ${nWatching}`); });
+await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[0].click()); await wait(300);
+await clickText(p, '.sd-sheet .sd-sheetopt, .sd-sheet .sd-sheetrow', 'All'); await wait(200);
+if (await p.evaluate(() => !!document.querySelector('.sd-sheet'))) { await clickText(p, '.sd-sheet button', 'Done'); await wait(250); }
 
 // typing in the filter
 await p.click('.sd-lfilter input'); await p.keyboard.type('the', { delay: 10 }); await wait(250);
-let nn = await newNames(p);
+nn = await newNames(p);
 ok(`typing "the" narrows the grid live (${nn.length} shows, all contain "the")`, () => { assert.ok(nn.length > 0 && nn.length < FOLLOWED); assert.ok(nn.every((x) => /the/i.test(x))); });
 t = await text(p);
 ok('phone shows the "N of M shows · Clear" line while filtering', () => assert.match(t, new RegExp(`${nn.length} of ${FOLLOWED} shows`, 'i')));
@@ -234,13 +249,13 @@ nn = await newNames(p); assert.equal(nn.length, FOLLOWED); checks++; console.log
 assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector('.sd-lcount')).display), 'none'); checks++; console.log('  PASS count line hidden when not filtering (phone)');
 
 // platform sheet
-await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[0].focus()); await p.keyboard.press('Enter'); await wait(300);
-const sheet = await p.evaluate(() => ({ dialog: document.querySelector('.sd-sheet').getAttribute('role'), title: document.querySelector('.sd-sheet').getAttribute('aria-label'), expanded: document.querySelectorAll('.sd-chipbtn')[0].getAttribute('aria-expanded'), opts: [...document.querySelectorAll('.sd-sheetopt')].map((o) => [o.querySelector('.ell').textContent, Number(o.querySelector('.n').textContent)]), bottom: Math.round(document.querySelector('.sd-sheet').getBoundingClientRect().bottom), vh: innerHeight }));
+await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[1].focus()); await p.keyboard.press('Enter'); await wait(300);
+const sheet = await p.evaluate(() => ({ dialog: document.querySelector('.sd-sheet').getAttribute('role'), title: document.querySelector('.sd-sheet').getAttribute('aria-label'), expanded: document.querySelectorAll('.sd-chipbtn')[1].getAttribute('aria-expanded'), opts: [...document.querySelectorAll('.sd-sheetopt')].map((o) => [o.querySelector('.ell').textContent, Number(o.querySelector('.n').textContent)]), bottom: Math.round(document.querySelector('.sd-sheet').getBoundingClientRect().bottom), vh: innerHeight }));
 ok('phone Platform picker is a bottom sheet (dialog, touches the bottom edge, chip aria-expanded)', () => { assert.equal(sheet.dialog, 'dialog'); assert.equal(sheet.title, 'Platform'); assert.equal(sheet.expanded, 'true'); assert.ok(Math.abs(sheet.bottom - sheet.vh) <= 2); });
 ok('"Any platform" first with the library total; platform counts are per-platform and sum to the total (every show here has one or none)', () => { assert.equal(sheet.opts[0][0], 'Any platform'); assert.equal(sheet.opts[0][1], FOLLOWED); const sum = sheet.opts.slice(1).reduce((s, o) => s + o[1], 0); assert.ok(sum <= FOLLOWED && sum > 0); });
 await shot(p, '02_platform_sheet', false);
 await clickText(p, '.sd-sheetopt', 'Netflix'); await wait(250);
-const afterPick = await p.evaluate(() => ({ chip: document.querySelectorAll('.sd-chipbtn')[0].textContent, active: document.querySelectorAll('.sd-chipbtn')[0].classList.contains('active'), sheetStillOpen: !!document.querySelector('.sd-sheet') }));
+const afterPick = await p.evaluate(() => ({ chip: document.querySelectorAll('.sd-chipbtn')[1].textContent, active: document.querySelectorAll('.sd-chipbtn')[1].classList.contains('active'), sheetStillOpen: !!document.querySelector('.sd-sheet') }));
 ok('choosing Netflix applies it, turns the chip amber with its name, and the sheet stays open until Done (as designed)', () => assert.deepEqual(afterPick, { chip: 'Netflix', active: true, sheetStillOpen: true }));
 await clickText(p, '.sd-sheet button', 'Done'); await wait(250);
 const backFocus = await p.evaluate(() => document.activeElement.className);
@@ -248,13 +263,15 @@ ok('closing a toggled sheet (Platform) returns focus to its chip — keyboard us
 nn = await newNames(p); const nflx = Object.values(shows).filter((s) => s.followed && s.platform === 'netflix').length;
 ok(`only the ${nflx} Netflix shows remain`, () => assert.equal(nn.length, nflx));
 t = await text(p); ok('"N of M shows · Clear" reflects the platform filter', () => assert.match(t, new RegExp(`${nflx} of ${FOLLOWED} shows`, 'i')));
-const tabCounts = await p.evaluate(() => [...document.querySelectorAll('[role=tab]')].map((x) => Number(x.querySelector('.n').textContent)));
-ok('status tab counts now describe Netflix shows only and still add up (All = Watching + Finished + Not started)', () => { assert.equal(tabCounts[0], nflx); assert.equal(tabCounts[1] + tabCounts[2] + tabCounts[3], tabCounts[0]); });
+await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[0].click()); await wait(300);
+const tabCounts = await p.evaluate(() => [...document.querySelectorAll('.sd-sheet .sd-sheetopt, .sd-sheet .sd-sheetrow')].map((x) => Number(x.textContent.trim().match(/(\d+)$/)[1])));
+await p.keyboard.press('Escape'); await wait(250);
+ok('Status counts now describe Netflix shows only and still add up (All = Watching + Finished + Not started)', () => { assert.equal(tabCounts[0], nflx); assert.equal(tabCounts[1] + tabCounts[2] + tabCounts[3], tabCounts[0]); });
 await clickText(p, '.sd-lclear.phone', 'Clear'); await wait(250);
 nn = await newNames(p); ok('Clear resets every filter', () => assert.equal(nn.length, FOLLOWED));
 
 // sort sheet + direction
-await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[1].click()); await wait(300);
+await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[2].click()); await wait(300);
 const sortOpts = await p.evaluate(() => [...document.querySelectorAll('.sd-sheetrow')].map((x) => x.textContent));
 ok('Sort sheet lists the five real sort orders', () => assert.deepEqual(sortOpts, ['Title', 'Recently watched', 'Recently added', 'Progress', 'Rating']));
 await clickText(p, '.sd-sheetrow', 'Rating'); await wait(200); await clickText(p, '.sd-sheet button', 'Done'); await wait(250);
@@ -263,7 +280,7 @@ ok(`sorting by Rating puts "${topRated}" first`, () => assert.equal(byRating[0],
 await p.evaluate(() => document.querySelector('button[aria-label$="tap to reverse"]').click()); await wait(200);
 const reversed = await newNames(p);
 ok('the arrow button reverses the order exactly', () => assert.deepEqual(reversed, byRating.slice().reverse()));
-const chipTxt = await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[1].textContent);
+const chipTxt = await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[2].textContent);
 ok('Sort chip reads "Sort Rating"', () => assert.match(chipTxt, /Sort\s*Rating/));
 await p.close();
 
@@ -378,7 +395,8 @@ p = await open(NEW);
 await p.click('.sd-lfilter input'); await p.keyboard.type('zzzz', { delay: 10 }); await wait(300);
 let e = await p.evaluate(() => ({ h2: document.querySelector('.sd-lempty h2').textContent, p: document.querySelector('.sd-lempty p').textContent, btns: [...document.querySelectorAll('.sd-lempty button')].map((b) => b.textContent.trim()), tabs: [...document.querySelectorAll('[role=tab] .n')].map((n) => n.textContent) }));
 ok('name not found: "Nothing called “zzzz” in your library", spelling hint, and a "Search TMDB for “zzzz”" shortcut', () => { assert.equal(e.h2, 'Nothing called “zzzz” in your library'); assert.match(e.p, /Check the spelling/); assert.deepEqual(e.btns, ['Search TMDB for “zzzz”', 'Clear filter']); });
-ok('status tab counts all drop to 0', () => assert.deepEqual(e.tabs, ['0', '0', '0', '0']));
+const zc = await statusCounts(p);
+ok('status counts all drop to 0', () => assert.deepEqual(Object.values(zc), [0, 0, 0, 0]));
 await shot(p, '06_name_not_found', false);
 net = [];
 await clickText(p, '.sd-lempty button', 'Search TMDB'); await wait(900);
@@ -389,13 +407,13 @@ await clickText(p, '.sd-lempty .sd-lclear', 'Clear filter'); await wait(250);
 assert.equal((await newNames(p)).length, FOLLOWED); checks++; console.log('  PASS "Clear filter" restores the library');
 // a combination that is certainly empty: the name "Suits" (a Finished show) with the Not started tab
 await p.click('.sd-lfilter input'); await p.keyboard.type('Suits', { delay: 10 }); await wait(250);
-await clickText(p, '[role=tab]', 'Not started'); await wait(250);
+await pickStatus(p, 'Not started');
 e = await p.evaluate(() => ({ h2: document.querySelector('.sd-lempty h2').textContent, chips: [...document.querySelectorAll('.sd-lempty .chips span')].map((x) => x.textContent), btns: [...document.querySelectorAll('.sd-lempty button')].map((b) => b.textContent.trim()) }));
 ok('filters match nothing: "No shows match these filters" with one chip per active filter and "Clear filters"', () => { assert.equal(e.h2, 'No shows match these filters'); assert.deepEqual(e.chips, ['Status: Not started', 'Name: “Suits”']); assert.deepEqual(e.btns, ['Clear filters']); });
 await shot(p, '06b_filters_match_nothing', false);
 await clickText(p, '.sd-lempty button', 'Clear filters'); await wait(300);
-const reset = await p.evaluate(() => ({ q: document.querySelector('.sd-lfilter input').value, tab: document.querySelector('[role=tab][aria-selected=true]').textContent.replace(/\d+$/, ''), n: document.querySelectorAll('.sd-ltile').length }));
-ok('"Clear filters" resets the name AND the status tab', () => assert.deepEqual(reset, { q: '', tab: 'All', n: FOLLOWED }));
+const reset = await p.evaluate(() => ({ q: document.querySelector('.sd-lfilter input').value, tab: document.querySelectorAll('.sd-chipbtn')[0].textContent.trim(), n: document.querySelectorAll('.sd-ltile').length }));
+ok('"Clear filters" resets the name AND the status', () => assert.deepEqual(reset, { q: '', tab: 'Status', n: FOLLOWED }));
 await p.close();
 p = await open(NEW, { state: EMPTY });
 e = await p.evaluate(() => ({ h2: document.querySelector('.sd-lempty h2').textContent, text: document.querySelector('.sd-lempty p').textContent, hasBar: !!document.querySelector('.sd-lbar'), hasTools: !!document.querySelector('.sd-toolsbtn'), btns: [...document.querySelectorAll('.sd-lempty button')].map((b) => b.textContent.trim()) }));
@@ -411,10 +429,10 @@ console.log('7. MOVIES — phone');
 p = await open(NEW, { tab: 'Movies' });
 const mi = await p.evaluate(() => [...document.querySelectorAll('input')].filter((i) => i.offsetParent !== null).map((i) => i.placeholder));
 ok('THE FIX on Movies too: one text box, "Filter 30 movies" (the "Search TMDB to log a movie" box is gone)', () => { assert.deepEqual(mi, [`Filter ${WATCHED_MOVIES} movies`]); });
-const mh = await p.evaluate(() => ({ count: document.querySelector('.sd-libhead h1 .n').textContent, add: document.querySelector('.sd-addbtn').getAttribute('aria-label'), radios: [...document.querySelectorAll('[role=radio]')].map((r) => [r.textContent, r.getAttribute('aria-checked')]), group: document.querySelector('[role=radiogroup]').getAttribute('aria-label') }));
+const mh = await p.evaluate(() => ({ count: document.querySelector('.sd-libhead h1 .n').textContent, add: document.querySelector('.sd-addbtn').getAttribute('aria-label'), radios: [...document.querySelectorAll('[role=radio]')].filter((r) => ['Recent', 'A–Z', 'Rating'].includes(r.textContent)).map((r) => [r.textContent, r.getAttribute('aria-checked')]), group: [...document.querySelectorAll('[role=radiogroup]')].find((g) => /Recent/.test(g.textContent)).getAttribute('aria-label') }));
 ok('title count, "Add a movie from TMDB" button, and a radio group Recent / A–Z / Rating', () => { assert.equal(mh.count, String(WATCHED_MOVIES)); assert.match(mh.add, /Add a movie/); assert.deepEqual(mh.radios, [['Recent', 'true'], ['A–Z', 'false'], ['Rating', 'false']]); assert.equal(mh.group, 'Sort movies'); });
-await p.focus('[role=radio][aria-checked=true]'); await p.keyboard.press('ArrowRight'); await wait(200);
-assert.equal(await p.evaluate(() => document.querySelector('[role=radio][aria-checked=true]').textContent + '|' + document.activeElement.textContent), 'A–Z|A–Z'); checks++; console.log('  PASS arrow-key navigation on the sort switch');
+await p.evaluate(() => [...document.querySelectorAll('[role=radio]')].find((r) => r.textContent === 'Recent').focus()); await p.keyboard.press('ArrowRight'); await wait(200);
+assert.equal(await p.evaluate(() => [...document.querySelectorAll('[role=radio][aria-checked=true]')].map((r) => r.textContent).find((x) => ['Recent', 'A–Z', 'Rating'].includes(x)) + '|' + document.activeElement.textContent), 'A–Z|A–Z'); checks++; console.log('  PASS arrow-key navigation on the sort switch');
 const badge = await p.evaluate(() => { const t = [...document.querySelectorAll('.sd-ltile')].find((x) => x.querySelector('.sd-ltile-badge')); const b = t.querySelector('.sd-ltile-badge').getBoundingClientRect(), a = t.querySelector('.sd-ltile-art').getBoundingClientRect(); return { topLeft: b.top - a.top < 12 && b.left - a.left < 12, date: !!t.querySelector('.sd-ltile-date') }; });
 ok('rating badge sits TOP-LEFT of the poster (as designed) and each tile shows its watch date', () => { assert.ok(badge.topLeft); assert.ok(badge.date); });
 await shot(p, '08_movies_phone', false);
@@ -449,9 +467,9 @@ await p.close();
 // ============================================================ 8. DESKTOP
 console.log('8. DESKTOP (1280px)');
 p = await open(NEW, { w: 1280, h: 800 });
-const bar = await p.evaluate(() => { const r = (s) => { const e = document.querySelector(s).getBoundingClientRect(); return { y: e.y, cy: e.y + e.height / 2, w: e.width, x: e.x, h: e.height }; }; return { filter: r('.sd-lfilter'), status: r('.sd-lstatus'), chip1: r('.sd-lbar-chips .sd-pop-wrap'), dir: r('.sd-lbar-chips .sd-ib') }; });
+const bar = await p.evaluate(() => { const r = (s) => { const e = document.querySelector(s).getBoundingClientRect(); return { y: e.y, cy: e.y + e.height / 2, w: e.width, x: e.x, h: e.height }; }; return { filter: r('.sd-lfilter'), status: r('.sd-chipbtn'), chip1: r('.sd-lbar-chips .sd-pop-wrap'), dir: r('.sd-lbar-chips .sd-ib') }; });
 ok('ONE toolbar row: filter, status, Platform, Sort and direction share a vertical centre', () => { const cs = [bar.filter.cy, bar.status.cy, bar.chip1.cy, bar.dir.cy]; assert.ok(Math.max(...cs) - Math.min(...cs) < 3, JSON.stringify(cs)); });
-ok('toolbar widths match the design (filter 260, status 380, chip 150)', () => { assert.ok(Math.abs(bar.filter.w - 260) < 2); assert.ok(Math.abs(bar.status.w - 380) < 2); assert.ok(Math.abs(bar.chip1.w - 150) < 2); });
+ok('toolbar widths: filter 260, Status 170, Platform 150', () => { assert.ok(Math.abs(bar.filter.w - 260) < 2, String(bar.filter.w)); assert.ok(Math.abs(bar.status.w - 170) < 2, String(bar.status.w)); assert.ok(Math.abs(bar.chip1.w - 150) < 2, String(bar.chip1.w)); });
 const hdr = await p.evaluate(() => ({ tagline: document.body.innerText.toLowerCase().includes('personal tracker'), logoLeft: Math.round(document.querySelector('.masthead h1').getBoundingClientRect().left), pageLeft: Math.round(document.querySelector('.sd-page').getBoundingClientRect().left) }));
 ok('header: no tagline, and the logo lines up with the page content', () => { assert.equal(hdr.tagline, false); assert.equal(hdr.logoLeft, hdr.pageLeft); });
 const dcols = await p.evaluate(() => new Set([...document.querySelectorAll('.sd-ltile')].map((e) => Math.round(e.getBoundingClientRect().left))).size);
@@ -461,7 +479,7 @@ ok('caption under the toolbar: "N shows · sorted by title, A→Z"', () => asser
 assert.ok(await noOverflow(p)); checks++; console.log('  PASS no horizontal overflow');
 await shot(p, '09_shows_desktop', false);
 // platform popover
-await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[0].click()); await wait(250);
+await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[1].click()); await wait(250);
 const pop = await p.evaluate(() => { const c = document.querySelector('.sd-lbar-chips .sd-chipbtn').getBoundingClientRect(), g = document.querySelector('.sd-pop').getBoundingClientRect(); return { sheet: !!document.querySelector('.sd-sheet'), role: document.querySelector('.sd-pop').getAttribute('role'), below: Math.round(g.top - c.bottom), left: Math.abs(g.left - c.left) < 2, w: Math.round(g.width), focus: document.activeElement.className, first: document.querySelector('.sd-popopt').textContent }; });
 ok('desktop Platform picker is a POPOVER under the chip (not a sheet), 260px wide, focus moved inside', () => { assert.equal(pop.sheet, false); assert.equal(pop.role, 'listbox'); assert.ok(pop.below >= 4 && pop.below <= 8, String(pop.below)); assert.ok(pop.left); assert.equal(pop.w, 260); assert.match(pop.focus, /sd-popopt/); });
 await shot(p, '10_platform_popover', false);
@@ -471,10 +489,10 @@ ok('keyboard: ArrowDown + Enter picks a platform, the popover closes, the chip t
 const clr = await p.evaluate(() => ({ bar: getComputedStyle(document.querySelector('.sd-lclear.bar')).display, phone: document.querySelector('.sd-lclear.phone') ? getComputedStyle(document.querySelector('.sd-lclear.phone')).display : 'none', cap: document.querySelector('.sd-lcount .sd-lbl').textContent }));
 ok('desktop: "Clear" sits on the toolbar (the phone Clear is hidden) and the caption says "N of M shows · sorted…"', () => { assert.notEqual(clr.bar, 'none'); assert.equal(clr.phone, 'none'); assert.match(clr.cap, /^\d+ of \d+ shows · sorted by title, A→Z$/); });
 await p.click('.sd-lclear.bar'); await wait(250);
-await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[0].click()); await wait(200);
+await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[1].click()); await wait(200);
 await p.click('.sd-libhead h1'); await wait(200); // an inert spot (the page title), not a poster tile
 assert.equal(await p.evaluate(() => !document.querySelector('.sd-pop')), true); checks++; console.log('  PASS outside click closes the popover');
-await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[1].click()); await wait(200); await p.keyboard.press('Escape'); await wait(200);
+await p.evaluate(() => document.querySelectorAll('.sd-chipbtn')[2].click()); await wait(200); await p.keyboard.press('Escape'); await wait(200);
 const escd = await p.evaluate(() => ({ closed: !document.querySelector('.sd-pop'), focus: document.activeElement.className }));
 ok('Escape closes the Sort popover and returns focus to its chip', () => { assert.equal(escd.closed, true); assert.match(escd.focus, /sd-chipbtn/); });
 // tools popover
@@ -505,3 +523,4 @@ await p.close();
 await browser.close(); servers.forEach((s) => s.close());
 console.log(`\n${checks} checks passed`);
 console.log('PROBLEMS:', problems.length ? '\n' + [...new Set(problems)].join('\n') : 'none');
+if (problems.length) process.exit(1);

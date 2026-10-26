@@ -51,12 +51,10 @@ Browser: settings 47 · desktop 56 · notes 35 · restore 24 · anime 35 · year
 rewatch 8 · recaps 20 · watchdates 21 · notes_search 22 · backup_nudge 21 · services 34 · tonight 28 ·
 movie_night 41 · goals 25 · wipe_resume 33 · discover 34.
 
-## Suites that cannot run on their own
-- `library.mjs` compares the Library tab against an OLD build kept in `.harness-work/wl-base-dist`
-  (the app before the Library redesign). That baseline no longer exists, so it does not run. It is
-  kept for reference; delete its old-vs-new section if it is ever revived.
-- `upnext.mjs` and `showpage.mjs` compare against design mock-ups (`.harness-work/design/*.html`) from the
-  original design hand-off, which are not part of the harness.
+## Every suite runs on its own
+- `library.mjs`, `upnext.mjs` and `showpage.mjs` used to compare against an old build and design
+  mock-ups that are not in the harness. Since 26 Oct 2026 they check the current UI against
+  expectations worked out from their own seeded data, like the other suites (`launch.mjs` is a helper).
 
 ## Rules
 - Tests assert the CURRENT UI. When a screen is changed on purpose, update the matching suite

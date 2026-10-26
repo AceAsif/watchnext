@@ -142,7 +142,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 
 - `npm run test:unit` → **70 suites, 1004 tests, all passing** (25 Oct 2026). The runner needs each suite to end with `console.log("N <words> tests passed")` (no hyphens in the words).
 - Browser suites: `node shot/browser/<name>.mjs`. Conventions: date pinned with a FakeDate (usually 2026-10-21T22:00Z = 22 Oct 09:00 Hobart), `emulateTimezone('Australia/Hobart')`, bypass the service worker, mock TMDB/OMDb with `access-control-allow-origin: *`, check no sideways scroll at 390px, take a screenshot and LOOK at it.
-- **All browser suites pass (25 Oct 2026)** except the 3 that **cannot run** (need old baseline/design files): library, upnext (stops at "Caught Up Airing"), showpage (stops at "Cast"). The 12 old failures were fixed on 25 Oct: 8 already passed after recent work; anime, notes, notes_search and region had stale checks, and anime also caught a real bug (Esc in a sheet also closed the page — sheets now `preventDefault` Esc).
+- **All browser suites run and pass (26 Oct 2026)**, including library, upnext and showpage: their old-build / design-mock-up comparisons were replaced with checks worked out from their own seeded data (library: Status is now a button + sheet/list, toolbar order Status · Platform · Sort · On my services; showpage: date fixed to 22 Oct 2026 and real checks instead of screenshots only). The 12 old failures were fixed on 25 Oct: 8 already passed after recent work; anime, notes, notes_search and region had stale checks, and anime also caught a real bug (Esc in a sheet also closed the page — sheets now `preventDefault` Esc).
 - A full run of every suite takes over 10 minutes: run it in two halves.
 - Sheets mark Esc as used (`e.preventDefault()` in `Sheet`); page-wide keys skip `defaultPrevented` events. Keep that if you add another Esc handler.
 - When a suite fails, check it also fails on `origin/main` (git stash, rebuild dists, run) before blaming your change.
@@ -162,7 +162,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 **Tidy-up from the code check (22–23 Oct):**
 - ~~Remove the Discover hit-rate line from Watchlist → Discover~~ (done 25 Oct; still in Stats → Your taste).
 - ~~Quiet the 3 background `console.warn` calls~~ (done 25 Oct: `devWarn` in `components/devLog.js`, logs only in `npm run dev`).
-- ~~Fix the 12 failing browser suites~~ (done 25 Oct, §9). Still open: the 3 suites that cannot run (library, upnext, showpage).
+- ~~Fix the 12 failing browser suites~~ (done 25 Oct, §9). ~~The 3 suites that could not run (library, upnext, showpage)~~ (done 26 Oct).
 - ~~Replace the 18 `alert()` and 6 `confirm()` pop-ups~~ (done 25 Oct). **Never use alert()/confirm() again**: `notify()` / `notifyError(…: ${reason(e)}.)` for messages and `await askConfirm({ title, body, confirmLabel, danger })` for questions (`components/appDialogs.js`, drawn by `DialogHost.jsx` in App). A unit test fails if alert( or confirm( comes back. Browser tests answer questions with `shot/browser/autoYes.js`.
 - (Done by this file: update the handover. Delete `docs/WatchNext-Handover-v6.md` once v7 is in.)
 
