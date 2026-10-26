@@ -14,6 +14,7 @@ import { watchedTitles, isAnime } from './originsLogic.js';
 import { groupMovies } from './movieGroupsLogic.js';
 import { collectNotes } from './notesSearchLogic.js';
 import { ratedEpisodes } from './epRatingsLogic.js';
+import { localDate } from './csvExport.js';
 
 export const LEVEL_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Legend'];
 
@@ -43,8 +44,8 @@ export const BADGES = [
 const isWatchedMovie = (m) => !!m && (!m.status || m.status === 'watched');
 const DAY = 86400000;
 
-// The longest run of consecutive days with any watch (same day rule as Stats: the date part
-// of the stored time).
+// The longest run of consecutive days with any watch (same day rule as Stats: your LOCAL day
+// of each watch, from localDate).
 export function longestStreak(days) {
   const nums = [...new Set(days)].map((d) => Date.parse(d + 'T00:00:00Z') / DAY).filter(Number.isFinite).sort((a, b) => a - b);
   let best = 0;
@@ -74,7 +75,7 @@ export function computeMetrics(state, { origins = { items: {} }, collections = n
       const n = Number.isInteger(w && w.n) && w.n > 0 ? w.n : 1;
       episodes += n;
       minutes += ((w && w.min) || 40) * n;
-      if (w && typeof w.at === 'string' && w.at.length >= 10) days.push(w.at.slice(0, 10));
+      if (w && typeof w.at === 'string' && localDate(w.at)) days.push(localDate(w.at)); // your local day
     }
     if (ws.length) for (const g of s.genres || []) genres.add(g);
     if (s.followed && s.dropped !== true && s.totalEpisodes && ws.length >= s.totalEpisodes) finished++;
@@ -85,7 +86,7 @@ export function computeMetrics(state, { origins = { items: {} }, collections = n
   let cinema = 0;
   for (const m of movies) {
     minutes += m.runtimeMin || 110;
-    if (typeof m.watchedAt === 'string' && m.watchedAt.length >= 10) days.push(m.watchedAt.slice(0, 10));
+    if (typeof m.watchedAt === 'string' && localDate(m.watchedAt)) days.push(localDate(m.watchedAt));
     for (const g of m.genres || []) genres.add(g);
     if (Number(m.rating) > 0) ratings++;
     if (m.platform === 'cinema') cinema++;

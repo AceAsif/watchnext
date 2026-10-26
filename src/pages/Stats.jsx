@@ -28,6 +28,7 @@ import {
   timeTotals,
 } from '../components/statsLogic.js';
 import { localISODate } from '../components/showLogic.js';
+import { localDate } from '../components/csvExport.js';
 import { viewingDates, doneDates } from '../components/viewingDates.js';
 import { rewatchedShows, rewatchedMovies, rewatchSummary } from '../components/rewatchLogic.js';
 import { lovedShows, collectNotes, LOVE_WEIGHT, FUNNY_WEIGHT } from '../components/notesSearchLogic.js';
@@ -105,12 +106,14 @@ export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview
         // Each viewing on its own date (first watch, rewatch, "+1"), so a rewatch this year counts
         // this year even when the first watch was long ago. Same rule as Month in review.
         for (const v of viewingDates(w, done[k])) {
-          const y = v.at.slice(0, 4);
+          // Days, months and years are YOUR local ones (a 1am watch in Hobart is that day, not
+          // yesterday in UTC), the same as Month in review and This month vs last year.
+          const day = localDate(v.at);
+          const y = day.slice(0, 4);
           perYear[y] = (perYear[y] || 0) + 1;
           perYearMin[y] = (perYearMin[y] || 0) + (w.min || 40);
           showYear[y] = (showYear[y] || 0) + 1;
           if (v.own) {
-            const day = v.at.slice(0, 10);
             events.push({ year: y, day, wd: weekdayOf(day), minute: v.at.slice(0, 16), ts: v.at });
           }
         }
@@ -180,11 +183,12 @@ export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview
         untaggedMin += m.runtimeMin || 110;
         untaggedTitles += 1;
       }
-      if (m.watchedAt) {
-        const y = m.watchedAt.slice(0, 4);
+      const mDay = m.watchedAt ? localDate(m.watchedAt) : '';
+      if (mDay) {
+        const day = mDay;
+        const y = day.slice(0, 4);
         moviesPerYear[y] = (moviesPerYear[y] || 0) + 1;
         perYearMin[y] = (perYearMin[y] || 0) + (m.runtimeMin || 110);
-        const day = m.watchedAt.slice(0, 10);
         events.push({ year: y, day, wd: weekdayOf(day), minute: m.watchedAt.slice(0, 16), ts: m.watchedAt });
       }
     }
@@ -265,7 +269,7 @@ export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview
 
     // Current streak: consecutive active days ending today or yesterday (so it
     // doesn't read as broken just because you haven't watched yet today).
-    const todayNum = dayNum(new Date().toISOString().slice(0, 10));
+    const todayNum = dayNum(localISODate()); // today on this device, not in UTC
     let current = 0;
     if (nums.length) {
       const last = nums[nums.length - 1];

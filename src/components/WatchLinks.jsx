@@ -20,8 +20,8 @@ export default function WatchLinks({ rec, title, mine, checking = false, classNa
           href={b.url}
           target="_blank"
           rel="noopener noreferrer"
-          title={`Search ${b.label} for “${title}”`}
-          aria-label={`Watch on ${b.label} (opens ${b.label} search)`}
+          title={b.search ? `Search ${b.label} for “${title}”` : `Open ${b.label} (search for “${title}” there)`}
+          aria-label={`Watch on ${b.label} (opens ${b.label}${b.search ? ' search' : ''})`}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5l12 7-12 7z" /></svg>
           {b.label}

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { img, hasKey } from '../api/tmdb.js';
 import { Chevron, Sheet } from './ui.jsx';
 import { nextTab } from './statsLogic.js';
+import { localDate } from './csvExport.js';
 import { posterTint, initialOf, resultsLabel } from './libraryLogic.js';
 import './ui.css';
 
@@ -487,7 +488,7 @@ export function ShowTile({ show, seen, onOpen, sub, times = 0 }) {
 
 // A watched movie: poster with a rating pill, title and the date you watched it.
 export function MovieTile({ movie, onOpen, times = 1 }) {
-  const date = (movie.watchedAt || '').slice(0, 10) || movie.year || '';
+  const date = localDate(movie.watchedAt) || movie.year || ''; // your local day
   return (
     <button
       type="button"

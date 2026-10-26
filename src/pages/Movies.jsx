@@ -58,6 +58,7 @@ import {
   FilmIcon,
 } from '../components/LibraryBar.jsx';
 import { notify, notifyError, reason, askConfirm } from '../components/appDialogs.js';
+import { localDate } from '../components/csvExport.js';
 
 const searchMoviesList = (q) => searchMovies(q).then((d) => d.results || []);
 
@@ -368,7 +369,7 @@ export default function Movies() {
       <Sheet
         open={!!sel}
         title={film ? film.name : ''}
-        subtitle={sel ? [film.year || sel.year, `watched ${(sel.watchedAt || '').slice(0, 10) || 'sometime'}`].filter(Boolean).join(' · ') : ''}
+        subtitle={sel ? [film.year || sel.year, `watched ${localDate(sel.watchedAt) || 'sometime'}`].filter(Boolean).join(' · ') : ''}
         onClose={closeSheet}
       >
         {sel && (

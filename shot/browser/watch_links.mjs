@@ -118,7 +118,7 @@ await ok('Dark shows ▶ Netflix, ▶ Stan and "All options · +1" (Foxtel Now h
   const l = await links(p);
   assert.deepEqual(l.map((x) => x.text), ['Netflix', 'Stan', 'All options · +1']);
   assert.equal(l[0].href, 'https://www.netflix.com/search?q=Dark');
-  assert.equal(l[1].href, 'https://www.stan.com.au/search?q=Dark');
+  assert.equal(l[1].href, 'https://play.stan.com.au/search?q=Dark');
   assert.equal(l[2].href, JW('tv', 1));
 });
 await ok('links open in a new tab, safely, and are 44px tall', async () => {

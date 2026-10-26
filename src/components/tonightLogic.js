@@ -11,6 +11,7 @@
 
 import { buildUpNext, daysBetween, codeOf } from './upnextLogic.js';
 import { nextToMark } from './showLogic.js';
+import { localDate } from './csvExport.js';
 import { isEpKey, cleanNote } from '../store/notes.js';
 import { isOnMyServices, servicesLabel } from './servicesLogic.js';
 import { titleTaste, profileIsEmpty } from './tasteLogic.js';
@@ -165,7 +166,7 @@ function jitter(seed, key) {
 
 function recency(c, today) {
   if (c.kind !== 'continue' || !c.lastWatch) return 0;
-  const d = daysBetween(c.lastWatch.slice(0, 10), today);
+  const d = daysBetween(localDate(c.lastWatch), today); // today is local, so the watch day is too
   return d == null ? 0 : d <= 3 ? 10 : d <= 7 ? 7 : d <= 14 ? 4 : 0;
 }
 

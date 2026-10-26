@@ -98,7 +98,7 @@ docs/                   this handover, screenshots, older .docx notes
 - **+1 watch keeps `at`** (the first date) and sets `last`. Hand-set dates get `fixedAt` and win in sync.
 - **Counting viewings in Stats:** `components/viewingDates.js` is the ONE rule — each viewing on its own date (first `at`, Rewatch mode `rewatch.done[key]`, `+1` `last`; extra viewings with no date go on `at`). Year in review, Goals, Month in review and This month vs last year all use it, so a rewatch counts when you rewatched (fixed 25 Oct: after "Bring back first watch dates" rewatches had moved to the old month).
 - **Activity log:** each user mutation is wrapped `logged(fn, label)` in db.js (originals renamed `X__raw`); 50 entries, device-only, Undo per entry (`activityLogic.js`).
-- Dates: "today" = local (`localISODate()` in showLogic.js). Some Stats use UTC dates, Month in review / CSV / month compare use local (known open decision).
+- Dates: "today" = local (`localISODate()` in showLogic.js). A watch time becomes a day with `localDate()` (csvExport.js) EVERYWHERE: all Stats cards (Year in review, Goals, heatmap, streaks, weekdays, Month cards), badge streaks, paces, Tonight, "watched on" labels (26 Oct; `tests/unit/local_days.test.mjs` and `shot/browser/local_days.mjs` run in Hobart time). Never `at.slice(0, 10)`.
 - Bulk imports: ≥15 watches in one minute = an import, left out of pace and habits.
 
 ### localStorage keys
@@ -132,7 +132,6 @@ Firestore: `users/{uid}/shows/{id}` (one doc per show) and `users/{uid}/library/
 - Scores: OMDb free limit 1,000/day; first look at a big Watchlist sorted by "Highest rated" costs one lookup per title (cached after).
 - Badge note, spoiler shield, calendar export memory, scores and taste are **per device**.
 - Calendar export is a snapshot; new dates need another export.
-- Stats UTC vs local dates can differ near midnight/month ends.
 - Offline: your own data works; anything needing TMDB/OMDb doesn't.
 
 ## 9. Testing harness
@@ -168,7 +167,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 - (Done by this file: update the handover. Delete `docs/WatchNext-Handover-v6.md` once v7 is in.)
 
 **Feature ideas left (5):**
-1. ~~Watch links~~ — built 24 Oct (`watchLinksLogic.js`, `WatchLinks.jsx`). Service search URLs live in `WATCH_SERVICES`; rows with `sure: false` (Disney+, Stan, Binge, Paramount+, HBO Max, iview, SBS) could not be opened from the sandbox and need checking on a real device. Exact title links later via Watchmode if needed. 26 Oct: the "All options" button says "Buy or rent" when TMDB lists only buy/rent here (`providersBuyRent` saved on shows and planned movies; older saves with a TMDB link but no streaming are checked again once), and Watchlist movie rows have Watch links (planned movies are checked quietly on the Queue tab, even with "On my services" off).
+1. ~~Watch links~~ — built 24 Oct (`watchLinksLogic.js`, `WatchLinks.jsx`). Service search URLs live in `WATCH_SERVICES`; checked 26 Oct in a signed-out browser: Disney+ has no linkable search (button just opens Disney+ home), Stan search is on play.stan.com.au, SBS uses `?query=`, iview works, Paramount+ opens its AU search page without filling the title; HBO Max and Binge (blocked from the checking browser) are still `sure: false`. Exact title links later via Watchmode if needed. 26 Oct: the "All options" button says "Buy or rent" when TMDB lists only buy/rent here (`providersBuyRent` saved on shows and planned movies; older saves with a TMDB link but no streaming are checked again once), and Watchlist movie rows have Watch links (planned movies are checked quietly on the Queue tab, even with "On my services" off).
 2. **Home-screen shortcuts** — long-press the app icon → Up Next, Search, Tonight (manifest `shortcuts`).
 3. **Keyboard shortcuts** — on the computer: "/" search, 1–6 switch tabs.
 4. ~~Compare with a friend~~ — built 24 Oct (`compareLogic.js`, `pages/Compare.jsx`, Stats → Friends). Friends swap a small JSON file ("Share mine" → WhatsApp/email → "Open a friend's file"); only titles, ratings, ♥, finished/dropped. Loved = 4★+ or ♥. Friends' files stay on the device. A live share code would need new Firestore rules.
@@ -178,7 +177,7 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 - ~~Movie sheet newest name/poster for every viewing~~ (done 25 Oct, `movieNamesLogic.js`): the sheet shows TMDB's current title/poster (else the newest viewing's); a viewing saved under a really different name shows "Saved as …" with Fix match / Use the new name; Settings → **Old movie names** updates all viewings to their film's newest viewing name (one undoable change, `updateMovies`).
 - Waiting on his friend's Letterboxd import screenshots.
 - Someday: make Habits stats more realistic (bulk-imported history shares one date).
-- Older ideas (v6): Power BI starter guide, more stats (genre trends, longest binge), UTC vs local for all Stats (ask first), new-episode push notifications (needs a backend), ~~friendly message when the Google popup is cancelled~~ (done 25 Oct: `store/signInLogic.js`; closing the window = calm note, no red; fake cloud can start signed out with `window.__fakeSignedOut` / fail with `window.__signInError`).
+- Older ideas (v6): Power BI starter guide, more stats (genre trends, longest binge), ~~UTC vs local for all Stats~~ (done 26 Oct), new-episode push notifications (needs a backend), ~~friendly message when the Google popup is cancelled~~ (done 25 Oct: `store/signInLogic.js`; closing the window = calm note, no red; fake cloud can start signed out with `window.__fakeSignedOut` / fail with `window.__signInError`).
 
 ## 12. First message to paste into the new chat
 

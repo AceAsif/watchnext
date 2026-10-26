@@ -1,3 +1,5 @@
+import { localDate } from './csvExport.js';
+
 // Watchlist total time: "≈ 23 days to finish everything".
 // PURE: no DOM, no store.
 //
@@ -97,7 +99,7 @@ export function yourPace(state, nowMs = Date.now()) {
   for (const [at, min] of recent) {
     if (perMinute.get(at.slice(0, 16)) >= BATCH) continue; // an import, not real watching
     total += min;
-    days.add(at.slice(0, 10));
+    days.add(localDate(at)); // your local day
     first = Math.min(first, Date.parse(at));
   }
   if (days.size < PACE_MIN_DAYS || total <= 0) return null;

@@ -25,10 +25,10 @@ t('search links put the title in safely', () => {
   assert.equal(searchUrl(nf, '  Tom & Jerry: #1 / 2? '), 'https://www.netflix.com/search?q=Tom%20%26%20Jerry%3A%20%231%20%2F%202%3F');
   assert.equal(searchUrl(WATCH_SERVICES.find((s) => s.id === 'iview'), 'Bluey'), 'https://iview.abc.net.au/search?keyword=Bluey');
 });
-t('every service has an https search link with {q}, a label and a unique id', () => {
+t('every service has an https link (a search with {q}, or just the service), a label and a unique id', () => {
   const ids = new Set();
   for (const s of WATCH_SERVICES) {
-    assert.ok(/^https:\/\/[^{}]+\{q\}/.test(s.search), s.id); assert.ok(s.label); assert.ok(!ids.has(s.id)); ids.add(s.id);
+    assert.ok(/^https:\/\/[^{}]+(\{q\})?$/.test(s.search), s.id); assert.ok(s.label); assert.ok(!ids.has(s.id)); ids.add(s.id);
     assert.equal(typeof s.sure, 'boolean');
   }
 });
@@ -89,5 +89,13 @@ t('streams somewhere (even a service we have no button for), or not saved yet: s
   assert.equal(watchLinks({ providersFree: P('SBS On Demand'), providersLink: JW, providersBuyRent: true }, 'X').allLabel, 'All options');
   assert.equal(watchLinks({ providers: [], providersLink: JW }, 'X').allLabel, 'All options');
   assert.equal(watchLinks({ providers: [], providersLink: JW, providersBuyRent: false }, 'X').allLabel, 'All options');
+});
+t('checked 26 Oct: SBS uses ?query=, Stan searches on play.stan.com.au, Disney+ just opens (no linkable search)', () => {
+  const svc = (id) => WATCH_SERVICES.find((s) => s.id === id);
+  assert.equal(searchUrl(svc('sbs'), 'Bluey'), 'https://www.sbs.com.au/ondemand/search?query=Bluey');
+  assert.equal(searchUrl(svc('stan'), 'Bluey'), 'https://play.stan.com.au/search?q=Bluey');
+  assert.equal(searchUrl(svc('disney'), 'Bluey'), 'https://www.disneyplus.com/home');
+  const r = watchLinks({ providers: P('Disney Plus', 'Netflix') }, 'Bluey');
+  assert.deepEqual(r.buttons.map((b) => [b.id, b.search]), [['disney', false], ['netflix', true]]);
 });
 console.log(`\n${n} watch links tests passed`);

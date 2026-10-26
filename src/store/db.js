@@ -11,6 +11,7 @@ import * as Lists from '../components/listsLogic.js';
 import * as People from '../components/peopleLogic.js';
 import * as Rewatch from '../components/rewatchModeLogic.js';
 import { localISODate } from '../components/showLogic.js';
+import { localDate } from '../components/csvExport.js';
 import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
 import { cleanTombs, lostKeys, addTombs, liftPresent } from './movieTombsLogic.js';
 import * as Activity from '../components/activityLogic.js';
@@ -351,11 +352,12 @@ export function paceFinish(show) {
   const entries = Object.values(show.watched || {}).filter((w) => w && w.at);
   if (entries.length < 3) return null;
 
+  // Day numbers of YOUR local days (a 1am watch counts on that day, not yesterday in UTC).
   const dayNumOf = (iso) => {
-    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+    const [y, m, d] = localDate(iso).split('-').map(Number);
     return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
   };
-  const todayNum = Math.floor(Date.now() / 86400000);
+  const todayNum = dayNumOf(localISODate());
   const windowStart = todayNum - PACE_WINDOW_DAYS;
 
   const minuteCount = {};
@@ -377,7 +379,7 @@ export function paceFinish(show) {
       seenBatch.add(min);
     }
     watchedInWindow += 1;
-    activeDays.add(w.at.slice(0, 10));
+    activeDays.add(localDate(w.at));
     if (earliest === null || dn < earliest) earliest = dn;
   }
 
