@@ -12,6 +12,7 @@ import * as People from '../components/peopleLogic.js';
 import * as Rewatch from '../components/rewatchModeLogic.js';
 import { localISODate } from '../components/showLogic.js';
 import { localDate } from '../components/csvExport.js';
+import { hotPatch, isDate } from '../components/hotLogic.js';
 import { recordShown, relinkShown, mergeLog, sameLog } from '../components/hitLogic.js';
 import { cleanTombs, lostKeys, addTombs, liftPresent } from './movieTombsLogic.js';
 import * as Activity from '../components/activityLogic.js';
@@ -527,6 +528,21 @@ export function setMovieProviders(tmdbId, providers, link, free, region, buyRent
   if (changed) markMoviesDirty();
 }
 
+// The full release date for every viewing of a film that doesn't have one yet (films logged
+// before it was saved). Filled in quietly when the film's sheet loads its TMDB details.
+export function setMovieReleased(tmdbId, released) {
+  if (tmdbId == null || !isDate(released)) return;
+  let changed = false;
+  update((s) => {
+    s.movies = (s.movies || []).map((m) => {
+      if (!m || m.tmdbId !== tmdbId || m.released === released) return m;
+      changed = true;
+      return { ...m, released };
+    });
+  });
+  if (changed) markMoviesDirty();
+}
+
 // Genres for a PLANNED movie that was queued before genres were stored, so "What should I
 // watch tonight?" can match it to a mood. Only planned entries with that TMDB id change.
 export function setMovieGenres(tmdbId, genres) {
@@ -614,14 +630,17 @@ function startWatchingShow__raw(id) {
   markShowDirty(id);
 }
 
-function markEpisode__raw(id, season, episode, runtimeMin, watched = true) {
+// airDate (optional 'YYYY-MM-DD'): the episode's air date when the caller knows it (the show
+// page's season list). A watch on the air day or the next one saves `air` ("Watch it Hot" badge).
+function markEpisode__raw(id, season, episode, runtimeMin, watched = true, airDate) {
   update((s) => {
     const show = s.shows[id];
     if (!show) return;
     const map = { ...(show.watched || {}) };
     const k = epKey(season, episode);
     if (watched) {
-      map[k] = map[k] || { at: new Date().toISOString(), min: runtimeMin || show.runtimeMin || null, n: 1 };
+      const at = new Date().toISOString();
+      map[k] = map[k] || { at, min: runtimeMin || show.runtimeMin || null, n: 1, ...hotPatch(show, season, episode, at, airDate) };
     } else {
       delete map[k];
     }
@@ -644,11 +663,13 @@ function markSeason__raw(id, season, episodes, watched = true, at) {
     for (const ep of episodes) {
       const k = epKey(season, ep.episode_number);
       if (watched) {
+        const at = when || new Date().toISOString();
         map[k] = map[k] || {
-          at: when || new Date().toISOString(),
+          at,
           min: ep.runtime || show.runtimeMin || null,
           n: 1,
           ...(when ? { fixedAt: new Date().toISOString() } : {}),
+          ...hotPatch(show, season, ep.episode_number, at, ep.air_date), // a whole season dropped today, watched today
         };
       } else {
         delete map[k];
@@ -825,6 +846,11 @@ export function tmdbFields(d) {
       .filter((x) => x.season_number > 0)
       .map((x) => ({ n: x.season_number, count: x.episode_count, air: x.air_date || null })),
     runtimeMin: (d.episode_run_time && d.episode_run_time[0]) || null,
+    // The newest aired episode: right after a drop, this is the episode you're about to tick
+    // ("Watch it Hot" needs its air date).
+    lastAir: d.last_episode_to_air && d.last_episode_to_air.air_date
+      ? { date: d.last_episode_to_air.air_date, season: d.last_episode_to_air.season_number, episode: d.last_episode_to_air.episode_number }
+      : null,
     nextAir: d.next_episode_to_air
       ? {
           date: d.next_episode_to_air.air_date,
@@ -1124,6 +1150,7 @@ function addMovieWatched__raw(details, force = false) {
         runtimeMin: details.runtime || null,
         poster: details.poster_path || null,
         year: (details.release_date || '').slice(0, 4) || null,
+        released: isDate(details.release_date) ? details.release_date : null, // full date ("Hot Ticket" badge)
         genres: (details.genres || []).map((g) => g.name),
       },
     ];
@@ -1146,6 +1173,7 @@ function addMovieToWatchlist__raw(details) {
         runtimeMin: details.runtime || null,
         poster: details.poster_path || null,
         year: (details.release_date || '').slice(0, 4) || null,
+        released: isDate(details.release_date) ? details.release_date : null, // full date ("Hot Ticket" badge)
         genres: (details.genres || []).map((g) => g.name),
       },
     ];

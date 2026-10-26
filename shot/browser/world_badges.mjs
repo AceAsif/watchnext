@@ -146,9 +146,9 @@ console.log('C. BADGES');
 await toTab(p, 'Badges');
 await until(p, () => !!document.querySelector('[data-testid=badges] [data-badge]'));
 const lv = () => p.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-badge]')].map((b) => [b.dataset.badge, +b.dataset.level])));
-await ok('15 badges; levels follow the library', async () => {
+await ok('17 badges; levels follow the library', async () => {
   const l = await lv();
-  assert.equal(Object.keys(l).length, 15);
+  assert.equal(Object.keys(l).length, 17);
   assert.equal(l.episodes, 1); // 112 episodes -> Bronze
   assert.equal(l.finished, 1); // Squid Game watched to the end
   assert.equal(l.cinema, 1); assert.equal(l.rewatch, 1); assert.equal(l.anime, 1); // Frieren + Spirited Away = 2 -> Bronze
@@ -175,7 +175,7 @@ await ok('every badge is drawn as a Gem hex: earned ones solid in the level colo
   const gold = await p.evaluate(() => document.querySelector('[data-badge=episodes] svg.ach-gem path').getAttribute('fill'));
   assert.equal(gold, 'rgb(205,127,50)'); // Bronze top facet
 });
-await ok('summary: badges earned and levels', async () => { assert.match(await p.evaluate(() => document.querySelector('.ach-sum').innerText), /\d+ of 15 badges[\s\S]*\d+ of \d+ levels/); });
+await ok('summary: badges earned and levels', async () => { assert.match(await p.evaluate(() => document.querySelector('.ach-sum').innerText), /\d+ of 17 badges[\s\S]*\d+ of \d+ levels/); });
 await ok('phone: no sideways scroll on Badges', async () => { assert.equal(await noSideways(p), false); });
 await p.screenshot({ path: `${OUT}/badges_phone.png`, fullPage: true });
 await p.close();
@@ -208,7 +208,7 @@ await p.close();
 console.log('F. EMPTY LIBRARY AND DESKTOP');
 ({ page: p, log } = await open({ shows: { 'tmdb:1': { tmdbId: 1, name: 'Squid Game', watched: eps(1, '2026-10-01') } }, movies: [], settings: { tmdbKey: 'TESTKEY' } }));
 await toTab(p, 'Badges'); await until(p, () => !!document.querySelector('[data-badge]')); await wait(400);
-await ok('a tiny library: every badge shows, most not earned yet, no errors', async () => { const l = await lv(); assert.equal(Object.keys(l).length, 15); assert.equal(l.episodes, 0); });
+await ok('a tiny library: every badge shows, most not earned yet, no errors', async () => { const l = await lv(); assert.equal(Object.keys(l).length, 17); assert.equal(l.episodes, 0); });
 await p.close();
 ({ page: p } = await open(STATE(), { w: 1280, h: 900 }));
 await toTab(p, 'World'); await doneLooking(p); await until(p, () => document.querySelectorAll('[data-testid=world-map] path').length > 100);

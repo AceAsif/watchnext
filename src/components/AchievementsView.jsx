@@ -31,16 +31,16 @@ export default function AchievementsView({ state }) {
 
       <div className="ach-grid">
         {badges.map((b) => (
-          <article key={b.id} className={`sd-card ach ach-l${b.level}${b.done ? ' ach-done' : ''}`} data-badge={b.id} data-level={b.level}>
+          <article key={b.id} className={`sd-card ach ach-l${b.tier}${b.done ? ' ach-done' : ''}${b.rare ? ' ach-rare' : ''}`} data-badge={b.id} data-level={b.level}>
             <div className="ach-top">
-              <span className="ach-icon"><BadgeIcon id={b.id} level={b.level} /></span>
+              <span className="ach-icon"><BadgeIcon id={b.id} level={b.tier} /></span>
               <div className="ach-head">
                 <h3 className="ach-title">{b.title}</h3>
                 <span className="ach-what">{b.what}</span>
               </div>
               {b.level > 0 && <span className="ach-chip">{b.levelName}</span>}
             </div>
-            <div className="ach-dots" aria-label={`Level ${b.level} of ${b.maxLevel}`}>
+            <div className="ach-dots" aria-label={b.rare ? (b.done ? 'Rare badge, earned' : 'Rare badge, not earned yet') : `Level ${b.level} of ${b.maxLevel}`}>
               {b.goals.map((g, i) => <span key={g} className={i < b.level ? 'on' : ''} title={g.toLocaleString('en-AU')} />)}
             </div>
             <span className="ach-bar sm" aria-hidden="true"><i style={{ width: `${b.pct}%` }} /></span>

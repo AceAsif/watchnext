@@ -356,7 +356,7 @@ function Season({ id, show, season, info, isCurrent, next, onResumed, onAdded, o
                 aria-label={rw ? `${on ? 'Untick' : 'Mark'} ${code} ${on ? 'in this rewatch' : 'rewatched'}` : `Mark ${code} ${on ? 'unwatched' : 'watched'}`}
                 onClick={() => {
                   if (rw) { markRewatchEpisode(id, season.n, ep.episode_number, !on, ep.runtime); return; }
-                  resumes(!on); if (!on) added(1); markEpisode(id, season.n, ep.episode_number, ep.runtime, !on);
+                  resumes(!on); if (!on) added(1); markEpisode(id, season.n, ep.episode_number, ep.runtime, !on, ep.air_date);
                 }}
               >
                 <span>{on && <CheckIcon size={16} w={3} />}</span>

@@ -46,7 +46,7 @@ export function checkBadges(seen, badges, empty) {
     if (!(b.id in levels)) { levels[b.id] = b.level; changed = true; continue; } // a badge added in a later version: start quietly
     if (b.level > had) { ups.push(b); levels[b.id] = b.level; changed = true; }
   }
-  ups.sort((a, b) => b.level - a.level || a.title.localeCompare(b.title));
+  ups.sort((a, b) => (b.tier ?? b.level) - (a.tier ?? a.level) || a.title.localeCompare(b.title));
   return { ups, seen: changed ? { v: 1, levels } : null };
 }
 
@@ -54,7 +54,7 @@ export function checkBadges(seen, badges, empty) {
 export function mergeUps(current, more) {
   const by = new Map((current || []).map((b) => [b.id, b]));
   for (const b of more) if (!by.has(b.id) || by.get(b.id).level < b.level) by.set(b.id, b);
-  return [...by.values()].sort((a, b) => b.level - a.level || a.title.localeCompare(b.title));
+  return [...by.values()].sort((a, b) => (b.tier ?? b.level) - (a.tier ?? a.level) || a.title.localeCompare(b.title));
 }
 
 // The words on the note.
@@ -65,7 +65,7 @@ export function noteText(ups) {
   const name = (b) => `${b.title} · ${b.levelName}`;
   if (ups.length === 1) {
     const b = ups[0];
-    return { head: b.done ? 'Legend badge!' : 'New badge!', line: name(b), sub: b.label.split(' · ').slice(1).join(' · ') };
+    return { head: b.rare ? 'Rare badge!' : b.done ? 'Legend badge!' : 'New badge!', line: name(b), sub: b.label.split(' · ').slice(1).join(' · ') };
   }
   const shown = ups.slice(0, 2);
   const rest = ups.length - shown.length;

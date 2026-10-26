@@ -8,13 +8,16 @@
 // computeMetrics(state, { origins, collections }) -> numbers (see below)
 // buildBadges(metrics)                           -> [badge], see BADGES
 // badge: { id, title, what, value, goals, level (0 = none yet), maxLevel, next,
-//          pct (to next, 0–100), done (all levels), label, nextLabel, needs ('origins'|null) }
+//          pct (to next, 0–100), done (all levels), label, nextLabel, needs ('origins'|null),
+//          rare, tier (the colour: the level, or 6 for an earned rare badge) }
+// A RARE badge has one goal only: earned or not, shown in the Legend colour, chip "Rare".
 
 import { watchedTitles, isAnime } from './originsLogic.js';
 import { groupMovies } from './movieGroupsLogic.js';
 import { collectNotes } from './notesSearchLogic.js';
 import { ratedEpisodes } from './epRatingsLogic.js';
 import { localDate } from './csvExport.js';
+import { countHotEpisodes, countHotMovies, HOT_TICKET_GOAL } from './hotLogic.js';
 
 export const LEVEL_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Legend'];
 
@@ -37,6 +40,8 @@ export const BADGES = [
   { id: 'rewatch', title: 'Comfort watch', what: 'Films watched more than once', goals: [1, 5, 10, 25, 50, 100], unit: (n) => plural(n, 'film') },
   { id: 'cinema', title: 'Big screen', what: 'Films watched at the cinema', goals: [1, 5, 10, 25, 50, 100], unit: (n) => plural(n, 'film') },
   { id: 'critic', title: 'Critic', what: 'Ratings given (shows, episodes and films)', goals: [10, 50, 100, 250, 500, 1000], unit: (n) => plural(n, 'rating') },
+  { id: 'hot', title: 'Watch it Hot', what: 'Episodes watched within 24 hours of airing', goals: [1, 10, 25, 50, 100, 250], unit: (n) => plural(n, 'episode') },
+  { id: 'hotticket', title: 'Hot Ticket', what: 'Films watched within a week of release', goals: [HOT_TICKET_GOAL], rare: true, unit: (n) => plural(n, 'film') },
   { id: 'notes', title: 'Note taker', what: 'Notes and reactions written', goals: [1, 10, 50, 100, 250, 500], unit: (n) => plural(n, 'note') },
   { id: 'collections', title: 'Completionist', what: 'Movie collections fully watched', goals: [1, 5, 10, 25, 50, 100], unit: (n) => plural(n, 'collection') },
 ];
@@ -126,6 +131,8 @@ export function computeMetrics(state, { origins = { items: {} }, collections = n
     streak: longestStreak(days),
     rewatch: groups.filter((g) => g.times > 1).length,
     cinema,
+    hot: countHotEpisodes(state && state.shows),
+    hotticket: countHotMovies(movies),
     critic: ratings,
     notes: collectNotes(state && state.shows, state && state.movies).length,
     collections: Array.isArray(collections) ? collections.filter((c) => c.complete).length : 0,
@@ -142,6 +149,15 @@ export function badgeFor(def, value) {
   const next = done ? null : def.goals[level];
   const prev = level ? def.goals[level - 1] : 0;
   const pct = done ? 100 : Math.max(0, Math.min(99, Math.floor(((v - prev) / (next - prev)) * 100)));
+  if (def.rare) {
+    return {
+      id: def.id, title: def.title, what: def.what, value: v, goals: def.goals, level, maxLevel, next, pct, done,
+      needs: def.needs || null, rare: true, tier: done ? LEVEL_NAMES.length : 0,
+      levelName: done ? 'Rare' : '',
+      label: done ? `Rare · ${def.unit(def.goals[0])}` : 'Not yet',
+      nextLabel: done ? `Rare badge earned · ${def.unit(v)}` : `Rare badge at ${def.unit(def.goals[0])} · ${(def.goals[0] - v).toLocaleString('en-AU')} to go`,
+    };
+  }
   return {
     id: def.id,
     title: def.title,
@@ -154,6 +170,8 @@ export function badgeFor(def, value) {
     pct,
     done,
     needs: def.needs || null,
+    rare: false,
+    tier: level,
     levelName: level ? LEVEL_NAMES[level - 1] : '',
     label: level ? `${LEVEL_NAMES[level - 1]} · ${def.unit(def.goals[level - 1])}` : 'Not yet',
     // "Next: Platinum at 50 anime · 9 to go" — the level you're working towards, never one you have.
@@ -178,7 +196,8 @@ export function badgeSummary(badges) {
 export function sortBadges(badges) {
   return badges.slice().sort((a, b) => {
     if (!!a.level !== !!b.level) return a.level ? -1 : 1;
-    if (a.level !== b.level) return b.level - a.level; // Legend first, then Diamond, Platinum…
+    const ta = a.tier ?? a.level, tb = b.tier ?? b.level;
+    if (ta !== tb) return tb - ta; // Legend (and earned rare badges) first, then Diamond, Platinum…
     return b.pct - a.pct;
   });
 }

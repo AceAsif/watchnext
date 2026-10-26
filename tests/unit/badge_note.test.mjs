@@ -59,6 +59,9 @@ t('note text: one badge, several badges, and Legend', () => {
   const sorted = mergeUps([], three);
   assert.deepEqual(noteText(sorted), { head: '3 new badge levels!', line: 'Episode explorer · Gold, Critic · Silver', sub: '+1 more' });
   assert.equal(noteText(badges({ streak: 100 }).filter((b) => b.level)).head, 'Legend badge!');
+  assert.deepEqual(noteText(badges({ hotticket: 10 }).filter((b) => b.level)), { head: 'Rare badge!', line: 'Hot Ticket · Rare', sub: '10 films' });
+  const r = checkBadges({ v: 1, levels: Object.fromEntries(BADGES.map((d) => [d.id, 0])) }, badges({ hotticket: 10, hot: 1 }), false);
+  assert.deepEqual(r.ups.map((b) => b.id), ['hotticket', 'hot'], 'the rare badge is listed first');
   assert.equal(noteText([]), null);
 });
 t('saved on this device; a broken record counts as none', () => {

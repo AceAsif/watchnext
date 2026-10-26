@@ -53,8 +53,8 @@ export default function BadgeNote({ onOpen }) {
   const top = ups[0];
   const close = () => { clearTimeout(hideTimer.current); setUps([]); };
   return (
-    <div className={`bn ach-l${top.level}`} role="status" data-testid="badge-note">
-      <span className="bn-icon"><BadgeIcon id={top.id} level={top.level} size={44} /></span>
+    <div className={`bn ach-l${top.tier ?? top.level}`} role="status" data-testid="badge-note">
+      <span className="bn-icon"><BadgeIcon id={top.id} level={top.tier ?? top.level} size={44} /></span>
       <span className="bn-text">
         <b className="bn-head">{text.head}</b>
         <span className="bn-line">{text.line.split(', ').map((x, i) => <React.Fragment key={x}>{i ? ', ' : ''}<span className="bn-name">{x}</span></React.Fragment>)}</span>

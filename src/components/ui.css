@@ -2076,7 +2076,10 @@ button.sd-coll-prow { cursor: pointer; }
 .sd-help-sec { display: flex; flex-direction: column; gap: 8px; scroll-margin-top: 12px; margin-top: 8px; }
 .sd-help-sec h2.sd-lbl { margin: 0; }
 .sd-help-list { padding: 0; overflow: hidden; }
-.sd-help-item + .sd-help-item { border-top: 1px solid var(--line); }
+/* Help rows: clear lines between questions, and an open question + its answer read as one
+   block (lighter background, amber bar on the left), so the next question doesn't look attached. */
+.sd-help-item + .sd-help-item { border-top: 1px solid #364051; }
+.sd-help-item.open { background: #1a2029; box-shadow: inset 3px 0 0 var(--amber); }
 .sd-help-q { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 48px; padding: 10px 16px; font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--text); cursor: pointer; overflow-wrap: anywhere; }
 .sd-help-q:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; border-radius: 10px; }
 .sd-help-q svg { flex-shrink: 0; }

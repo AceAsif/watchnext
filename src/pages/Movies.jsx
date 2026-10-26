@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import ScoresRow from '../components/ScoresRow.jsx';
 import WatchLinks from '../components/WatchLinks.jsx';
 import { regionBlock } from '../components/watchLinksLogic.js';
@@ -17,6 +17,7 @@ import {
   setMoviePlatform,
   setMovieNote,
   movieStatus,
+  setMovieReleased,
 } from '../store/db.js';
 import { FIX_RESULTS_MAX } from '../components/movieSearchLogic.js';
 import { searchMovies, movieDetails, movieDetailsWithCredits, hasKey, img, movieVideos, pickTrailer } from '../api/tmdb.js';
@@ -148,6 +149,7 @@ export default function Movies() {
         name: details.title,
         poster: details.poster_path || null,
         year: (details.release_date || '').slice(0, 4) || null,
+        released: /^\d{4}-\d{2}-\d{2}$/.test(details.release_date || '') ? details.release_date : null,
         runtimeMin: details.runtime || null,
       });
       setFixIndex(null);
@@ -272,6 +274,9 @@ export default function Movies() {
   };
   // Watch links: where it streams in your region, from the details the sheet already loaded.
   const watchRec = d && !d.error ? (({ providers, free, link, buyRent }) => ({ providers, providersFree: free, providersLink: link, providersBuyRent: buyRent }))(normalizeProviders(regionBlock(d, svc.region))) : null;
+  // Films logged before the full release date was saved get it now ("Hot Ticket" badge).
+  const relDate = d && !d.error && typeof d.release_date === 'string' ? d.release_date : '';
+  useEffect(() => { if (sel && sel.tmdbId && relDate) setMovieReleased(sel.tmdbId, relDate); }, [sel && sel.tmdbId, relDate]); // eslint-disable-line react-hooks/exhaustive-deps
   const fixing = sel && fixIndex === sel.index;
   const selCollId = useCollectionForDetails(d);
   const selColl = selCollId ? collInfo.collections.find((c) => c.id === selCollId) || null : null;

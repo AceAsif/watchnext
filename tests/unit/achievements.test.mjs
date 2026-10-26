@@ -91,14 +91,14 @@ t('sortBadges: highest level first (Legend, Diamond…), then the nearest to a f
 });
 t('every badge has rising goals, its own Gem hex icon and a unit label', () => {
   for (const b of A.BADGES) {
-    assert.equal(b.goals.length, A.LEVEL_NAMES.length, b.id + ': every badge has all six levels, so a colour means the same everywhere');
+    assert.equal(b.goals.length, b.rare ? 1 : A.LEVEL_NAMES.length, b.id + ': every badge has all six levels (a rare badge has one), so a colour means the same everywhere');
     assert.ok(b.goals.every((g, i) => i === 0 || g > b.goals[i - 1]), b.id);
     assert.ok(Array.isArray(BADGE_ICONS[b.id]) && BADGE_ICONS[b.id].length > 0, b.id + ' has no icon');
     assert.ok(b.title && b.what && b.unit(2).includes('2'), b.id);
   }
 });
 t('the next-level line never names a level you already have', () => {
-  for (const def of A.BADGES) for (const v of [0, def.goals[0], def.goals[2] + 1, def.goals[5]]) {
+  for (const def of A.BADGES.filter((b) => !b.rare)) for (const v of [0, def.goals[0], def.goals[2] + 1, def.goals[5]]) { // rare badges: see their own test
     const b = A.badgeFor(def, v);
     if (b.done) assert.match(b.nextLabel, /^Legend reached/);
     else { assert.ok(b.nextLabel.startsWith('Next: ' + A.LEVEL_NAMES[b.level] + ' at '), b.nextLabel); assert.notEqual(A.LEVEL_NAMES[b.level], b.levelName); }
@@ -108,5 +108,25 @@ t('the old confusing case: Genre hopper at 19 genres is now Platinum of 6, not "
   const b = A.badgeFor(A.BADGES.find((x) => x.id === 'genres'), 19);
   assert.equal(b.levelName, 'Platinum'); assert.equal(b.level, 4); assert.equal(b.done, false);
   assert.equal(b.nextLabel, 'Next: Diamond at 20 genres · 1 to go');
+});
+t('rare badge (Hot Ticket): one goal, earned or not, Legend colour, chip "Rare"', () => {
+  const def = A.BADGES.find((b) => b.id === 'hotticket');
+  assert.equal(def.rare, true); assert.deepEqual(def.goals, [10]);
+  const no = A.badgeFor(def, 7);
+  assert.deepEqual([no.level, no.tier, no.done, no.label, no.levelName], [0, 0, false, 'Not yet', '']);
+  assert.equal(no.nextLabel, 'Rare badge at 10 films · 3 to go'); assert.equal(no.pct, 70);
+  const yes = A.badgeFor(def, 12);
+  assert.deepEqual([yes.level, yes.maxLevel, yes.tier, yes.done, yes.levelName, yes.label], [1, 1, 6, true, 'Rare', 'Rare · 10 films']);
+  assert.equal(yes.nextLabel, 'Rare badge earned · 12 films');
+  assert.equal(A.badgeFor(A.BADGES.find((b) => b.id === 'hot'), 10).tier, 2, 'normal badges: tier = level');
+  // an earned rare badge sorts with the Legends
+  const s = A.sortBadges([{ id: 'x', level: 5, tier: 5, pct: 0 }, { id: 'r', level: 1, tier: 6, pct: 100 }, { id: 'y', level: 1, tier: 1, pct: 0 }]);
+  assert.deepEqual(s.map((b) => b.id), ['r', 'x', 'y']);
+});
+t('Watch it Hot / Hot Ticket metrics come from saved air and release dates', () => {
+  const m = A.computeMetrics({ shows: { a: { name: 'A', watched: {
+    '1x1': { at: '2026-10-25T10:00:00.000Z', air: '2026-10-25' }, '1x2': { at: '2026-10-25T10:00:00.000Z' }, '1x3': { at: '2026-10-29T10:00:00.000Z', air: '2026-10-25' },
+  } } }, movies: [{ name: 'F', tmdbId: 1, status: 'watched', watchedAt: '2026-10-25T10:00:00.000Z', released: '2026-10-20' }, { name: 'G', tmdbId: 2, status: 'watched', watchedAt: '2026-10-25T10:00:00.000Z', released: '2026-01-01' }] });
+  assert.equal(m.hot, 1); assert.equal(m.hotticket, 1);
 });
 console.log(`\n${n} achievements tests passed`);

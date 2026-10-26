@@ -251,7 +251,9 @@ export const HELP_SECTIONS = [
         id: 'badges',
         q: 'How do badges work?',
         a: [
-          'Stats → Badges has 15 badges. Each has 6 levels: Bronze, Silver, Gold, Platinum, Diamond and Legend. When you reach a new level, a “New badge!” note appears.',
+          'Stats → Badges has 17 badges. Most have 6 levels: Bronze, Silver, Gold, Platinum, Diamond and Legend. When you reach a new level, a “New badge!” note appears.',
+          '“Watch it Hot” counts episodes you watch within 24 hours of airing (on the air day or the day after). It counts episodes you tick from now on, because the app saves the air date when you tick one.',
+          '“Hot Ticket” is a rare badge with one level: watch 10 different films within a week of their release date.',
         ],
       },
       {

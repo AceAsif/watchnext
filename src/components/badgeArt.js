@@ -25,6 +25,8 @@ export const BADGE_ICONS = {
   cinema: ['M6 9h12l-1.5 12h-9z', 'M10 9l.5 12', 'M14 9l-.5 12', 'M6.5 9a2.5 2.5 0 0 1 3.5-3.5 2.5 2.5 0 0 1 4 0 2.5 2.5 0 0 1 3.5 3.5'], // popcorn
   critic: ['M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z'], // star
   notes: ['M5 3h10l4 4v14H5z', 'M15 3v4h4', 'M9 11h6', 'M9 15h4'], // note
+  hot: ['M4 10h16v10H4z', 'M8 7.5c-1-1 1-2 0-3.5', 'M12 7.5c-1-1 1-2 0-3.5', 'M16 7.5c-1-1 1-2 0-3.5'], // steaming TV
+  hotticket: ['M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z', 'M15 7v10', 'M9 9.5l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z'], // ticket with a star
   collections: ['M4 4h4v16H4z', 'M10 4h4v16h-4z', 'M15 5l3.5-.9 3.2 14.9-3.5.9z'], // books
 };
 export const FALLBACK_ICON = BADGE_ICONS.critic;
