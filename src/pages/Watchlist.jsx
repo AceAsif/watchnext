@@ -23,6 +23,7 @@ import { scoreKey, sortScore } from '../components/scoresLogic.js';
 import { showTime, movieTime, watchlistTotal, yourPace, finishEstimate, headline, paceText, fmtLength, fmtShort, SORTS } from '../components/watchlistTimeLogic.js';
 import { askConfirm } from '../components/appDialogs.js';
 import WatchLinks from '../components/WatchLinks.jsx';
+import MovieInfoSheet from '../components/MovieInfoSheet.jsx';
 import { hasKey } from '../api/tmdb.js';
 import { recordRegion, cleanRegion } from '../components/regionLogic.js';
 
@@ -108,6 +109,8 @@ export default function Watchlist({ openShow }) {
   const mine = useMemo(() => new Set(svc.mine), [svc.mine]);
   const on = svc.watchlistOnly;
   const [pick, setPick] = useState(false);
+  const [infoIndex, setInfoIndex] = useState(null); // the planned movie whose info sheet is open
+  const infoMovie = infoIndex != null ? movies.find((m) => m.index === infoIndex) || null : null;
   const checkItems = useMemo(() => {
     const seen = new Set();
     const out = shows.map(([id, s]) => ({ key: 's:' + id, kind: 'tv', id, tmdbId: s.tmdbId, rec: s }));
@@ -151,6 +154,14 @@ export default function Watchlist({ openShow }) {
         </div>
       )}
       {pick && <ServicesSheet onClose={() => setPick(false)} />}
+      {infoMovie && (
+        <MovieInfoSheet
+          movie={infoMovie}
+          onClose={() => setInfoIndex(null)}
+          onWatched={(m) => markPlannedMovieWatched(m.index)}
+          onRemove={(m) => removeMovie(m.index)}
+        />
+      )}
 
       <div style={{ marginTop: 18 }}>
         {tab === 'discover' ? (
@@ -220,6 +231,7 @@ export default function Watchlist({ openShow }) {
                     <MediaRow
                       path={m.poster}
                       name={m.name}
+                      onClick={() => setInfoIndex(m.index)}
                       actions={
                         <>
                           <button

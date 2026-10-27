@@ -41,6 +41,7 @@ import {
   watchProviders,
   tvVideos,
   pickTrailer,
+  tvDetailsWithCredits,
 } from '../api/tmdb.js';
 import { PLATFORMS, platformById } from '../components/PlatformPicker.jsx';
 import CastCrew from '../components/CastCrew.jsx';
@@ -535,6 +536,16 @@ export default function ShowDetail({ id, onBack }) {
     }
   }, [id]);
 
+  // The show's description ("About") and its cast, from ONE request (shared with the Cast card).
+  const [tvd, setTvd] = useState(null); // TMDB /tv details + aggregate_credits, or { error }
+  useEffect(() => {
+    setTvd(null);
+    if (!show || !show.tmdbId || !hasKey()) return undefined;
+    let alive = true;
+    tvDetailsWithCredits(show.tmdbId).then((d) => alive && setTvd(d)).catch((e) => alive && setTvd({ error: e.message }));
+    return () => { alive = false; };
+  }, [show && show.tmdbId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Watch links need to know where it streams: check quietly when opening a show that was never
   // checked for this region (or not for 14 days). No pop-up on failure; "Streaming in …" can retry.
   const [autoStream, setAutoStream] = useState(false);
@@ -864,6 +875,23 @@ export default function ShowDetail({ id, onBack }) {
       </aside>
 
       <div className="sd-main">
+      {/* ---------------- about (the show's description) */}
+      {hasKey() && show.tmdbId && (
+        <section className="sd-card sd-pad sd-about" data-testid="show-about">
+          <h2 className="sd-h2">About</h2>
+          {!tvd ? (
+            <p className="sd-about-txt dim">Loading…</p>
+          ) : tvd.error ? (
+            <p className="sd-about-txt dim">Couldn’t load the description: {tvd.error}</p>
+          ) : (
+            <>
+              {tvd.tagline ? <p className="sd-about-txt" style={{ fontStyle: 'italic' }}>{tvd.tagline}</p> : null}
+              <p className="sd-about-txt">{(tvd.overview || '').trim() || 'No description available on TMDB.'}</p>
+            </>
+          )}
+        </section>
+      )}
+
       {/* ---------------- seasons */}
       <section className="sd-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '14px 16px 10px' }}>
@@ -931,8 +959,9 @@ export default function ShowDetail({ id, onBack }) {
       <EpisodeRatings show={show} />
 
       {/* ---------------- cast & crew */}
-      {hasKey() && show.tmdbId && (
-        <CastCrew tmdbId={show.tmdbId} trackedTv={trackedTv} trackedMovie={trackedMovie} />
+      {/* waits for the About download and reuses it (if that failed, the card loads by itself) */}
+      {hasKey() && show.tmdbId && tvd && (
+        <CastCrew tmdbId={show.tmdbId} details={tvd.error ? null : tvd} trackedTv={trackedTv} trackedMovie={trackedMovie} />
       )}
       </div>
       </div>

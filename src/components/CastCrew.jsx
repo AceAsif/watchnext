@@ -106,8 +106,8 @@ function PersonSheet({ person, excludeTvId, excludeMovieId, trackedTv, trackedMo
 }
 
 // ---------------------------------------------------------------- the card
-// details: a film's /movie response that already has `credits` (the movie sheet fetched it), so no
-// second request is made.
+// details: a response that already has the credits (a film's /movie with `credits`, or a show's
+// /tv with `aggregate_credits`, fetched by the page), so no second request is made.
 export default function CastCrew({ tmdbId, trackedTv, trackedMovie, kind = 'tv', details = null }) {
   const [data, setData] = useState(null); // summarizeCredits() output
   const [err, setErr] = useState(null);
@@ -118,8 +118,8 @@ export default function CastCrew({ tmdbId, trackedTv, trackedMovie, kind = 'tv',
     let alive = true;
     setData(null);
     setErr(null);
-    if (kind === 'movie' && details) {
-      setData(summarizeMovieCredits(details));
+    if (details) {
+      setData(kind === 'movie' ? summarizeMovieCredits(details) : summarizeCredits(details));
       return undefined;
     }
     (kind === 'movie' ? movieDetailsWithCredits(tmdbId) : tvDetailsWithCredits(tmdbId))
@@ -128,7 +128,7 @@ export default function CastCrew({ tmdbId, trackedTv, trackedMovie, kind = 'tv',
     return () => {
       alive = false;
     };
-  }, [tmdbId, kind]);
+  }, [tmdbId, kind, details]);
 
   const openPerson = (p, sub) => setPerson({ id: p.id, name: p.name, profile: p.profile || null, sub: sub || '' });
 

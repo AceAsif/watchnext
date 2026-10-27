@@ -180,6 +180,13 @@ export const HELP_SECTIONS = [
         ],
       },
       {
+        id: 'read-first',
+        q: 'Can I read about a show or movie before I watch it?',
+        a: [
+          'Yes. On the Watchlist, tap a movie to see its description, trailer, scores, where to watch and cast, then tap “I watched it” when you have. Tap a show to open its page: the About card has the description, and the Trailer button and scores are there too.',
+        ],
+      },
+      {
         id: 'tonight',
         q: 'What should I watch tonight?',
         a: [

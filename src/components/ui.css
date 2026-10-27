@@ -2191,3 +2191,11 @@ button.sd-cmp-main:focus-visible { outline: 2px solid var(--amber); outline-offs
 .sd-gtrend-move { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
 .sd-gtrend-move .up { color: var(--teal); }
 .sd-gtrend-move .down { color: #f0a0a0; }
+
+/* Show page: About (the show's description) */
+.sd-about { display: flex; flex-direction: column; gap: 8px; }
+.sd-about .sd-h2 { margin: 0; }
+.sd-about-txt { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--text); }
+.sd-about-txt.dim { color: var(--text-dim); }
+/* Watchlist movie info sheet: the two actions side by side */
+.sd-minfo-acts { display: flex; flex-wrap: wrap; gap: 10px; flex-direction: row; }
