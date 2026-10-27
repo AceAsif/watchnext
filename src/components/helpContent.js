@@ -248,6 +248,14 @@ export const HELP_SECTIONS = [
         ],
       },
       {
+        id: 'binges-genres',
+        q: 'What are Biggest binges and Genres over time?',
+        a: [
+          'Biggest binges (Stats → Habits) lists the most episodes of one show you watched in one day. Imports and “mark season watched” are left out.',
+          'Genres over time (Stats → Breakdown) shows how much of each year’s watching was each of your top genres, and which genre is rising or falling.',
+        ],
+      },
+      {
         id: 'badges',
         q: 'How do badges work?',
         a: [

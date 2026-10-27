@@ -798,7 +798,7 @@
   .sd-habits {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas: "activity activity" "streak dow" "tiles dow";
+    grid-template-areas: "activity activity" "streak dow" "tiles dow" "binge binge";
     gap: 22px 28px;
     align-items: start;
   }
@@ -806,6 +806,7 @@
   .sd-habits .a-streak { grid-area: streak; }
   .sd-habits .a-dow { grid-area: dow; }
   .sd-habits .a-tiles { grid-area: tiles; display: flex; flex-direction: column; gap: 10px; }
+  .sd-habits .a-binge { grid-area: binge; }
   .sd-heat-months { font-size: 11px; }
   .sd-heat-months .s { display: none; }
   .sd-heat-months .l { display: inline; }
@@ -2167,3 +2168,26 @@ button.sd-cmp-main:focus-visible { outline: 2px solid var(--amber); outline-offs
 .sd-savedas p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
 .sd-savedas-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .sd-savedas-acts .sd-btn.sm { height: 44px; }
+
+/* Stats → Habits: Biggest binges */
+.sd-binges { list-style: none; margin: 0; padding: 4px 0; }
+.sd-binge { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
+.sd-binge + .sd-binge { border-top: 1px solid var(--line); }
+.sd-binge-n { width: 18px; flex-shrink: 0; color: var(--text-dim); font-size: 13px; text-align: right; }
+.sd-binge:first-child .sd-binge-n { color: var(--amber); }
+.sd-binge-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.sd-binge-name { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-binge-meta { font-size: 12px; color: var(--text-dim); }
+.sd-binge-eps { flex-shrink: 0; font-size: 13px; color: var(--text-dim); }
+.sd-binge-eps b { font-size: 20px; color: var(--text); font-weight: 700; margin-right: 2px; }
+.sd-binge:first-child .sd-binge-eps b { color: var(--amber); }
+
+/* Stats → Breakdown: Genres over time (cell shade = share, --a set inline) */
+.sd-gtrend-wrap { padding: 8px 10px; overflow-x: auto; }
+.sd-gtrend { width: 100%; border-collapse: separate; border-spacing: 4px; font-size: 13px; }
+.sd-gtrend th { font-weight: 500; color: var(--text-dim); text-align: center; font-family: var(--font-mono); font-size: 11.5px; padding: 2px 0; }
+.sd-gtrend th[scope=row] { text-align: left; color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600; padding-right: 6px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-gtrend td { text-align: center; padding: 8px 2px; border-radius: 8px; font-family: var(--font-mono); font-size: 12.5px; color: var(--text); background: rgba(242, 163, 60, var(--a, 0.1)); min-width: 40px; }
+.sd-gtrend-move { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+.sd-gtrend-move .up { color: var(--teal); }
+.sd-gtrend-move .down { color: #f0a0a0; }

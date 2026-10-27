@@ -29,6 +29,7 @@ import {
 } from '../components/statsLogic.js';
 import { localISODate } from '../components/showLogic.js';
 import { localDate } from '../components/csvExport.js';
+import { binges, genreTrends } from '../components/moreStatsLogic.js';
 import { viewingDates, doneDates } from '../components/viewingDates.js';
 import { rewatchedShows, rewatchedMovies, rewatchSummary } from '../components/rewatchLogic.js';
 import { lovedShows, collectNotes, LOVE_WEIGHT, FUNNY_WEIGHT } from '../components/notesSearchLogic.js';
@@ -41,6 +42,66 @@ import { lovedShows, collectNotes, LOVE_WEIGHT, FUNNY_WEIGHT } from '../componen
 
 const TABS = ['Overview', 'Habits', 'Rankings', 'Breakdown', 'Badges', 'World'];
 const plural = (n, one, many) => (n === 1 ? one : many || one + 's');
+// "6 hrs 36 min", "45 min"
+const fmtMins = (m) => { const h = Math.floor(m / 60), r = Math.round(m % 60); return h ? `${h} ${h === 1 ? 'hr' : 'hrs'}${r ? ` ${r} min` : ''}` : `${r} min`; };
+
+// Stats → Habits: the most episodes of one show you watched in one day.
+function BingeList({ rows, scope }) {
+  return (
+    <Section title="Biggest binges" className="a-binge">
+      {rows.length ? (
+        <ol className="sd-card sd-binges" aria-label={`Biggest binges, ${scope}`} data-testid="binges">
+          {rows.map((r, i) => (
+            <li key={r.id + r.day} className="sd-binge">
+              <span className="sd-binge-n sd-mono" aria-hidden="true">{i + 1}</span>
+              <span className="sd-binge-main">
+                <span className="sd-binge-name">{r.name}</span>
+                <span className="sd-binge-meta sd-mono">{fmtDay(r.day)} · {fmtMins(r.minutes)}</span>
+              </span>
+              <span className="sd-binge-eps"><b>{r.eps}</b> eps</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <div className="sd-card sd-pad sd-empty">No binges yet ({scope}): watch 2 or more episodes of a show in one day.</div>
+      )}
+      <Note>One show, one day (your local day). Bulk-marked batches, like imports or “mark season watched”, are left out.</Note>
+    </Section>
+  );
+}
+
+// Stats → Breakdown: your top genres year by year, as a share of that year's watching.
+function GenreTrends({ data }) {
+  const max = Math.max(1, ...data.rows.flatMap((r) => r.shares));
+  return (
+    <Section title="Genres over time" className="a-gtrend">
+      <div className="sd-card sd-gtrend-wrap">
+        <table className="sd-gtrend" data-testid="genre-trends">
+          <thead>
+            <tr><th scope="col"><span className="sd-vh">Genre</span></th>{data.years.map((y) => <th scope="col" key={y}>{y}</th>)}</tr>
+          </thead>
+          <tbody>
+            {data.rows.map((r) => (
+              <tr key={r.genre}>
+                <th scope="row">{r.genre}</th>
+                {r.shares.map((v, i) => (
+                  <td key={data.years[i]} style={{ '--a': (0.08 + 0.62 * (v / max)).toFixed(2) }} title={`${r.genre}, ${data.years[i]}: ${v}% of your watching (${r.counts[i].toLocaleString()} watches)`}>{v}%</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {(data.rising || data.falling) && (
+        <p className="sd-gtrend-move" data-testid="genre-moves">
+          {data.rising && <span className="up">▲ {data.rising.genre} up from {data.rising.from}% to {data.rising.to}% ({data.rising.fromYear} → {data.rising.toYear})</span>}
+          {data.falling && <span className="down">▼ {data.falling.genre} down from {data.falling.from}% to {data.falling.to}%</span>}
+        </p>
+      )}
+      <Note>Share of each year’s episodes and films. A title in two genres counts for both, so a year can add up to more than 100%.</Note>
+    </Section>
+  );
+}
 
 // The Overview headline: "1 year 2 months 5 days" (big numbers, small units); zero parts are left out,
 // and under a month it is just days.
@@ -342,6 +403,8 @@ export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview
   }, [state.shows, state.movies]);
 
   const habits = useMemo(() => computeHabits(base.events, year), [base.events, year]);
+  const bingeRows = useMemo(() => binges(state.shows, { year }), [state.shows, year]);
+  const trends = useMemo(() => genreTrends(state.shows, state.movies), [state.shows, state.movies]);
 
   const activeReviewYear = reviewYear ?? base.years[0] ?? null;
   // What you watched in a year, counted exactly as the Year in review card counts it.
@@ -466,6 +529,8 @@ export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview
         </div>
         <Note>Most in a day counts separately-timed watches only ({scopeLabel}).</Note>
       </div>
+
+      <BingeList rows={bingeRows} scope={scopeLabel} />
     </div>
   ) : (
     <div className="sd-card sd-pad sd-empty">No dated watches yet — your viewing habits will appear here once you have some.</div>
@@ -598,6 +663,7 @@ export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview
             </div>
           )}
         </Section>
+        {trends && <GenreTrends data={trends} />}
       </div>
     </div>
   );
