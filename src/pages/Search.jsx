@@ -16,6 +16,7 @@ import {
   img,
 } from '../api/tmdb.js';
 import { notifyError, reason } from '../components/appDialogs.js';
+import TitleInfoSheet from '../components/TitleInfoSheet.jsx';
 
 // One search box across both TMDB shows AND movies, flagging what's already in
 // your library / watchlist so you don't re-add something. Results are merged
@@ -27,6 +28,7 @@ export default function Search({ openShow, onClose }) {
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
   const [acting, setActing] = useState(null); // result key currently being acted on
+  const [preview, setPreview] = useState(null); // the result whose info sheet is open (read before adding)
 
   // Tracked-status lookups, rebuilt only when the library changes.
   const status = useMemo(() => {
@@ -90,19 +92,13 @@ export default function Search({ openShow, onClose }) {
     }
   }
 
-  const openShowResult = (it) =>
-    withActing(it.key, async () => {
-      const existing = status.showByTmdb.get(it.id);
-      if (existing) {
-        onClose();
-        openShow(existing[0]);
-        return;
-      }
-      const details = await showDetails(it.id);
-      addShowFromTmdb(details);
-      onClose();
-      openShow(`tmdb:${details.id}`);
-    });
+  // A show already in your library opens its page; one you don't have yet opens the info sheet
+  // (it is NOT added to your library just by looking at it).
+  const openShowResult = (it) => {
+    const existing = status.showByTmdb.get(it.id);
+    if (existing) { onClose(); openShow(existing[0]); return; }
+    setPreview(it);
+  };
 
   const followShow = (it) =>
     withActing(it.key, async () => addShowFromTmdb(await showDetails(it.id)));
@@ -128,14 +124,16 @@ export default function Search({ openShow, onClose }) {
     else if (planned) badge = <span style={{ color: 'var(--teal)' }}> · on watchlist</span>;
 
     return (
-      <div className="movie-row">
-        {it.poster ? (
-          <img src={img(it.poster, 'w154')} alt="" loading="lazy" />
-        ) : (
-          <div className="thumb" />
-        )}
+      <div className="movie-row" data-testid="search-result">
+        <button type="button" className="sr-peek" onClick={() => setPreview(it)} aria-label={`About ${it.name} (${it.type === 'show' ? 'show' : 'movie'}${it.year ? `, ${it.year}` : ''})`}>
+          {it.poster ? (
+            <img src={img(it.poster, 'w154')} alt="" loading="lazy" />
+          ) : (
+            <div className="thumb" />
+          )}
+        </button>
         <div className="info">
-          <div className="name">{it.name}</div>
+          <button type="button" className="name sr-peek-name" onClick={() => setPreview(it)}>{it.name}</button>
           <div className="detail">
             {it.year || 'unknown year'} · {it.type === 'show' ? 'Show' : 'Movie'}
             {badge}
@@ -231,6 +229,40 @@ export default function Search({ openShow, onClose }) {
           )}
         </>
       )}
+
+      {preview && (() => {
+        const it = preview;
+        const isActing = acting === it.key;
+        const tracked = it.type === 'show' ? status.showByTmdb.get(it.id) : null;
+        const followed = tracked && tracked[1].followed;
+        const onShowWatchlist = tracked && tracked[1].watchlist && !tracked[1].followed;
+        const watched = it.type === 'movie' && status.movieWatched.has(it.id);
+        const planned = it.type === 'movie' && status.moviePlanned.has(it.id);
+        const note = followed ? '✓ Following' : onShowWatchlist || planned ? 'On your watchlist' : watched ? '✓ Watched' : 'Not in your library';
+        return (
+          <TitleInfoSheet
+            kind={it.type === 'show' ? 'tv' : 'movie'}
+            title={{ tmdbId: it.id, name: it.name, poster: it.poster, year: it.year }}
+            note={note}
+            testId="search-info"
+            onClose={() => setPreview(null)}
+            actions={it.type === 'show' ? (
+              <>
+                {followed ? null : <button type="button" className="sd-btn primary" onClick={() => followShow(it)} disabled={isActing}>Follow</button>}
+                {!followed && !onShowWatchlist ? <button type="button" className="sd-btn" onClick={() => watchlistShow(it)} disabled={isActing}>＋ Watchlist</button> : null}
+                {tracked ? <button type="button" className="sd-btn" onClick={() => { setPreview(null); onClose(); openShow(tracked[0]); }}>Open show page</button> : null}
+              </>
+            ) : (
+              <>
+                {watched
+                  ? <button type="button" className="sd-btn" onClick={() => watchedMovie(it, true)} disabled={isActing}>Log rewatch</button>
+                  : <button type="button" className="sd-btn primary" onClick={() => watchedMovie(it)} disabled={isActing}>Watched it</button>}
+                {!watched && !planned ? <button type="button" className="sd-btn" onClick={() => watchlistMovie(it)} disabled={isActing}>＋ Watchlist</button> : null}
+              </>
+            )}
+          />
+        );
+      })()}
 
       {results === null && !busy && hasKey() && (
         <p className="muted" style={{ fontSize: 13.5, marginTop: 12 }}>

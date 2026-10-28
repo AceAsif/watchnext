@@ -183,7 +183,8 @@ export const HELP_SECTIONS = [
         id: 'read-first',
         q: 'Can I read about a show or movie before I watch it?',
         a: [
-          'Yes. On the Watchlist, tap a movie to see its description, trailer, scores, where to watch and cast, then tap “I watched it” when you have. Tap a show to open its page: the About card has the description, and the Trailer button and scores are there too.',
+          'Yes. In Search, tap a result’s poster or name to see its description, trailer, scores, where to watch and cast, then Follow it, add it to your Watchlist or mark it watched from there. Nothing is added just by looking.',
+          'On the Watchlist, tap a movie for the same details, then “I watched it” when you have. Tap a show to open its page: the About card has the description, and the Trailer button and scores are there too.',
         ],
       },
       {
@@ -326,6 +327,14 @@ export const HELP_SECTIONS = [
     id: 'data',
     title: 'Sync, backup & your data',
     items: [
+      {
+        id: 'sources',
+        q: 'Where does WatchNext get its show and movie information?',
+        a: [
+          'Details, posters, cast and trailers come from The Movie Database (TMDB). This product uses the TMDB API but is not endorsed or certified by TMDB.',
+          'Where-to-watch data is by JustWatch (through TMDB), scores come from the OMDb API, and anime details from AniList. The full credits are at the bottom of Settings and of this page.',
+        ],
+      },
       {
         id: 'sync',
         q: 'How do I use WatchNext on my phone and computer?',

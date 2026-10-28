@@ -79,9 +79,9 @@ await tab('Watchlist');
 await ok('a Watchlist movie row is a button now', async () => { assert.equal(await p.evaluate(() => document.querySelector('[data-testid=wl-movie] .sd-open').tagName), 'BUTTON'); });
 log = [];
 await openMovie('Bad Apples');
-await until(p, () => !!document.querySelector('[data-testid=movie-overview]'));
+await until(p, () => !!document.querySelector('[data-testid=title-overview]'));
 await ok('tapping it opens an info sheet: title, year, "On your watchlist", runtime and genres', async () => {
-  const t = await sheetText(); assert.match(t, /Bad Apples/); assert.match(t, /2026 · On your watchlist/); assert.match(t, /100 min/); assert.match(t, /Horror, Comedy/);
+  const t = await sheetText(); assert.match(t, /Bad Apples/); assert.match(t, /2026 · Movie · On your watchlist/); assert.match(t, /100 min/); assert.match(t, /Horror, Comedy/);
 });
 await ok('the description and tagline', async () => { const t = await sheetText(); assert.match(t, /A teacher takes matters into her own hands\./); assert.match(t, /Some lessons bite back\./); });
 await ok('a score (TMDB ★ 6.4 here; with critic scores switched on the IMDb / RT / Metacritic row shows) and where to watch ("Buy or rent")', async () => { const t = await sheetText(); assert.match(t, /★ 6\.4 TMDB/); assert.match(t, /Buy or rent/); });

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Credits from '../components/Credits.jsx';
 import { Chevron } from '../components/ui.jsx';
 import { FilterField } from '../components/LibraryBar.jsx';
 import { HELP_SECTIONS } from '../components/helpContent.js';
@@ -108,6 +109,8 @@ export default function Help({ onBack, startAt = null }) {
           </div>
         </section>
       ))}
+
+      <Credits />
     </div>
   );
 }

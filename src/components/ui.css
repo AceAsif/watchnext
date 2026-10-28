@@ -2199,3 +2199,10 @@ button.sd-cmp-main:focus-visible { outline: 2px solid var(--amber); outline-offs
 .sd-about-txt.dim { color: var(--text-dim); }
 /* Watchlist movie info sheet: the two actions side by side */
 .sd-minfo-acts { display: flex; flex-wrap: wrap; gap: 10px; flex-direction: row; }
+
+/* Credits footer (Settings and Help): TMDB's required notice + data sources */
+.sd-credits { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; padding: 16px 4px 4px; border-top: 1px solid #364051; font-size: 13px; line-height: 1.55; color: var(--text-dim); }
+.sd-credits h2.sd-lbl { margin: 0; }
+.sd-credits p { margin: 0; }
+.sd-credits b { color: var(--text); font-weight: 600; }
+.sd-credits a { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import Credits from '../components/Credits.jsx';
 import { findDuplicateMovies } from '../components/duplicateMoviesLogic.js';
 import { groupMovies } from '../components/movieGroupsLogic.js';
 import { oldNames, allPatches, oldNamesIntro } from '../components/movieNamesLogic.js';
@@ -342,6 +343,7 @@ export default function Settings({ onOpenHelp = () => {} }) {
         <BackupCard lastLine={lastBackupLine(bk, new Date())} onDownload={exportBackup} onRestore={() => restoreRef.current.click()} restoreRef={restoreRef} onRestoreFile={onRestoreFile} datesRef={datesRef} onDatesFile={onDatesFile} />
         <CsvCard onExport={exportCsv} />
         <DangerCard signedIn={signedIn} onAsk={() => setConfirm({ type: 'all' })} onAskEverywhere={() => setConfirm({ type: 'everywhere' })} />
+        <Credits />
       </div>
 
       <p className="sd-credit" data-testid="credit">

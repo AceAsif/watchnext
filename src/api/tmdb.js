@@ -163,6 +163,12 @@ export function tvDetailsWithCredits(tmdbId) {
   return get(`/tv/${tmdbId}`, { append_to_response: 'aggregate_credits' });
 }
 
+// A show's details + cast & crew + where it streams in ONE request, for the info sheet
+// (search results you haven't added yet).
+export function tvDetailsForPreview(tmdbId) {
+  return get(`/tv/${tmdbId}`, { append_to_response: 'aggregate_credits,watch/providers' });
+}
+
 // A film's details + cast & crew in ONE request, for the movie sheet's Cast card.
 export function movieDetailsWithCredits(tmdbId) {
   // watch/providers too, for the movie sheet's Watch links (all regions; the sheet picks yours).

@@ -570,3 +570,12 @@ h3.subsection {
   .poster-card .poster, .next-row { transition: border-color 0.15s ease, transform 0.15s ease; }
   .poster-card:hover .poster { transform: translateY(-2px); border-color: var(--amber); }
 }
+
+/* Search results: tap the poster or the name to read about it first */
+.movie-row .sr-peek { all: unset; flex: none; cursor: pointer; border-radius: 8px; }
+.movie-row .sr-peek > img,
+.movie-row .sr-peek > .thumb { display: block; width: 56px; height: 84px; border-radius: 8px; object-fit: cover; background: var(--bg-raise); }
+.movie-row .sr-peek-name { all: unset; display: block; cursor: pointer; font-weight: 600; font-size: 14.5px; line-height: 1.35; overflow-wrap: anywhere; color: var(--text); }
+.movie-row .sr-peek-name::after { content: ' ›'; color: var(--text-dim); }
+.movie-row .sr-peek:focus-visible,
+.movie-row .sr-peek-name:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
