@@ -230,6 +230,14 @@ export const HELP_SECTIONS = [
         ],
       },
       {
+        id: 'notifications',
+        q: 'Does WatchNext send notifications or reminders for new episodes?',
+        a: [
+          'Not yet. Notifications (an alert when a new episode comes out) are a feature we are working on.',
+          'For now, go to Up Next → “On the way” and tap “Add to calendar”. Open the file and the episodes appear on their air days in your phone or computer calendar, where you can turn on your calendar’s own reminders.',
+        ],
+      },
+      {
         id: 'spoilers',
         q: 'How do I avoid spoilers?',
         a: [

@@ -75,4 +75,13 @@ t('sections with no match are left out; nothing found gives an empty list', () =
   assert.ok(r.every((g) => g.items.length > 0));
   assert.deepEqual(searchHelp(HELP_SECTIONS, 'zzzzqq'), []);
 });
+t('searching "notification", "notifications", "reminder" or "alert" finds the notifications answer, which points to the calendar', () => {
+  for (const w of ['notification', 'notifications', 'reminder', 'alert']) {
+    const hit = searchHelp(HELP_SECTIONS, w).flatMap((g) => g.items).find((i) => i.id === 'notifications');
+    assert.ok(hit, w);
+  }
+  const it = HELP_SECTIONS.flatMap((s) => s.items).find((i) => i.id === 'notifications');
+  assert.match(it.a.join(' '), /working on/);
+  assert.match(it.a.join(' '), /Add to calendar/);
+});
 console.log(`\n${n} help and faq tests passed`);
