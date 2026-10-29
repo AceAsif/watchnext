@@ -24,7 +24,7 @@ t('computeHabits: a bulk batch (>=15 in one minute) counts as ONE event for day-
   const evs = Array.from({ length: 20 }, (_, i) => ev('2019-03-05', '10:00:' + String(i).padStart(2, '0'))); // Tue, one minute
   const h = S.computeHabits(evs, 'all');
   assert.equal(h.dowRows.find((r) => r.label === 'Tue').value, 1);
-  assert.deepEqual([h.batchMinutes, h.batchWatches, h.activeDays], [1, 20, 1]);
+  assert.deepEqual([h.batchMinutes, h.batchWatches, h.activeDays, h.bulkOnlyDays], [1, 20, 0, 1]); // an import-only day is not an active day
 });
 t('computeHabits: 14 in a minute is NOT a batch (threshold is exactly 15)', () => {
   const mk = (k) => Array.from({ length: k }, (_, i) => ev('2019-03-05', '10:00:' + String(i).padStart(2, '0')));
@@ -36,6 +36,27 @@ t('computeHabits: busiest day counts DISTINCT timestamps (200 stamped identicall
   const real = ['19:00:00', '19:30:00', '20:05:00', '21:10:00', '22:40:00'].map((x) => ev('2026-07-14', x));
   const h = S.computeHabits([...dump, ...real], 'all');
   assert.deepEqual(h.busiest, { date: '2026-07-14', count: 5 });
+});
+t('computeHabits: a bulk batch with DIFFERENT seconds still counts as one sitting, and an import-only day is never busiest', () => {
+  const dump = Array.from({ length: 300 }, (_, i) => ev('2018-08-12', '10:00:' + String(i % 60).padStart(2, '0')));
+  const real = ['19:00:00', '20:05:00', '21:10:00'].map((x) => ev('2026-07-14', x));
+  const h = S.computeHabits([...dump, ...real], 'all');
+  assert.deepEqual(h.busiest, { date: '2026-07-14', count: 3 });
+  assert.deepEqual([h.activeDays, h.bulkOnlyDays], [1, 1]);
+  assert.equal(S.computeHabits(dump, 'all').busiest, null); // only an import: no busiest day at all
+});
+t('computeHabits: a batch on a day you also really watched counts once there, and the day stays active', () => {
+  const dump = Array.from({ length: 20 }, (_, i) => ev('2026-07-14', '09:00:' + String(i).padStart(2, '0')));
+  const real = ['19:00:00', '20:05:00'].map((x) => ev('2026-07-14', x));
+  const h = S.computeHabits([...dump, ...real], 'all');
+  assert.deepEqual(h.busiest, { date: '2026-07-14', count: 3 }); // 2 real + 1 batch
+  assert.deepEqual([h.activeDays, h.bulkOnlyDays], [1, 0]);
+});
+t('realDaySet: a day is real when any watch on it is outside a bulk minute', () => {
+  const dump = Array.from({ length: 15 }, (_, i) => ev('2019-01-01', '10:00:' + String(i).padStart(2, '0')));
+  const sparse = [ev('2019-01-02', '20:00:00'), ev('2019-01-03', '20:00:00')];
+  assert.deepEqual([...S.realDaySet([...dump, ...sparse])].sort(), ['2019-01-02', '2019-01-03']);
+  assert.equal(S.realDaySet([]).size, 0); assert.equal(S.realDaySet(null).size, 0);
 });
 t('computeHabits: rows are Mon-first and year scoping works', () => {
   const evs = [ev('2025-01-06', '20:00:00'), ev('2026-01-05', '20:00:00'), ev('2026-01-11', '20:00:00')]; // Mon, Mon, Sun
@@ -49,6 +70,8 @@ t('busiestMonthOf / activeDaysOf', () => {
   const evs = [ev('2026-07-01', '20:00:00'), ev('2026-07-02', '20:00:00'), ev('2026-07-02', '21:00:00'), ev('2026-03-01', '20:00:00'), ev('2025-12-01', '20:00:00')];
   assert.deepEqual(S.busiestMonthOf(evs, '2026'), { name: 'Jul', count: 3 });
   assert.equal(S.busiestMonthOf(evs, '2030'), null); assert.equal(S.activeDaysOf(evs, '2026'), 3);
+  const bulk = Array.from({ length: 15 }, (_, i) => ev('2026-02-01', '10:00:' + String(i).padStart(2, '0')));
+  assert.equal(S.activeDaysOf([...evs, ...bulk], '2026'), 3); // the import-only day is not counted
 });
 
 // ============================================ new: labels

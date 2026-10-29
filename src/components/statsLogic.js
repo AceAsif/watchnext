@@ -32,12 +32,26 @@ export function dayNum(ds) {
   return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
 }
 
+// A "real" day = a day with at least one watch that is NOT part of a bulk batch (a minute with
+// BATCH_MIN+ watches). A day that only holds a bulk-marked backlog or import is not a day you
+// really watched on, so it must not count as a streak day, an active day or a lit heatmap cell.
+// events: [{ day, minute }]. Returns a Set of 'YYYY-MM-DD'.
+export function realDaySet(events) {
+  const list = Array.isArray(events) ? events : [];
+  const minuteCount = {};
+  for (const e of list) minuteCount[e.minute] = (minuteCount[e.minute] || 0) + 1;
+  const days = new Set();
+  for (const e of list) if (minuteCount[e.minute] < BATCH_MIN) days.add(e.day);
+  return days;
+}
+
 // De-skewed timing stats for a scope (all years or one year).
 // - By day of week: each bulk batch (a minute with >= BATCH_MIN watches)
 //   contributes ONE event instead of its full size, so a 1,000-watch backlog
 //   dump doesn't bury the real weekly rhythm.
-// - Most in one day: the busiest day measured by DISTINCT timestamps, i.e. the
-//   biggest genuine sitting — 200 episodes stamped the same second count as 1.
+// - Most in one day: the busiest REAL day, by distinct timestamps. A bulk batch counts as ONE
+//   sitting however its timestamps differ, so a backlog import can't be your "busiest day".
+// - Days with a watch: real days only (see realDaySet). bulkOnlyDays says how many were left out.
 export function computeHabits(events, year) {
   const evs = year === 'all' ? events : events.filter((e) => e.year === year);
 
@@ -45,17 +59,18 @@ export function computeHabits(events, year) {
   for (const e of evs) minuteCount[e.minute] = (minuteCount[e.minute] || 0) + 1;
 
   const dow = [0, 0, 0, 0, 0, 0, 0]; // Sun..Sat
-  const distinctTsPerDay = {}; // day -> Set of timestamps
-  const days = new Set();
+  const sittingsPerDay = {}; // day -> Set of real timestamps + one entry per bulk batch
+  const realDays = new Set();
+  const allDays = new Set();
   const seenBatchMinute = new Set();
   let batchMinutes = 0; // how many batches we collapsed
   let batchWatches = 0; // how many raw watches those batches represented
 
   for (const e of evs) {
-    days.add(e.day);
-    (distinctTsPerDay[e.day] || (distinctTsPerDay[e.day] = new Set())).add(e.ts);
-
+    allDays.add(e.day);
+    const set = sittingsPerDay[e.day] || (sittingsPerDay[e.day] = new Set());
     if (minuteCount[e.minute] >= BATCH_MIN) {
+      set.add('batch:' + e.minute);
       batchWatches++;
       if (!seenBatchMinute.has(e.minute)) {
         seenBatchMinute.add(e.minute);
@@ -63,19 +78,22 @@ export function computeHabits(events, year) {
         dow[e.wd] += 1; // whole batch = a single event
       }
     } else {
+      realDays.add(e.day);
+      set.add(e.ts);
       dow[e.wd] += 1;
     }
   }
 
   let busiest = null;
-  for (const [d, set] of Object.entries(distinctTsPerDay)) {
+  for (const [d, set] of Object.entries(sittingsPerDay)) {
+    if (!realDays.has(d)) continue; // an import-only day is never "busiest"
     if (!busiest || set.size > busiest.count) busiest = { date: d, count: set.size };
   }
 
-  // Display Mon-first; DOW/dow are indexed Sun..Sat.
+// Display Mon-first; DOW/dow are indexed Sun..Sat.
   const dowRows = [1, 2, 3, 4, 5, 6, 0].map((i) => ({ label: DOW[i], value: dow[i] }));
 
-  return { dowRows, busiest, activeDays: days.size, batchMinutes, batchWatches };
+  return { dowRows, busiest, activeDays: realDays.size, bulkOnlyDays: allDays.size - realDays.size, batchMinutes, batchWatches };
 }
 
 // Busiest month for a single year, de-skewed the same way (a bulk batch counts
@@ -101,9 +119,8 @@ export function busiestMonthOf(events, year) {
 }
 
 export function activeDaysOf(events, year) {
-  const days = new Set();
-  for (const e of events) if (e.year === year) days.add(e.day);
-  return days.size;
+  const real = realDaySet(events.filter((e) => e.year === year));
+  return real.size;
 }
 
 // ===================================================================== new

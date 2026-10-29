@@ -23,6 +23,7 @@ import {
   computeHabits,
   busiestMonthOf,
   activeDaysOf,
+  realDaySet,
   streakRangeLabel,
   durationParts,
   timeTotals,
@@ -281,7 +282,10 @@ export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview
     for (const e of events) dailyMinuteCount[e.minute] = (dailyMinuteCount[e.minute] || 0) + 1;
     const dailyCounts = {};
     const dailySeenBatch = new Set();
+    // Days that only hold a bulk-marked batch are not real viewing days: not lit, not in streaks.
+    const realDays = realDaySet(events);
     for (const e of events) {
+      if (!realDays.has(e.day)) continue;
       if (dailyMinuteCount[e.minute] >= BATCH_MIN) {
         if (!dailySeenBatch.has(e.minute)) {
           dailySeenBatch.add(e.minute);
@@ -309,8 +313,8 @@ export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview
     ratedShows.sort(byRecent);
     ratedMovies.sort(byRecent);
 
-    // --- streaks (all-time; unaffected by the batch skew since they're day-based) ---
-    const dayKeys = [...new Set(events.map((e) => e.day))].sort(); // ISO dates sort chronologically
+    // --- streaks (all-time; real days only, so a bulk-marked import day is not a streak day) ---
+    const dayKeys = [...realDays].sort(); // ISO dates sort chronologically
     const nums = dayKeys.map(dayNum);
     let longest = 0;
     let longestEndNum = null;
@@ -527,7 +531,10 @@ export default function Stats({ onOpenNotes, onOpenCompare, startTab = 'Overview
           <StatTile statKey="busiest" value={(habits.busiest ? habits.busiest.count : 0).toLocaleString()} label={busiestLabel} />
           <StatTile statKey="active-days" value={habits.activeDays.toLocaleString()} label="Days with a watch" />
         </div>
-        <Note>Most in a day counts separately-timed watches only ({scopeLabel}).</Note>
+        <Note>
+          Most in a day counts separately-timed watches only ({scopeLabel}).
+          {habits.bulkOnlyDays > 0 && ` ${habits.bulkOnlyDays.toLocaleString()} ${plural(habits.bulkOnlyDays, 'day')} with only bulk-marked watches ${habits.bulkOnlyDays === 1 ? 'is' : 'are'} not counted as ${habits.bulkOnlyDays === 1 ? 'a day' : 'days'} you watched, and ${habits.bulkOnlyDays === 1 ? 'is' : 'are'} left out of streaks and the heatmap.`}
+        </Note>
       </div>
 
       <BingeList rows={bingeRows} scope={scopeLabel} />
