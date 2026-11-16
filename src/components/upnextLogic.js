@@ -166,10 +166,27 @@ export function groupAgenda(items, today) {
 }
 
 // ---------------------------------------------------------------- mark guard
-// After a show's next episode is marked, the same button immediately points at
-// the following episode — so a quick double-tap would silently mark two. Taps
-// on the same show closer together than this window are ignored.
-export const MARK_COOLDOWN_MS = 700;
+// After a show's next episode is marked, the same button would point at the
+// following episode — so a second tap would silently mark two. The row shows
+// "✓ S09·E07 watched" (button filled, not tappable) for JUST_MARKED_MS before it
+// moves on to the next episode, and taps on the same show inside the window are
+// ignored. (Before 11 Nov 2026 the row changed instantly and only one letter
+// changed, so it looked like nothing happened and people tapped again.)
+export const JUST_MARKED_MS = 1500;
+export const MARK_COOLDOWN_MS = JUST_MARKED_MS;
 export function isRepeatTap(lastMs, nowMs, windowMs = MARK_COOLDOWN_MS) {
   return typeof lastMs === 'number' && nowMs - lastMs >= 0 && nowMs - lastMs < windowMs;
+}
+
+// While a row shows "✓ watched", Continue watching keeps its order (a show you just ticked
+// would otherwise jump to the top, and the row under your finger would become another show).
+// cont: buildUpNext's list; order: the ids in the order they were on screen when you tapped
+// (or null). Shows not in `order` keep their place after the known ones.
+export function holdOrder(cont, order) {
+  if (!Array.isArray(order) || !order.length) return cont;
+  const pos = new Map(order.map((id, i) => [id, i]));
+  return cont
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => (pos.has(a.c.id) ? pos.get(a.c.id) : order.length + a.i) - (pos.has(b.c.id) ? pos.get(b.c.id) : order.length + b.i))
+    .map((x) => x.c);
 }

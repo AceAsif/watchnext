@@ -101,7 +101,7 @@ await ok('marking from Up Next says "rewatched" and Undo puts it back exactly', 
   await p.evaluate(() => [...document.querySelectorAll('.sd-toast button')].find((b) => b.textContent.trim() === 'Undo').click()); await wait(250);
   const s = await show(p); assert.equal(s.watched['1x2'].n || 1, 1); assert.equal(s.rewatch.done['1x2'], undefined);
 });
-await p.evaluate(() => document.querySelector('button[aria-label^="Mark Dark S01"]').click()); await wait(1300);
+await p.evaluate(() => document.querySelector('button[aria-label^="Mark Dark S01"]').click()); await wait(1700);
 await p.evaluate(() => document.querySelector('button[aria-label^="Mark Dark S01"]').click()); await wait(300);
 await ok('the last episode finishes the rewatch ("rewatch finished 🎉") and the show leaves Up Next', async () => {
   assert.match(await p.evaluate(() => document.querySelector('.sd-toast').innerText), /rewatch finished/);

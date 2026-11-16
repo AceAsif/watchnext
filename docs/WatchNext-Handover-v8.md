@@ -1,8 +1,10 @@
-# WatchNext — Developer Handover (v7)
+# WatchNext — Developer Handover (v8)
 
-Read this first in a new chat. **It replaces v6** (v6 was written early October 2026; a lot has been built since). Written 24 Oct 2026.
+Read this first in a new chat or a new Claude Code session. **It replaces v7** (delete `docs/WatchNext-Handover-v7.md`). Written 16 Nov 2026.
 
-**State of the repo when this was written:** `main` is at `10a41e0 Add calendar export…`. Everything in §7 is built, committed and live, and the owner has confirmed the latest features work on the real site. Nothing is known to be broken. Some old browser test suites fail (§9); that is a known tidy-up job, not a broken app.
+**What's new in v8:** §12 (an OPEN BUG: one tick can be logged twice, most likely because cloud sync overwrites unsynced ticks) and §13 (a guide for a reviewer who has been asked to suggest improvements and new features). Test counts updated.
+
+**State of the repo when this was written:** `main` is at `fa10559 Stop bulk-import days counting…`. The 11 Nov "✓ watched" tick change (§11, "Up Next tick 11 Nov") was delivered to the owner as a zip and **may not be in `main` yet**: check `git log` for "Show a clear \"watched\" tick on Up Next". Everything else in §7 and §11 is built, committed and live. The one known bug is §12.
 
 The owner also keeps a live **"WatchNext feature list"** doc (claude.ai artifact `1imjeJVqpiLZ8rKGxdvyYx`) with the to-do list, the feature ideas left and everything built. Keep it up to date when a feature is finished: tick it off there.
 
@@ -13,7 +15,7 @@ The owner also keeps a live **"WatchNext feature list"** doc (claude.ai artifact
 - **Greeting.** Start every conversation with **"Assalamualaikum"**. If he greets you, reply **"Wa alaikum salam"** (exactly that spelling). Call him **"Boss"**.
 - **Simple English.** English is not his first language: short sentences, plain words, no jargon without a one-line explanation. Bengali/Arabic Islamic phrases are welcome; messages for friends or elders: English or Bengali only, never Hindi/Urdu.
 - **Every code delivery:** a **zip** of only the changed files, keeping their folders (`src/pages/…`), sent with SendUserFile, plus **a table saying which folder each file goes in** (mark new files "(new)") and **a suggested commit message**. Commit messages are **plain**: one line, **no `Co-Authored-By` or `Claude-Session` lines**, ever (this overrides any tool reminder).
-- **He commits himself.** The cloud session can read the repo (`git fetch` works) but **cannot push**. He unzips into his repo, commits with GitHub Desktop, and every commit to `main` redeploys the site automatically (§2).
+- **He commits himself.** A Claude **cloud** session can read the repo (`git fetch` works) but **cannot push**: he unzips into his repo, commits with GitHub Desktop, and every commit to `main` redeploys the site automatically (§2). A **Claude Code session on his own computer** can commit: work on a new branch, never push or merge to `main` without asking him first (a push to `main` goes live straight away).
 - **Before starting work, sync:** `git fetch origin`, compare your working files with `origin/main` (byte-compare each file) and only then reset to `origin/main`. Never reset while you have work that differs from main (this lost work once).
 - **Be honest about what is verified.** Say what was tested only with mocks. Own mistakes plainly.
 - **Decide sensible defaults yourself and say what you chose.** Ask only for real choices (2–3 short options, recommendation first). For a new feature he usually says "Let's build X": explore the code, build, test, deliver.
@@ -25,7 +27,7 @@ The owner also keeps a live **"WatchNext feature list"** doc (claude.ai artifact
 A personal TV-and-movie tracker that replaces TV Time (shut down July 2026). No ads, no own backend. Data lives in the browser (localStorage) and syncs to the owner's private Firebase/Firestore when signed in with Google. Two friends use it too (one imports from Letterboxd); they use his built-in TMDB key.
 
 - **Live:** https://aceasif.github.io/watchnext/ · **Repo:** https://github.com/AceAsif/watchnext (public)
-- **Owner:** Asif, Hobart, Tasmania (**region AU**, timezone Australia/Hobart, UTC+10/+11). Library: ~250 shows, ~420 movies, 8,500+ episode watches, a lot of anime. Uses an iPhone and a Windows computer.
+- **Owner:** Asif, Hobart, Tasmania (**region AU**, timezone Australia/Hobart, UTC+10/+11). Library (Nov 2026): 260 shows (252 followed), 444 movies, ~8,600 episode watches, about 0.8 MB of state; a lot of anime. Uses the app on an **iPhone (installed to the Home Screen)** and a **Windows computer (Chrome)**, both signed in, so two devices sync the same shows.
 
 ## 2. Tech stack, keys and deploy
 
@@ -71,7 +73,7 @@ src/
                      PURE: backupMerge, watchedMerge, wipeLogic, notes, epRatings, movieTombsLogic, accountSwitch …
   pages/             UpNext · Shows · ShowDetail · Movies · Watchlist · Stats · Settings · Search · Notes
   components/        UI (*.jsx) + PURE logic (*Logic.js, unit-tested in plain node) + hooks (use*.js)
-tests/unit/*.test.mjs   65 plain-Node suites      shot/browser/*.mjs   headless-Chrome suites
+tests/unit/*.test.mjs   ~80 plain-Node suites      shot/browser/*.mjs   ~59 headless-Chrome suites
 docs/                   this handover, screenshots, older .docx notes
 ```
 
@@ -105,9 +107,16 @@ docs/                   this handover, screenshots, older .docx notes
 Library & sync: `watchnext-state-v1`, `watchnext-sync-v1`, `watchnext-tombstones-v1`, `watchnext-wipe-tombstones-v1`, `watchnext-movie-tombs-v1`, `watchnext-owner-v1`, `watchnext-signout-backup-v1`.
 **Device-only (not synced, not in backups):** `watchnext-activity-v1`, `watchnext-backup-v1`, `watchnext-services-v1` (region + my services), `watchnext-tonight-v1`, `watchnext-movienight-v1`, `watchnext-taste-v1`, `watchnext-discover-log-v1`, `watchnext-newon-v1`, `watchnext-origins-v1`, `watchnext-collections-v1`, `watchnext-people-credits-v1`, `watchnext-scores-v1` (OMDb cache), `watchnext-ep-scores-v1` (episode IMDb scores per season), `watchnext-badges-seen-v1`, `watchnext-spoilers-v1`, `watchnext-cal-exported-v1`, `watchnext-wl-sort`, `watchnext-friends-v1` (your share name + friends' compare files).
 
-## 6. Cloud sync (short)
+## 6. Cloud sync
 
-Firestore: `users/{uid}/shows/{id}` (one doc per show) and `users/{uid}/library/{movies|goals|hidden|lists|people|discover|wipe}`. Local changes flush every ~2.5 s and on page hide, with dirty flags per area. Sign-in merge: wipe marker first; shows `{...remote, ...local}` with `watched` merged by `watchedMerge.js`; movies union with tombstones; goals/hidden/lists newest-wins per item. **Delete everywhere** wipes the account with a marker that other devices obey. Verified on real Firebase (8–9 Oct 2026). An **account-switch prompt** appears if a different Google account signs in on a device holding another library.
+Firestore: `users/{uid}/shows/{id}` (one doc per show, the whole show record) and `users/{uid}/library/{movies|goals|hidden|lists|people|discover|wipe}`. Rules (`firestore.rules`): a user can only read/write `users/{their uid}/**`. Firestore uses the default **memory cache** (`getFirestore` in `src/firebase.js`, no offline persistence), so every app start downloads everything again.
+
+How it runs (all in `src/store/cloudEngine.js`, `startSync`):
+1. **Changes go up:** every mutation in `db.js` calls `markShowDirty(id)` (etc.). `flush()` runs on a **2.5 s timer**, on tab hide and on page hide; it takes the dirty set (`takeDirty()`) and writes the whole current show record of each dirty show in one batch. A failed batch puts the ids back as dirty.
+2. **Sign-in / app-start pull** (`pullAndMerge`): wipe marker first; then every show is merged `{...remote, ...local}` with `watched` combined by `watchedMerge.js` (union; this device wins unless the cloud copy's date was corrected later — `fixedAt`; the higher rewatch count `n` is kept), notes and episode ratings unioned; movies union with tombstones; goals/hidden/lists/people newest-wins per item. Then it marks **every show dirty** and flushes, so both sides converge.
+3. **Live listener on `users/{uid}/shows`** (`onSnapshot`, started at the same time as the pull, not after it): for each changed doc it does `s.shows[id] = { ...(s.shows[id] || {}), ...remote }` — the remote copy **replaces** `watched` (and every other field) with **no merge** and **no check** for local changes that have not been flushed yet. **This is the most likely cause of the open bug in §12.**
+
+**Delete everywhere** wipes the account with a marker that other devices obey. Tombstones stop a deleted show from coming back. Verified on real Firebase (8–9 Oct 2026). An **account-switch prompt** appears if a different Google account signs in on a device holding another library.
 
 ## 7. Features (all live)
 
@@ -140,10 +149,12 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 
 **Sandbox setup:** clone or fetch the repo, `npm install`, `cd shot && npm install` (+ `npm i --no-save @sparticuz/chromium` if no Chrome), then `node shot/build-test-dists.mjs` — it builds `.harness-work/dist`, `dist-fake` (fake cloud) and `dist-scores` (OMDb test key `TESTOMDB`). **Rebuild the test dists after every source change** before running browser suites.
 
-- `npm run test:unit` → **70 suites, 1004 tests, all passing** (25 Oct 2026). The runner needs each suite to end with `console.log("N <words> tests passed")` (no hyphens in the words).
+- `npm run test:unit` → **79 suites, 1,079 tests, all passing** (11 Nov 2026, with the 11 Nov tick change). The runner needs each suite to end with `console.log("N <words> tests passed")` (no hyphens in the words).
+- `npm run test:browser:build` then `npm run test:browser` → **58 suites, ~1,267 checks, all passing** (11 Nov 2026). Browser suites print `N checks passed` and `PROBLEMS: none`.
 - Browser suites: `node shot/browser/<name>.mjs`. Conventions: date pinned with a FakeDate (usually 2026-10-21T22:00Z = 22 Oct 09:00 Hobart), `emulateTimezone('Australia/Hobart')`, bypass the service worker, mock TMDB/OMDb with `access-control-allow-origin: *`, check no sideways scroll at 390px, take a screenshot and LOOK at it.
 - **All browser suites run and pass (26 Oct 2026)**, including library, upnext and showpage: their old-build / design-mock-up comparisons were replaced with checks worked out from their own seeded data (library: Status is now a button + sheet/list, toolbar order Status · Platform · Sort · On my services; showpage: date fixed to 22 Oct 2026 and real checks instead of screenshots only). The 12 old failures were fixed on 25 Oct: 8 already passed after recent work; anime, notes, notes_search and region had stale checks, and anime also caught a real bug (Esc in a sheet also closed the page — sheets now `preventDefault` Esc).
-- A full run of every suite takes over 10 minutes: run it in two halves.
+- A full run of every browser suite takes 10–15 minutes.
+- The real cloud engine is NOT covered by browser tests: they use `shot/browser/fakecloud.js` (a fake signed-in user, no Firestore). Unit tests cover the pure merge modules (`watchedMerge`, `backupMerge`, `wipeLogic`, …). A Firestore emulator could not be downloaded in the cloud sandbox (blocked network), but should work on the owner's computer (`npx firebase-tools emulators:start --only firestore`, needs Java).
 - Sheets mark Esc as used (`e.preventDefault()` in `Sheet`); page-wide keys skip `defaultPrevented` events. Keep that if you add another Esc handler.
 - When a suite fails, check it also fails on `origin/main` (git stash, rebuild dists, run) before blaming your change.
 - Gotchas: `innerText` applies `text-transform` (use case-insensitive regex); elements behind the fixed tab bar need `el.click()` in `evaluate`; screenshots during sheet/note animations catch half-drawn UI (wait ~500 ms); new Settings cards must be added to the order list in `settings.mjs`; episode rows need a mocked `/tv/{id}/season/{n}` response.
@@ -164,7 +175,6 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 - ~~Quiet the 3 background `console.warn` calls~~ (done 25 Oct: `devWarn` in `components/devLog.js`, logs only in `npm run dev`).
 - ~~Fix the 12 failing browser suites~~ (done 25 Oct, §9). ~~The 3 suites that could not run (library, upnext, showpage)~~ (done 26 Oct).
 - ~~Replace the 18 `alert()` and 6 `confirm()` pop-ups~~ (done 25 Oct). **Never use alert()/confirm() again**: `notify()` / `notifyError(…: ${reason(e)}.)` for messages and `await askConfirm({ title, body, confirmLabel, danger })` for questions (`components/appDialogs.js`, drawn by `DialogHost.jsx` in App). A unit test fails if alert( or confirm( comes back. Browser tests answer questions with `shot/browser/autoYes.js`.
-- (Done by this file: update the handover. Delete `docs/WatchNext-Handover-v6.md` once v7 is in.)
 
 **Feature ideas left (5):**
 1. ~~Watch links~~ — built 24 Oct (`watchLinksLogic.js`, `WatchLinks.jsx`). Service search URLs live in `WATCH_SERVICES`; checked 26 Oct in a signed-out browser: Disney+ has no linkable search (button just opens Disney+ home), Stan search is on play.stan.com.au, SBS uses `?query=`, iview works, Paramount+ opens its AU search page without filling the title; HBO Max and Binge (blocked from the checking browser) are still `sure: false`. Exact title links later via Watchmode if needed. 26 Oct: the "All options" button says "Buy or rent" when TMDB lists only buy/rent here (`providersBuyRent` saved on shows and planned movies; older saves with a TMDB link but no streaming are checked again once), and Watchlist movie rows have Watch links (planned movies are checked quietly on the Queue tab, even with "On my services" off).
@@ -184,8 +194,43 @@ Runs on any computer and in the cloud sandbox (details: `tests/README_HARNESS.md
 - Credits 28 Oct: `Credits.jsx` footer at the bottom of Settings and Help & FAQ with TMDB's required notice (exact text, no logo) and JustWatch / OMDb / AniList credits; Help answer "Where does WatchNext get its show and movie information?" (data section). Monetising: parked for now (needs a TMDB commercial licence first).
 - Real days 29 Oct (`realDaySet` in `statsLogic.js`): a day that only holds a bulk batch (a minute with BATCH_MIN+ watches) is NOT a real viewing day. It is left out of "Days with a watch", the longest/current streak, the heatmap and the Year in review active-days number, and can never be "Most in a day". "Most in a day" now counts each bulk batch as ONE sitting (before, an import stamped with different seconds could win). A bulk batch on a day you also really watched still counts once on that day. The Habits note says how many import-only days were left out (`bulkOnlyDays`). Test: `shot/browser/habits_bulk.mjs`. Month recap's own active-days number (`monthRecapLogic.js`) is unchanged.
 - Help 29 Oct: new answer "Does WatchNext send notifications or reminders for new episodes?" (Shows & episodes... Finding what to watch section, id `notifications`): not yet, being worked on, use Up Next → On the way → Add to calendar.
-- Older ideas (v6): Power BI starter guide, ~~more stats (genre trends, longest binge)~~ (done 27 Oct), ~~UTC vs local for all Stats~~ (done 26 Oct), new-episode push notifications (needs a backend), ~~friendly message when the Google popup is cancelled~~ (done 25 Oct: `store/signInLogic.js`; closing the window = calm note, no red; fake cloud can start signed out with `window.__fakeSignedOut` / fail with `window.__signInError`).
+- Up Next tick 11 Nov (`UpNext.jsx`, `upnextLogic.js`): the row used to jump straight to the next episode, and only one letter changed ("E07" → "E08"), so it looked like nothing happened and people tapped again, marking extra episodes (seen in real data: Suits S9 episodes 0.7–2 s apart). Now the ticked row shows "✓ S09·E07 watched" with a filled teal button for `JUST_MARKED_MS` (1.5 s) before moving on; the filled button can't be tapped; the double-tap guard (`MARK_COOLDOWN_MS`) is the same 1.5 s; Continue watching keeps its on-screen order during that time (`holdOrder`) so the row doesn't jump away under your finger; a show you just finished stays visible (✓) for that moment. The work behind a tick takes about 30 ms on the owner's real library (260 shows), so speed is not the issue. **Update 16 Nov:** a double "Watched S9E8" in the iPhone's activity log shows a second cause — ticks being silently undone by cloud sync. See §12; this 1.5 s change does not fix that.
+- Power BI starter guide (29 Oct): a written Claude Doc for the owner (not in the repo); `docs/WatchNext Power BI starter guide.docx` is a copy.
+- Older ideas (v6): ~~Power BI starter guide~~ (done 29 Oct), ~~more stats (genre trends, longest binge)~~ (done 27 Oct), ~~UTC vs local for all Stats~~ (done 26 Oct), new-episode push notifications (needs a backend; planned 29 Oct, see §13), ~~friendly message when the Google popup is cancelled~~ (done 25 Oct: `store/signInLogic.js`; closing the window = calm note, no red; fake cloud can start signed out with `window.__fakeSignedOut` / fail with `window.__signInError`).
 
-## 12. First message to paste into the new chat
+## 12. Open bug: one tick logged twice (Up Next) — NOT FIXED YET
 
-> Assalamualaikum. Please clone my repo `AceAsif/watchnext` (or fetch it) and read `docs/WatchNext-Handover-v7.md` first. Tell me in 5 short lines what you understand, set up the test harness as in §9 and run the unit tests to check it works. Then let's build: [name the feature, e.g. "Watch links"].
+**What the owner saw (15 Nov 2026, iPhone):** Settings → Your recent changes shows **two** entries "Suits · Watched S9E8 · 15 Nov, 9:05 pm". Earlier (10–11 Nov) he said a tick on Up Next "does not change, so I press it 2 or 3 times and then it changes".
+
+**Why two entries means the tick was undone in between:** an entry is only written when the state really changes (`logged()` + `Activity.makeEntry` → `diffState` in `activityLogic.js`). Marking an episode that is already watched changes nothing (`markEpisode__raw` keeps `map[k]` if it exists), so it makes no entry. A real Undo would add an "Unwatched S9E8" entry, and there isn't one. So S9E8 was **removed without an entry**, and only sync does that: changes from the cloud listener use `update()` directly and are not logged.
+
+**Most likely cause (from reading the code; not yet reproduced on real Firebase):** the live listener in `cloudEngine.js` (§6, step 3) overwrites the local show with the server copy:
+```js
+s.shows[id] = { ...(s.shows[id] || {}), ...remote };   // remote.watched replaces local.watched
+```
+A tick is only on the device until the next `flush()` (up to 2.5 s later, longer on a phone that was just woken up). If a snapshot for that show arrives in that gap, the tick is lost. Snapshots arrive:
+- **on every app start / reconnect** — memory cache, so the first snapshot delivers *every* show as "added", and it starts at the same time as `pullAndMerge`, so it can also run *before* the pull's merge and wipe ticks made since the last sync (possible data loss, not only a double entry);
+- **when the other device writes the same show** — and every app start on any device marks *all* shows dirty and uploads them (`pullAndMerge` end), so opening WatchNext on the computer re-uploads the computer's copy of Suits.
+The owner then sees the row go back to "S09·E08", taps again, and the second entry is logged. Earlier real data shows the same pattern: Suits S9E2→S9E3 marked 0.7 s apart and S9E4→S9E5 2 s apart (some of those may also be plain double taps, which the 11 Nov change now blocks).
+
+**Clues and things to decide when fixing:**
+- Do not overwrite a show that is **dirty** (changed here, not yet flushed) — merge it instead, or skip it and let the next flush win. `dirtyShows` lives in `db.js` (only `markShowDirty` / `takeDirty` are exported; note `takeDirty` empties the set at the *start* of a flush, while the batch is still in flight).
+- Use the same merge as the pull (`mergeWatched`, notes, epRatings) for the live listener, or check `change.doc.metadata.hasPendingWrites`.
+- **Careful with un-ticks:** a pure union brings back an episode that was un-ticked on another device. Today the pull already has that weakness; the live listener is what currently makes an un-tick on the computer reach the phone. Any fix needs an answer for both (e.g. per-episode "removed at" markers, like the movie tombstones in `movieTombsLogic.js`).
+- Starting the live listener only after `pullAndMerge` has finished would close the start-up race.
+- Movies have no live listener (only the pull), so they don't have this problem; goals, hidden, lists, people and the Discover log have live listeners that merge newest-wins and skip `hasPendingWrites` — a useful pattern to copy.
+
+**Done means:** a unit-tested pure function for "apply a remote show to the local one" (no Firestore in the test), the listener using it, a test that reproduces the lost tick first (fails before the fix, passes after), all existing unit and browser suites still passing, and a manual check on the owner's iPhone + computer (tick on the phone, open the computer at once, tick again; no lost ticks, no doubles, an un-tick still reaches the other device).
+
+## 13. For a reviewer: how to look at this app and what to suggest
+
+The owner wants an outside review: **what to improve and which new features to build**, in plain English, with effort sizes. Useful facts for that:
+- **Who uses it:** the owner daily (iPhone + Windows), two friends occasionally. Personal project, not monetised (a TMDB commercial licence would be needed first). No own server: only GitHub Pages + Firebase (free Spark plan) + TMDB/OMDb/AniList from the browser.
+- **Biggest risk areas:** cloud sync correctness (§6, §12); `ui.css` and `db.js` are very large single files; the real cloud engine has no automated test; per-device data that people may expect to sync (activity log, badges seen, spoiler shield, scores cache); localStorage size (state + caches; the browser limit is ~5 MB per site).
+- **Where most code lives:** `src/store/db.js` (state + every mutation), `src/store/cloudEngine.js` (sync), `src/pages/*.jsx` (screens), `src/components/*Logic.js` (pure, tested logic), `src/components/ui.css` (all redesigned styles).
+- **Ideas already on the list:** new-episode push notifications — planned 29 Oct as a GitHub Actions hourly job (free) + Firebase Cloud Messaging that sends one "New today" message per user at their chosen hour (iPhone needs the app on the Home Screen, iOS 16.4+); Compare with a friend (built, waiting for a friend to test); optional Letterboxd real-export test.
+- **Read before suggesting:** §7 (what already exists, so you don't suggest it again), §8 (known limits), §11 (what was built recently and why).
+
+## 14. First message to paste into the new chat
+
+> Assalamualaikum. Please clone my repo `AceAsif/watchnext` (or fetch it) and read `docs/WatchNext-Handover-v8.md` first. Tell me in 5 short lines what you understand, set up the test harness as in §9 and run the unit tests to check it works. Then let's build: [name the feature, e.g. "Watch links"].

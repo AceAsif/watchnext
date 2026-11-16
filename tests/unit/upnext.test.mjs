@@ -149,4 +149,16 @@ t('isRepeatTap: ignores taps inside the window, allows later ones, tolerates fir
   assert.equal(U.isRepeatTap(5000, 4000), false); // clock went backwards: don't swallow taps
 });
 
+t('JUST_MARKED_MS: the "✓ watched" moment and the double-tap guard are the same 1.5 s', () => {
+  assert.equal(U.JUST_MARKED_MS, 1500); assert.equal(U.MARK_COOLDOWN_MS, U.JUST_MARKED_MS);
+  assert.equal(U.isRepeatTap(1000, 2400), true); // 1.4 s later: still the same tap burst
+});
+t('holdOrder: keeps the on-screen order while a row shows "watched", new shows go after', () => {
+  const c = (id) => ({ id });
+  const now = [c('b'), c('a'), c('x'), c('c')]; // b jumped to the top after being ticked
+  assert.deepEqual(U.holdOrder(now, ['a', 'b', 'c']).map((r) => r.id), ['a', 'b', 'c', 'x']);
+  assert.deepEqual(U.holdOrder(now, null).map((r) => r.id), ['b', 'a', 'x', 'c']);
+  assert.deepEqual(U.holdOrder(now, []).map((r) => r.id), ['b', 'a', 'x', 'c']);
+  assert.deepEqual(U.holdOrder([c('a')], ['gone', 'a']).map((r) => r.id), ['a']); // a show that left the list
+});
 console.log(`\n${n} upnext tests passed`);

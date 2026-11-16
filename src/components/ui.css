@@ -452,6 +452,12 @@
   cursor: pointer;
 }
 .sd-markbtn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+/* Just ticked (Up Next): the button fills in and the row says "✓ S09·E07 watched" for 1.5 s. */
+.sd-markbtn--done { background: var(--teal); border-color: var(--teal); color: #10141c; cursor: default; animation: sd-mark-pop 0.25s ease-out; }
+.sd-controw--marked { background: rgba(86, 200, 181, 0.08); transition: background 0.2s; }
+.sd-marked-line { color: var(--teal); font-weight: 600; }
+@keyframes sd-mark-pop { 0% { transform: scale(0.85); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .sd-markbtn--done { animation: none; } }
 
 @keyframes sd-spin { to { transform: rotate(360deg); } }
 .sd-spin { animation: sd-spin 0.9s linear infinite; }
@@ -879,7 +885,7 @@
   .sd-opt:hover,
   .sd-cast-cell:hover { border-color: var(--amber); }
   .sd-btn.primary:not(:disabled):hover { filter: brightness(1.08); }
-  .sd-markbtn:hover { background: var(--amber-soft); }
+  .sd-markbtn:not(.sd-markbtn--done):hover { background: var(--amber-soft); }
   .sd-check:hover > span { border-color: var(--amber); }
   .sd-rewatch:hover > span { border-color: var(--amber); color: var(--amber); }
   .sd-seg button[aria-pressed='false']:hover { color: var(--text); }

@@ -29,6 +29,8 @@ import {
   codeOf,
   shortDate,
   isRepeatTap,
+  holdOrder,
+  JUST_MARKED_MS,
 } from '../components/upnextLogic.js';
 
 // Up Next — the "v2" layout from the Claude Design round: today's date, a
@@ -75,7 +77,7 @@ function Notice({ children, accent }) {
 }
 
 // ---------------------------------------------------------------- continue row
-function ContinueRow({ id, show, next, today, first, onOpen, onMark, rewatch = false }) {
+function ContinueRow({ id, show, next, today, first, onOpen, onMark, rewatch = false, marked = null }) {
   const left = episodesLeft(show);
   const hrs = hoursLeft(show);
   const finish = paceFinish(show);
@@ -85,7 +87,14 @@ function ContinueRow({ id, show, next, today, first, onOpen, onMark, rewatch = f
   // Line 2: what's next and how much is left. If there's nothing to mark (the
   // show hasn't been synced with TMDB yet) say where you last got to instead.
   let line2;
-  if (next) {
+  if (marked) {
+    // Just ticked: say so clearly for a moment before the row moves on to the next episode.
+    line2 = (
+      <span className="sd-marked-line" data-testid="marked-line">
+        ✓ <span className="sd-mono">{codeOf(marked.season, marked.episode)}</span> watched
+      </span>
+    );
+  } else if (next) {
     line2 = (
       <>
         <span className="sd-mono" style={{ color: 'var(--amber)' }}>{codeOf(next.season, next.episode)}</span>
@@ -114,6 +123,7 @@ function ContinueRow({ id, show, next, today, first, onOpen, onMark, rewatch = f
 
   return (
     <div
+      className={marked ? 'sd-controw sd-controw--marked' : 'sd-controw'}
       style={{
         display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px 10px 12px',
         borderTop: first ? 'none' : '1px solid var(--sd-line-soft)',
@@ -127,8 +137,19 @@ function ContinueRow({ id, show, next, today, first, onOpen, onMark, rewatch = f
           {line3 && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{line3}</span>}
         </span>
       </button>
-      {next && (
+      {marked ? (
         <button
+          type="button"
+          className="sd-markbtn sd-markbtn--done"
+          aria-label={`${show.name} ${codeOf(marked.season, marked.episode)} marked watched`}
+          aria-disabled="true"
+          onClick={() => {}}
+        >
+          <CheckIcon />
+        </button>
+      ) : next && (
+        <button
+          type="button"
           className="sd-markbtn"
           aria-label={`Mark ${show.name} ${codeOf(next.season, next.episode)} watched`}
           onClick={() => onMark(id, show, next, rewatch)}
@@ -155,13 +176,19 @@ export default function UpNext({ openShow, startTonight = false, onStartedTonigh
   const alive = useRef(true);
   const lastTap = useRef({}); // show id -> ms of the last mark tap
   const toastTimer = useRef(null);
+  // Rows showing "✓ S09·E07 watched" right after a tick: { [show id]: { season, episode } }.
+  const [justMarked, setJustMarked] = useState({});
+  const markTimers = useRef({});
+  const [heldOrder, setHeldOrder] = useState(null); // on-screen order while a row shows "watched"
   useEffect(
     () => () => {
       alive.current = false;
       clearTimeout(toastTimer.current);
+      Object.values(markTimers.current).forEach(clearTimeout);
     },
     []
   );
+  useEffect(() => { if (!Object.keys(justMarked).length) setHeldOrder(null); }, [justMarked]);
 
   const { cont, items, syncTargets } = useMemo(
     () => buildUpNext(Object.entries(state.shows), today, { watchedCount, lastWatchDate }),
@@ -178,6 +205,15 @@ export default function UpNext({ openShow, startTonight = false, onStartedTonigh
     const now = Date.now();
     if (isRepeatTap(lastTap.current[id], now)) return;
     lastTap.current[id] = now;
+    if (justMarked[id]) return; // still showing "✓ watched" for this show
+
+    if (!heldOrder) setHeldOrder(contShown.map((c) => c.id));
+    setJustMarked((m) => ({ ...m, [id]: { season: next.season, episode: next.episode, show, rewatch } }));
+    clearTimeout(markTimers.current[id]);
+    markTimers.current[id] = setTimeout(() => {
+      delete markTimers.current[id];
+      if (alive.current) setJustMarked((m) => { const { [id]: _gone, ...rest } = m; return rest; }); // eslint-disable-line no-unused-vars
+    }, JUST_MARKED_MS);
 
     if (rewatch) {
       const before = state.shows[id];
@@ -198,6 +234,9 @@ export default function UpNext({ openShow, startTonight = false, onStartedTonigh
     // Re-marking right after an undo is deliberate, so don't let the
     // double-tap guard swallow it.
     delete lastTap.current[toast.id];
+    clearTimeout(markTimers.current[toast.id]);
+    delete markTimers.current[toast.id];
+    setJustMarked((m) => { const { [toast.id]: _gone, ...rest } = m; return rest; }); // eslint-disable-line no-unused-vars
     clearTimeout(toastTimer.current);
     setToast(null);
   }
@@ -219,7 +258,12 @@ export default function UpNext({ openShow, startTonight = false, onStartedTonigh
     if (alive.current) setRefresh(null);
   }
 
-  const contShown = showAll ? cont.slice(0, CONTINUE_MAX) : cont.slice(0, CONTINUE_PREVIEW);
+  // A show you just finished leaves "Continue watching", but it stays on screen (showing
+  // "✓ watched") until its moment is over, so the tick still visibly lands.
+  const finishedNow = Object.entries(justMarked)
+    .filter(([id]) => !cont.some((c) => c.id === id))
+    .map(([id, m]) => ({ id, show: state.shows[id] || m.show, next: null, rewatch: m.rewatch }));
+  const contShown = holdOrder([...cont, ...finishedNow], heldOrder).slice(0, showAll ? CONTINUE_MAX : CONTINUE_PREVIEW);
   const hasOnTheWay = !empty && (syncTargets.length > 0 || upcomingCount > 0);
   // Two columns on desktop only when there's something for both; a lone section
   // gets a comfortable single column instead of sitting in a narrow side one.
@@ -266,7 +310,7 @@ export default function UpNext({ openShow, startTonight = false, onStartedTonigh
       {/* Phone: the two sections stack. Desktop: side by side (ui.css). */}
       <div className={'sd-cols sd-cols-un' + (solo ? ' sd-cols-solo' : '')}>
       {/* ---------------- continue watching */}
-      {cont.length > 0 && (
+      {contShown.length > 0 && (
         <section className="sd-sec sd-un-left">
           {/* Same 44px header height as "On the way" (which holds the controls),
               so the two desktop columns' cards start level. */}
@@ -291,6 +335,7 @@ export default function UpNext({ openShow, startTonight = false, onStartedTonigh
                 first={i === 0}
                 onOpen={() => openShow(id)}
                 onMark={markNext}
+                marked={justMarked[id] || null}
               />
             ))}
           </div>

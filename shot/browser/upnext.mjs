@@ -151,7 +151,15 @@ let s1 = await stored(p);
 ok('marking writes exactly one episode: Suits 8x14', () => { assert.ok(s1['tmdb:3'].watched['8x14']); assert.equal(Object.keys(s1['tmdb:3'].watched).length, Object.keys(before['tmdb:3'].watched).length + 1); });
 t = await text(p);
 ok('undo toast appears with the code and show name', () => assert.match(t, /S08·E14\s*marked watched · Suits/));
-ok('Suits row advanced to S08·E15 (12 to go)', () => assert.match(t, /S08·E15 · 12 to go/));
+ok('the row says "✓ S08·E14 watched" right away, with a filled button', async () => {
+  assert.match(t, /✓ S08·E14 watched/);
+  assert.ok(await p.evaluate(() => !!document.querySelector('.sd-markbtn--done[aria-label="Suits S08·E14 marked watched"]')));
+});
+await OUTSHOT(p, '03a_just_marked');
+await p.evaluate(() => document.querySelector('.sd-markbtn--done').click()); await wait(100);
+ok('tapping the filled button again marks nothing', async () => { const s2 = await stored(p); assert.equal(s2['tmdb:3'].watched['8x15'], undefined); });
+await wait(1500); t = await text(p);
+ok('after 1.5 s the Suits row moves on to S08·E15 (12 to go)', () => { assert.match(t, /S08·E15 · 12 to go/); assert.doesNotMatch(t, /✓ S08·E14 watched/); });
 await OUTSHOT(p, '03_after_mark_toast');
 await click(p, 'Undo'); await wait(300);
 s1 = await stored(p);
@@ -166,20 +174,37 @@ s1 = await stored(p);
 ok('DOUBLE TAP: two rapid taps marked only ONE episode (8x14), not two', () => { assert.ok(s1['tmdb:3'].watched['8x14']); assert.equal(s1['tmdb:3'].watched['8x15'], undefined); });
 await click(p, 'Undo'); await wait(200);
 // a deliberate second tap after the cooldown DOES mark the next one
-await click(p, 'Mark Suits S08·E14 watched'); await wait(900);
+await click(p, 'Mark Suits S08·E14 watched'); await wait(1650);
 await click(p, 'Mark Suits S08·E15 watched'); await wait(300);
 s1 = await stored(p);
 ok('a deliberate second tap after the cooldown marks the next episode (binge-marking still works)', () => { assert.ok(s1['tmdb:3'].watched['8x14'] && s1['tmdb:3'].watched['8x15']); });
 await wait(100);
 
 // ---- finishing a show removes it; Undo brings it back
-await click(p, 'Mark Only Murders in the Building S06·E01 watched'); await wait(400);
+await wait(1600);
+await click(p, 'Mark Only Murders in the Building S06·E01 watched'); await wait(300);
 let top = await p.evaluate(() => [...document.querySelectorAll('section')][0].innerText);
-ok('marking the FINAL episode removes the show from Continue watching', () => assert.ok(!top.includes('Only Murders in the Building')));
+ok('the FINAL episode first shows "✓ S06·E01 watched" (the tick visibly lands)', () => assert.match(top, /Only Murders in the Building[\s\S]{0,40}✓ S06·E01 watched/));
+await wait(1600);
+top = await p.evaluate(() => [...document.querySelectorAll('section')][0].innerText);
+ok('…then the finished show leaves Continue watching', () => assert.ok(!top.includes('Only Murders in the Building')));
 await click(p, 'Undo'); await wait(300);
 top = await p.evaluate(() => [...document.querySelectorAll('section')][0].innerText);
 ok('…and Undo brings it straight back', () => assert.ok(top.includes('Only Murders in the Building')));
 assert.equal((await stored(p))['tmdb:5'].watched['6x1'], undefined); checks++; console.log('  PASS store: 6x1 not watched after undo');
+
+// ---- the row you tick stays put while it shows "watched" (no jumping under your finger)
+await wait(300);
+const rowNames = () => p.evaluate(() => [...[...document.querySelectorAll('section')][0].querySelectorAll('.sd-open')].map((b) => b.innerText.split('\n')[0].replace(/^♥ /, '')));
+const order0 = await rowNames();
+const second = order0[1];
+await p.evaluate((n) => { const b = [...document.querySelectorAll('.sd-markbtn')].find((x) => x.getAttribute('aria-label').startsWith('Mark ' + n + ' ')); b.click(); }, second);
+await wait(200);
+ok('while "✓ watched" shows, the ticked row keeps its place (2nd)', async () => { assert.deepEqual(await rowNames(), order0); });
+await wait(1600);
+ok('afterwards it moves to the top as the most recently watched', async () => { assert.equal((await rowNames())[0], second); });
+await click(p, 'Undo'); await wait(300);
+ok('Undo puts the order back', async () => { assert.deepEqual(await rowNames(), order0); });
 
 // ============================================================ 2. On the way
 console.log('2. on the way (agenda)');
