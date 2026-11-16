@@ -19,6 +19,7 @@ globalThis.__fs = {
   remoteSet(path, data) { docs.set(path, clone(data)); notify(path, false, 'modified'); },
   failNextCommit: false,
   failNextSetDoc: false,
+  initialCollectionSnapshot: false,
 };
 export const doc = (db, ...parts) => ({ path: parts.join('/') });
 export const collection = (db, ...parts) => ({ path: parts.join('/'), isCollection: true });
@@ -32,6 +33,12 @@ export function onSnapshot(ref, cb) {
   const l = { path: ref.path, isCollection: !!ref.isCollection, cb };
   listeners.push(l);
   if (!l.isCollection) cb(snapOf(ref.path));
+  // Real Firestore sends a collection listener every document as "added" the moment it attaches
+  // (the app keeps no offline cache). Opt in with __fs.initialCollectionSnapshot = true.
+  if (l.isCollection && globalThis.__fs.initialCollectionSnapshot) {
+    const kids = [...docs.keys()].filter((p) => p.startsWith(ref.path + '/') && p.split('/').length === ref.path.split('/').length + 1);
+    cb({ docChanges: () => kids.map((p) => ({ type: 'added', doc: snapOf(p) })), forEach: () => {}, metadata: { hasPendingWrites: false } });
+  }
   return () => { const i = listeners.indexOf(l); if (i >= 0) listeners.splice(i, 1); };
 }
 export async function setDoc(ref, data, opts) {

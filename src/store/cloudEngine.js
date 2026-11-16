@@ -44,6 +44,7 @@ import { mergeNotes } from './notes.js';
 import { mergeEpRatings } from './epRatings.js';
 import { runWipe, wipeDecision, isValidWipe, readMeta, writeMeta } from './wipeLogic.js';
 import { mergeWatched } from './watchedMerge.js';
+import { createBaseTracker } from './liveShowMerge.js';
 
 // --- sync engine state ---
 let uid = null;
@@ -51,6 +52,10 @@ let unsubShows = null;
 let flushTimer = null;
 let applyingRemote = false;
 let wiping = false; // true while wipeEverywhere() runs: pauses the normal flush
+// The copy of each show the cloud was last known to hold (downloaded or uploaded). The live listener
+// compares it with this device's copy to find ticks made here and not uploaded yet, and keeps them
+// (liveShowMerge.js). In memory only: the sign-in pull rebuilds it.
+const showBases = createBaseTracker();
 
 // --- per-account sync record (localStorage) -------------------------------
 // lastSync = the last time this device finished a pull or a successful push;
@@ -207,6 +212,7 @@ export function signOutCloud() {
 function startSync(newUid) {
   uid = newUid;
   pulledOnce = false;
+  showBases.clear();
   reportSyncing(true); // the first download of this account's library has started
   // The pull checks for a wipe marker BEFORE merging. Only after it has finished
   // do we start listening for markers written later, so the two never race.
@@ -269,31 +275,38 @@ function startSync(newUid) {
         if (uid !== newUid) return;
         if (applyRemoteSeen(snap.exists() ? snap.data().log : {})) flush();
       });
-    });
-
-  unsubShows = onSnapshot(collection(db, 'users', uid, 'shows'), (snap) => {
-    applyingRemote = true;
-    update((s) => {
-      snap.docChanges().forEach((change) => {
-        const id = change.doc.id;
-        if (change.type === 'removed') {
-          delete s.shows[id];
-          return;
+      // Live changes to shows (the other device). Started only AFTER the pull has merged, so the
+      // first snapshot (every show arrives as "added") can't overwrite ticks made since the last sync.
+      unsubShows = onSnapshot(collection(db, 'users', newUid, 'shows'), (snap) => {
+        applyingRemote = true;
+        try {
+          update((s) => {
+            snap.docChanges().forEach((change) => {
+              const id = change.doc.id;
+              if (change.type === 'removed') {
+                delete s.shows[id];
+                showBases.forget(id);
+                return;
+              }
+              // A remote add/update for a show we've deleted locally must not
+              // resurrect it — drop it and re-queue the Firestore delete.
+              const [remote, wipeAt] = splitCloudShow(change.doc.data());
+              if (isTombstoned(id, wipeAt)) {
+                delete s.shows[id];
+                showBases.forget(id);
+                queueShowDelete(id);
+                return;
+              }
+              clearTombstone(id); // accepted: a deliberate restore/add after a wipe lifts that wipe's tombstone
+              // Not a plain overwrite: ticks and edits made here that are not uploaded yet are kept.
+              s.shows[id] = showBases.apply(id, s.shows[id], remote);
+            });
+          });
+        } finally {
+          applyingRemote = false;
         }
-        // A remote add/update for a show we've deleted locally must not
-        // resurrect it — drop it and re-queue the Firestore delete.
-        const [remote, wipeAt] = splitCloudShow(change.doc.data());
-        if (isTombstoned(id, wipeAt)) {
-          delete s.shows[id];
-          queueShowDelete(id);
-          return;
-        }
-        clearTombstone(id); // accepted: a deliberate restore/add after a wipe lifts that wipe's tombstone
-        s.shows[id] = { ...(s.shows[id] || {}), ...remote };
       });
     });
-    applyingRemote = false;
-  });
 
   clearInterval(flushTimer);
   flushTimer = setInterval(flush, 2500);
@@ -319,6 +332,7 @@ function stopSync() {
   unsubSeen = null;
   pulledOnce = false;
   uid = null;
+  showBases.clear();
   reportSyncing(false);
   clearInterval(flushTimer);
   flushTimer = null;
@@ -350,9 +364,11 @@ async function pullAndMerge(forUid) {
       const [remote, wipeAt] = splitCloudShow(d.data());
       if (isTombstoned(d.id, wipeAt)) {
         queueShowDelete(d.id);
+        showBases.forget(d.id);
         return;
       }
       clearTombstone(d.id);
+      showBases.remember(d.id, showBases.snap(remote)); // what the cloud holds now: the baseline for the live listener
       const local = s.shows[d.id];
       if (!local) {
         s.shows[d.id] = remote;
@@ -408,10 +424,14 @@ async function flush() {
   const state = getState();
   const seenWipeAt = syncMeta(uid).seenWipeAt; // lets the device that ran a wipe tell a restore from a stale push
   const batch = writeBatch(db);
+  const sent = new Map(); // a copy of each show as uploaded: it becomes the baseline once the upload lands
   showIds.forEach((id) => {
     if (hasDeletes && deletedIds.has(id)) return; // a delete wins over an update
     const show = state.shows[id];
-    if (show) batch.set(doc(db, 'users', uid, 'shows', id), seenWipeAt ? { ...show, _wipeAt: seenWipeAt } : show);
+    if (show) {
+      batch.set(doc(db, 'users', uid, 'shows', id), seenWipeAt ? { ...show, _wipeAt: seenWipeAt } : show);
+      sent.set(id, showBases.snap(show));
+    }
   });
   if (hasDeletes) {
     deletedIds.forEach((id) => {
@@ -439,6 +459,7 @@ async function flush() {
 
   try {
     await batch.commit();
+    sent.forEach((snapshot, id) => showBases.remember(id, snapshot));
     touchSync(uid);
   } catch (err) {
     console.error('Cloud sync failed, will retry on next change:', err);
@@ -492,6 +513,7 @@ export async function wipeEverywhere() {
       clearLocal: (ids, marker) => {
         resetAll(); // same as "Delete all data": shows, movies, settings (TMDB key) on this device
         takeDirty(); // nothing queued may be pushed back up
+        showBases.clear();
         // So a STALE device pushing these back can't resurrect them here. Tagged with the wipe's
         // time: a device that has seen this wipe stamps its uploads with it, so its deliberate
         // restore from backup is let through instead of being deleted again.
