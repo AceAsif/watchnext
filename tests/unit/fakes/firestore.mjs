@@ -17,6 +17,7 @@ function notify(path, pending, type) {
 globalThis.__fs = {
   docs, writes: [],
   remoteSet(path, data) { docs.set(path, clone(data)); notify(path, false, 'modified'); },
+  remoteDelete(path) { docs.delete(path); notify(path, false, 'removed'); },
   failNextCommit: false,
   failNextSetDoc: false,
   initialCollectionSnapshot: false,

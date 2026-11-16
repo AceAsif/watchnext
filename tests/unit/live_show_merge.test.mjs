@@ -1,7 +1,7 @@
 // applyRemoteShow / createBaseTracker (src/store/liveShowMerge.js): pure, no Firestore.
 //   node tests/unit/live_show_merge.test.mjs
 import assert from 'node:assert/strict';
-import { applyRemoteShow, createBaseTracker, cloneShow, sameValue } from '../../src/store/liveShowMerge.js';
+import { applyRemoteShow, createBaseTracker, cloneShow, sameValue, mergeWatchedOnPull } from '../../src/store/liveShowMerge.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; console.log('ok  -', name); };
@@ -119,5 +119,33 @@ t('tracker: forget and clear drop the base', () => {
   tr.remember('a', show(w('1x1'))); tr.remember('b', show(w('1x1')));
   tr.forget('a'); assert.equal(tr.has('a'), false); assert.equal(tr.has('b'), true);
   tr.clear(); assert.equal(tr.has('b'), false);
+});
+t('pull: an episode in the synced list that the cloud no longer has was un-ticked there, so it goes', () => {
+  const r = mergeWatchedOnPull(w('1x1', '1x3'), w('1x1', '1x2', '1x3'), ['1x1', '1x2', '1x3']);
+  assert.deepEqual(Object.keys(r).sort(), ['1x1', '1x3']);
+});
+t('pull: a tick made here (not in the synced list) is kept, and a tick from the cloud is added', () => {
+  const r = mergeWatchedOnPull(w('1x1', '1x4'), w('1x1', '1x2', '1x3'), ['1x1', '1x2']);
+  assert.deepEqual(Object.keys(r).sort(), ['1x1', '1x3', '1x4']); // 1x2 was un-ticked there; 1x3 is new here
+});
+t('pull: no synced list = the old union, nothing is dropped', () => {
+  assert.deepEqual(Object.keys(mergeWatchedOnPull(w('1x1'), w('1x1', '1x2'), undefined)).sort(), ['1x1', '1x2']);
+});
+t('pull: an episode with a rewatch count or a hand-set date is never dropped', () => {
+  const local = { '1x1': { at: T0, n: 2 }, '1x2': { at: T0, n: 1, fixedAt: T1 }, '1x3': { at: T0, n: 1 } };
+  const r = mergeWatchedOnPull(w('1x9'), local, ['1x1', '1x2', '1x3', '1x9']);
+  assert.deepEqual(Object.keys(r).sort(), ['1x1', '1x2', '1x9']);
+});
+t('pull: a cloud copy with no watched field drops nothing', () => {
+  assert.deepEqual(Object.keys(mergeWatchedOnPull(undefined, w('1x1'), ['1x1'])), ['1x1']);
+});
+t('pull: an episode missing here but in the synced list stays out of the union only if the cloud has it too (this limit is documented)', () => {
+  // un-ticked HERE while offline: the cloud still has it, the union brings it back
+  assert.deepEqual(Object.keys(mergeWatchedOnPull(w('1x1', '1x2'), w('1x1'), ['1x1', '1x2'])).sort(), ['1x1', '1x2']);
+});
+t('tracker: watchedKeys lists the episode keys of each remembered show', () => {
+  const tr = createBaseTracker();
+  tr.remember('a', show(w('1x1', '1x2'))); tr.remember('b', { tmdbId: 2 });
+  assert.deepEqual(tr.watchedKeys(), { a: ['1x1', '1x2'] });
 });
 console.log(`\n${n} live show merge tests passed`);

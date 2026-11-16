@@ -91,6 +91,29 @@ export function applyRemoteShow(local, remote, base) {
   return out;
 }
 
+// Sign-in pull (app start). The pull used to be a plain union, so an episode un-ticked on the OTHER
+// device while this app was closed came back here and was uploaded again. `synced` is the list of
+// episode keys this device last knew to be in the cloud for this show (saved on the device, see
+// cloudEngine.js; never uploaded). An episode that is here, was in that list, and is missing from
+// the cloud copy now was un-ticked there: leave it out. An episode this device ticked since is never
+// in the list, so a tick made offline is never dropped. Entries with real work on them (a rewatch
+// count above 1, a hand-set date) are always kept. No list (first run, cleared storage) = the old union.
+// Un-ticks made HERE while offline are not covered: the union brings that episode back.
+export function mergeWatchedOnPull(remote, local, synced) {
+  const r = isObj(remote) ? remote : {};
+  let l = isObj(local) ? local : {};
+  if (Array.isArray(synced) && isObj(remote)) {
+    const was = new Set(synced);
+    l = {};
+    for (const [k, v] of Object.entries(isObj(local) ? local : {})) {
+      const plain = isObj(v) && !(Number(v.n) > 1) && !v.fixedAt;
+      if (was.has(k) && !(k in r) && plain) continue; // un-ticked on the other device
+      l[k] = v;
+    }
+  }
+  return mergeWatched(r, l);
+}
+
 // Remembers, per show, the cloud copy this device last saw. It lives in memory only: after a
 // restart the sign-in pull rebuilds it (cloudEngine.js).
 export function createBaseTracker() {
@@ -101,6 +124,12 @@ export function createBaseTracker() {
     forget(id) { bases.delete(id); },
     clear() { bases.clear(); },
     has: (id) => bases.has(id),
+    // { showId: [episode keys the cloud held] }: the small list the sign-in pull needs after a restart
+    watchedKeys() {
+      const out = {};
+      for (const [id, b] of bases) if (isObj(b.watched)) out[id] = Object.keys(b.watched);
+      return out;
+    },
     // The cloud sent `remote` for show `id`: merge it into `local`, then remember it as the new base.
     apply(id, local, remote) {
       const out = applyRemoteShow(local, remote, bases.get(id));

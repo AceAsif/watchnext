@@ -97,6 +97,85 @@ await t('START-UP RACE: ticks made while signed out are not wiped by the first s
   assert.ok(cloud().includes('9x10'), 'and in the cloud');
 });
 
+await t('SIGN-IN PULL: an un-tick made on the other device while this app was closed is still removed here', async () => {
+  await flushNow();
+  const before = local();
+  assert.ok(before.includes('9x4'));
+  globalThis.__auth.emit(null); await settle(); // app closed
+  FS.docs.set(PATH, { ...FS.docs.get(PATH), watched: Object.fromEntries(Object.entries(FS.docs.get(PATH).watched).filter(([k]) => k !== '9x4')) }); // computer un-ticks S9E4
+  globalThis.__auth.emit({ uid: 'u1', email: 'a@x.co' }); // app start: sign-in pull
+  await settle(); await flushNow();
+  assert.ok(!local().includes('9x4'), 'S9E4 is un-ticked here too');
+  assert.ok(!cloud().includes('9x4'), 'and it did not come back in the cloud');
+  assert.deepEqual(local(), cloud());
+});
+
+await t('SIGN-IN PULL: a tick made here while offline still goes up, and a tick from the other device still comes down', async () => {
+  globalThis.__auth.emit(null); await settle();
+  D.markEpisode('tmdb:1', 9, 11, 45); // ticked offline here
+  FS.docs.set(PATH, { ...FS.docs.get(PATH), watched: { ...FS.docs.get(PATH).watched, '9x12': { at: T0, min: 45, n: 1 } } }); // ticked on the computer
+  globalThis.__auth.emit({ uid: 'u1', email: 'a@x.co' });
+  await settle(); await flushNow();
+  assert.ok(local().includes('9x11') && local().includes('9x12'));
+  assert.deepEqual(local(), cloud());
+});
+
+await t('a tick made while the upload fails (offline) is kept, retried, and survives a cloud copy in between', async () => {
+  const orig = console.error; console.error = () => {};
+  FS.failNextCommit = true;
+  D.markEpisode('tmdb:1', 9, 13, 45);
+  await flushNow(); // upload fails: offline
+  console.error = orig;
+  assert.ok(!cloud().includes('9x13'));
+  FS.remoteSet(PATH, FS.docs.get(PATH)); // the cloud sends its (older) copy while offline-ish
+  await settle();
+  assert.ok(local().includes('9x13'), 'tick kept');
+  await flushNow(); // back online
+  assert.ok(cloud().includes('9x13'), 'tick uploaded on the retry');
+});
+
+await t('two ticks on one show within 2.5 s: both are kept and both reach the cloud, even with a cloud copy between them', async () => {
+  D.markEpisode('tmdb:1', 9, 14, 45);
+  FS.remoteSet(PATH, FS.docs.get(PATH));
+  await settle();
+  D.markEpisode('tmdb:1', 9, 15, 45);
+  await flushNow();
+  assert.ok(local().includes('9x14') && local().includes('9x15'));
+  assert.ok(cloud().includes('9x14') && cloud().includes('9x15'));
+});
+
+await t('notes and episode ratings written on both devices are both kept', async () => {
+  D.setEpisodeNote('tmdb:1', '9x1', { react: 'love', text: 'mine' });
+  D.setEpisodeRating('tmdb:1', '9x5', 4, 'Five');
+  FS.remoteSet(PATH, { ...FS.docs.get(PATH), notes: { '9x2': { text: 'theirs', at: T0 } }, epRatings: { '9x3': { r: 4.5, at: T0 } } });
+  await settle();
+  const s = D.getState().shows['tmdb:1'];
+  assert.ok(s.notes['9x1'] && s.notes['9x2'], 'both notes');
+  assert.ok(s.epRatings['9x5'] && s.epRatings['9x3'], 'both ratings');
+  await flushNow();
+  const c = FS.docs.get(PATH);
+  assert.ok(c.notes['9x1'] && c.notes['9x2'] && c.epRatings['9x5'] && c.epRatings['9x3'], 'and all of it is in the cloud');
+});
+
+await t('a show deleted on the other device is removed here', async () => {
+  D.update((s) => { s.shows['tmdb:2'] = { tmdbId: 2, name: 'Other', followed: true, watched: eps(1) }; });
+  D.markShowDirty('tmdb:2'); await flushNow();
+  assert.ok(FS.docs.has('users/u1/shows/tmdb:2'));
+  FS.remoteDelete('users/u1/shows/tmdb:2');
+  await settle();
+  assert.equal(D.getState().shows['tmdb:2'], undefined);
+});
+
+await t('a show deleted here is not brought back by a late cloud copy, and the cloud copy is deleted', async () => {
+  D.update((s) => { s.shows['tmdb:3'] = { tmdbId: 3, name: 'Gone', followed: true, watched: eps(1) }; });
+  D.markShowDirty('tmdb:3'); await flushNow();
+  D.deleteShow('tmdb:3');
+  FS.remoteSet('users/u1/shows/tmdb:3', { tmdbId: 3, name: 'Gone', followed: true, watched: eps(1) }); // a late copy from the other device
+  await settle(); await flushNow();
+  assert.equal(D.getState().shows['tmdb:3'], undefined, 'not resurrected');
+  assert.equal(FS.docs.has('users/u1/shows/tmdb:3'), false, 'and removed from the cloud');
+});
+
 globalThis.__auth.emit(null);
 console.log(`\n${n} cloud live tick tests passed`);
 process.exit(0);
