@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import UpNext from './pages/UpNext.jsx';
 import ShowDetail from './pages/ShowDetail.jsx';
 import { initCloudSync } from './store/cloud.js';
+import { followWatchedShows } from './store/db.js';
 import Shows from './pages/Shows.jsx';
 import Movies from './pages/Movies.jsx';
 import Watchlist from './pages/Watchlist.jsx';
@@ -101,6 +102,10 @@ export default function App() {
     const unsub = initCloudSync();
     return unsub;
   }, []);
+
+  // Shows you ticked episodes on before ticking followed them (watchlist-only, never followed):
+  // follow them once now so they appear on Shows and Up Next.
+  useEffect(() => { followWatchedShows(); }, []);
 
   // Take "?go=…" out of the address so a reload opens the app as normal.
   useEffect(() => {

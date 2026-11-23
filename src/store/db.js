@@ -439,6 +439,26 @@ function setShowDropped__raw(id, dropped, at) {
 const RESUME = { dropped: false, droppedAt: null };
 const resumePatch = (show) => (show.dropped === true ? RESUME : {});
 
+// Watching an episode also puts the show in your library. A show that was only on the
+// watchlist (or only searched) used to stay un-followed after you ticked episodes, so it never
+// showed on Shows or Up Next. Ticking now follows it and takes it off the watchlist, like
+// "Start watching". Un-ticking never follows. Returns the patch to spread into the show record
+// — empty when the show is already followed.
+const FOLLOW = { followed: true, watchlist: false };
+const followPatch = (show) => (show.followed === true ? {} : FOLLOW);
+
+// One-time tidy-up for shows ticked before that rule existed: on the watchlist, not followed, and
+// episodes already watched. Follows them, and syncs. Returns how many it fixed.
+export function followWatchedShows() {
+  const ids = Object.entries(getState().shows)
+    .filter(([, sh]) => sh && sh.followed !== true && sh.watchlist === true && sh.watched && Object.keys(sh.watched).length > 0)
+    .map(([id]) => id);
+  if (!ids.length) return 0;
+  update((s) => { for (const id of ids) s.shows[id] = { ...s.shows[id], ...FOLLOW }; });
+  for (const id of ids) markShowDirty(id);
+  return ids.length;
+}
+
 // Favourite a show (♥): it stays at the top of Shows and of Up Next's "Continue watching".
 // Rides the show's own sync doc. Never stores `favourite: false` / undefined: removing it
 // deletes the field.
@@ -644,7 +664,7 @@ function markEpisode__raw(id, season, episode, runtimeMin, watched = true, airDa
     } else {
       delete map[k];
     }
-    s.shows[id] = { ...show, watched: map, ...(watched ? resumePatch(show) : {}) };
+    s.shows[id] = { ...show, watched: map, ...(watched ? { ...resumePatch(show), ...followPatch(show) } : {}) };
   });
   markShowDirty(id);
 }
@@ -675,7 +695,7 @@ function markSeason__raw(id, season, episodes, watched = true, at) {
         delete map[k];
       }
     }
-    s.shows[id] = { ...show, watched: map, ...(watched && episodes.length ? resumePatch(show) : {}) };
+    s.shows[id] = { ...show, watched: map, ...(watched && episodes.length ? { ...resumePatch(show), ...followPatch(show) } : {}) };
   });
   markShowDirty(id);
 }
@@ -763,7 +783,7 @@ function markRewatchEpisode__raw(id, season, episode, on = true, runtimeMin = nu
     const now = new Date().toISOString();
     let next = Rewatch.markInRound(show, season, episode, on, now, runtimeMin);
     if (on && Rewatch.roundComplete(next, localISODate())) { next = Rewatch.endRewatch(next, now); finished = true; }
-    s.shows[id] = next;
+    s.shows[id] = on ? { ...next, ...followPatch(next) } : next;
   });
   markShowDirty(id);
   return { finished };
@@ -781,7 +801,7 @@ function logEpisodeRewatch__raw(id, season, episode, runtimeMin) {
     map[k] = existing
       ? { ...existing, last: new Date().toISOString(), n: (existing.n || 1) + 1, min: runtimeMin || existing.min } // `at` (first watch) is kept
       : { at: new Date().toISOString(), min: runtimeMin || show.runtimeMin || null, n: 1 };
-    s.shows[id] = { ...show, watched: map, ...resumePatch(show) };
+    s.shows[id] = { ...show, watched: map, ...resumePatch(show), ...followPatch(show) };
   });
   markShowDirty(id);
   return prev;
