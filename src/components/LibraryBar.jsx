@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { img, hasKey } from '../api/tmdb.js';
 import { Chevron, Sheet } from './ui.jsx';
+import TitleInfoSheet from './TitleInfoSheet.jsx';
 import { nextTab } from './statsLogic.js';
 import { localDate } from './csvExport.js';
 import { posterTint, initialOf, resultsLabel } from './libraryLogic.js';
@@ -526,6 +527,7 @@ export function AddDialog({ kind, search, initialQuery = '', onClose, badgeFor, 
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [preview, setPreview] = useState(null); // the result whose info sheet is open (read before adding)
   const seq = useRef(0);
   const timer = useRef(null);
   const noticeTimer = useRef(null);
@@ -599,10 +601,18 @@ export function AddDialog({ kind, search, initialQuery = '', onClose, badgeFor, 
     }
   };
 
+  // Buttons inside the info sheet: do the same thing as the row's buttons, then close the sheet so
+  // the confirmation (or the error) shows in the list underneath.
+  const previewAct = async (r, fn, okMessage) => {
+    await act(r, fn, okMessage);
+    setPreview(null);
+  };
+
   const titleOf = (r) => (kind === 'movie' ? r.title : r.name);
   const yearOf = (r) => ((kind === 'movie' ? r.release_date : r.first_air_date) || '').slice(0, 4);
 
   return (
+    <>
     <Sheet
       open
       variant="add"
@@ -661,15 +671,19 @@ export function AddDialog({ kind, search, initialQuery = '', onClose, badgeFor, 
             const [c1, c2] = posterTint(titleOf(r));
             return (
               <li className="sd-res" key={r.id}>
-                {r.poster_path ? (
-                  <img className="sd-res-poster" src={img(r.poster_path, 'w154')} alt="" loading="lazy" />
-                ) : (
-                  <span className="sd-res-poster ph" aria-hidden="true" style={{ background: `linear-gradient(160deg, ${c1}, ${c2})` }}>
-                    {initialOf(titleOf(r))}
-                  </span>
-                )}
+                <button type="button" className="sd-res-open" aria-label={`Read about ${titleOf(r)}`} onClick={() => setPreview(r)}>
+                  {r.poster_path ? (
+                    <img className="sd-res-poster" src={img(r.poster_path, 'w154')} alt="" loading="lazy" />
+                  ) : (
+                    <span className="sd-res-poster ph" aria-hidden="true" style={{ background: `linear-gradient(160deg, ${c1}, ${c2})` }}>
+                      {initialOf(titleOf(r))}
+                    </span>
+                  )}
+                </button>
                 <div className="sd-res-info">
-                  <div className="sd-res-title">{titleOf(r)}</div>
+                  <button type="button" className="sd-res-open sd-res-title" data-testid="res-open" onClick={() => setPreview(r)}>
+                    {titleOf(r)} <span aria-hidden="true" className="sd-res-chev">›</span>
+                  </button>
                   <div className="sd-res-meta">
                     <span className="sd-mono">{kind === 'movie' ? 'Movie' : 'TV'}{yearOf(r) ? ` · ${yearOf(r)}` : ''}</span>
                     {badge ? <span className="sd-badge"><CheckIcon size={12} />{badge}</span> : null}
@@ -683,6 +697,17 @@ export function AddDialog({ kind, search, initialQuery = '', onClose, badgeFor, 
         </ul>
       ) : null}
     </Sheet>
+    {preview ? (
+      <TitleInfoSheet
+        kind={kind === 'movie' ? 'movie' : 'tv'}
+        title={{ tmdbId: preview.id, name: titleOf(preview), poster: preview.poster_path || null, year: yearOf(preview) }}
+        note={(badgeFor && badgeFor(preview)) || 'Not in your library'}
+        testId="add-info"
+        onClose={() => setPreview(null)}
+        actions={renderActions(preview, { busy: busyId != null, act: previewAct })}
+      />
+    ) : null}
+    </>
   );
 }
 
